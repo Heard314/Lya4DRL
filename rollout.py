@@ -58,7 +58,6 @@ class Rollout:
             torch.manual_seed(alg_params.train_seed)
             np.random.seed(alg_params.train_seed)
             
-            self.train_mode = gen_params.train_mode
             self.train_time_slots = alg_params.train_time_slots
             self.train_freq = alg_params.train_freq
             if self.train_mode == "maddpg":
