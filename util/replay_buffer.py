@@ -49,21 +49,24 @@ class MappoReplayBuffer():
        
        with torch.no_grad():
            vs = value_net(v_inputs.reshape([-1, self.state_dim]))
+       # 使用价值网络计算状态价值
        vs = vs.reshape([self.train_freq, self.train_time_slots + 1, 1])
        
        # [train_freq, train_time_slots, 1]
        rewards = torch.tensor(self.joint_reward, dtype = torch.float) \
                  [:, 0: self.train_time_slots].unsqueeze(-1)
-       
+       # 计算优势函数
        # [train_episodes, train_time_slots, 1]
        deltas = rewards + self.gamma * vs[:, 1: self.train_time_slots + 1] - \
                 vs[:, 0: self.train_time_slots]
+       # 计算GAE优势函数
        gae = 0
        advs = torch.zeros([self.train_freq, self.train_time_slots, 1])
        for t in reversed(range(self.train_time_slots)):
            gae = deltas[:, t] + self.lamda * self.gamma * gae
            advs[:, t] = gae
        
+       # 计算价值网络目标值
        # [train_episodes, train_time_slots, 1]
        v_tags = advs + vs[:, 0: self.train_time_slots]
        # normalization

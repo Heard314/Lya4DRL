@@ -10,7 +10,6 @@ if __name__ == '__main__':
     if not gen_params.evaluate:
         print("---------- training mode: " + gen_params.train_mode + " ----------")
         time.sleep(2)
-        
         ctr.train()
     else:
         '''
@@ -18,7 +17,6 @@ if __name__ == '__main__':
         '''
         print("---------- evaluation mode: " + gen_params.eval_mode + " ----------")
         time.sleep(2)
-        
         joint_reward, device_rewards, \
         joint_cost, device_costs, \
         edge_comp_ql, device_comp_qls, \

@@ -23,8 +23,9 @@ class MappoPolicyNet(nn.Module):
     def forward(self, obs):
         x = self.tanh(self.fc1(obs))
         x = self.tanh(self.fc2(x))
+        # 平均值生成
         mean = self.tanh(self.fc3(x)) * 5 + 5
-        
+        # 方差生成
         log_std = self.log_std.expand_as(mean)
         std = torch.exp(log_std)
         

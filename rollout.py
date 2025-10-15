@@ -7,12 +7,11 @@ LocalComputingDeviceAgent, EdgeComputingDeviceAgent, RandomComputingDeviceAgent
 from agent.edge_agent import MappoEdgeAgent, MaddpgEdgeAgent
 from util.replay_buffer import MappoReplayBuffer, MaddpgReplayBuffer
 from util.utils import ObsScaling, RewardScaling
-
+from torch.utils.tensorboard import SummaryWriter
 class Rollout:
     def __init__(self, gen_params, alg_params):
         self.device_num = gen_params.device_num
         self.task_num = gen_params.task_num
-        
         self.evaluate = gen_params.evaluate
         self.train_mode = gen_params.train_mode
         self.eval_mode = gen_params.eval_mode
@@ -38,11 +37,13 @@ class Rollout:
         
         # edge agent and replay buffer
         if not self.evaluate and self.train_mode == "mappo":
-           self.edge_agent = MappoEdgeAgent(gen_params, alg_params)
-           self.replay_buffer = MappoReplayBuffer(gen_params, alg_params)
+            print("The training mode is in rollout: mappo")
+            self.edge_agent = MappoEdgeAgent(gen_params, alg_params)
+            self.replay_buffer = MappoReplayBuffer(gen_params, alg_params)
         if not self.evaluate and self.train_mode == "maddpg":
-           self.edge_agent = MaddpgEdgeAgent(gen_params, alg_params)
-           self.replay_buffer = MaddpgReplayBuffer(gen_params, alg_params)
+            print("The training mode is in rollout: maddpg")
+            self.edge_agent = MaddpgEdgeAgent(gen_params, alg_params)
+            self.replay_buffer = MaddpgReplayBuffer(gen_params, alg_params)
         
         # obs scaling
         if not self.evaluate or (self.evaluate and self.eval_mode[0] == "m"):
@@ -55,6 +56,7 @@ class Rollout:
         # training
         if not self.evaluate:
             # fix random seed
+            self.seed = alg_params.train_seed
             torch.manual_seed(alg_params.train_seed)
             np.random.seed(alg_params.train_seed)
             
@@ -75,6 +77,7 @@ class Rollout:
         # evaluation
         else:
             # fix random seed
+            self.seed = gen_params.eval_seed
             torch.manual_seed(gen_params.eval_seed)
             np.random.seed(gen_params.eval_seed)
             
@@ -86,6 +89,18 @@ class Rollout:
                     path = alg_params.weights_dir + "p_net_params_" + str(i) + ".pkl"
                     self.device_agents[i].load_net(path)
         
+        import datetime
+        self.log_dir_name = (
+                "runs/"
+                + (self.evaluate and "evaluate" or "train")
+                + "/"
+                + (self.evaluate and self.eval_mode or self.train_mode)
+                + "_s_"
+                + str(self.seed)
+                + "_t_"
+                + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+            )
+        self.writer = SummaryWriter(log_dir=f"{self.log_dir_name}/")
         self.joint_reward = None
         self.device_rewards = None
         self.joint_cost = None
@@ -113,6 +128,8 @@ class Rollout:
         self.device_overtime_nums = np.zeros([self.device_num], dtype = np.float32)
         
     def run(self, e_id):
+
+        writer = self.writer
         # reset
         self.reset()
         
@@ -126,7 +143,7 @@ class Rollout:
         # rollout
         time_slots = self.train_time_slots + 1 if not self.evaluate else self.eval_time_slots
         for t_id in range(1, time_slots + 1):
-            print("-------------time slot: " + str(t_id) + "-------------")
+            # print("-------------time slot: " + str(t_id) + "-------------")
             
             # choose action (use deterministic strategy during evaluation)
             device_acts = [None for i in range(self.device_num)]
@@ -235,6 +252,32 @@ class Rollout:
         device_comp_expns = copy.copy(self.device_comp_expns)
         device_overtime_nums = copy.copy(self.device_overtime_nums)
         
+        # tensorboard日志保存
+        writer.add_scalar("joint_reward", joint_reward, e_id)
+        print(f"joint_reward: {joint_reward}")
+        writer.add_scalar("joint_cost", joint_cost, e_id)
+        print(f"joint_cost: {joint_cost}")
+        writer.add_scalar("edge_comp_ql", edge_comp_ql, e_id)
+        print(f"edge_comp_ql: {edge_comp_ql}")
+        for i in range(self.device_num):
+            writer.add_scalar("device_reward_"+str(i), device_rewards[i], e_id)
+            print(f"device_reward_{i}: {device_rewards[i]}")
+            writer.add_scalar("device_cost_"+str(i), device_costs[i], e_id)
+            print(f"device_cost_{i}: {device_costs[i]}")
+            writer.add_scalar("device_comp_ql_"+str(i), device_comp_qls[i], e_id)
+            print(f"device_comp_ql_{i}: {device_comp_qls[i]}")
+            writer.add_scalar("device_comp_dlys_"+str(i), device_comp_dlys[i], e_id)
+            print(f"device_comp_dlys_{i}: {device_comp_dlys[i]}")
+            writer.add_scalar("device_csum_engys_"+str(i), device_csum_engys[i], e_id)
+            print(f"device_csum_engys_{i}: {device_csum_engys[i]}")
+            writer.add_scalar("device_comp_expns_"+str(i), device_comp_expns[i], e_id)
+            print(f"device_comp_expns_{i}: {device_comp_expns[i]}")
+            writer.add_scalar("device_overtime_nums_"+str(i), device_overtime_nums[i], e_id)
+            print(f"device_overtime_nums_{i}: {device_overtime_nums[i]}")
+        
+        if e_id % 50 == 0:
+            self.writer.flush()
+
         return joint_reward, device_rewards, \
                joint_cost, device_costs, \
                edge_comp_ql, device_comp_qls, \

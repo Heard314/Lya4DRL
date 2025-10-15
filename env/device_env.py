@@ -124,7 +124,7 @@ class DeviceEnv():
         obs = [comp_ql, cgnp_rto] + task_msgs
         
         return obs
-            
+
     def compute(self, act):
         '''offloading'''
         # offloading data-size

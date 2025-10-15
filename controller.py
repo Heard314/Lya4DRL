@@ -18,6 +18,9 @@ class Controller:
            (gen_params.evaluate and gen_params.eval_mode) == "maddpg":
             alg_params = get_maddpg_params()
         
+        print("The training mode is in controller: ", gen_params.train_mode)
+        print("The evaluation mode is in controller: ", gen_params.eval_mode)
+        
         # rollout
         self.rollout = Rollout(gen_params, alg_params)
         
@@ -63,8 +66,8 @@ class Controller:
             self.device_comp_expns_col.append(device_comp_expns)
             self.device_overtime_nums_col.append(device_overtime_nums)
             
-            if e_id % 50 == 0:
-                self.visualize()
+            # if e_id % 50 == 0:
+            #     self.visualize()
             
             if e_id % 1000 == 0:
                 with open(self.results_dir + "joint_rewards_" + str(e_id) + ".pkl", "wb") as f:
@@ -87,7 +90,8 @@ class Controller:
                     pickle.dump(self.device_comp_expns_col, f)
                 with open(self.results_dir + "device_overtime_nums_" + str(e_id) + ".pkl", "wb") as f:
                     pickle.dump(self.device_overtime_nums_col, f)
-                
+        self.rollout.writer.close()
+
     def evaluate(self):
         joint_reward = 0
         device_rewards = np.zeros([self.device_num], dtype = np.float32)
@@ -117,7 +121,8 @@ class Controller:
             device_csum_engys += device_csum_engys_
             device_comp_expns += device_comp_expns_
             device_overtime_nums += device_overtime_nums_
-            
+        self.rollout.writer.close()
+
         # averages
         joint_reward /= self.eval_episodes
         device_rewards /= self.eval_episodes

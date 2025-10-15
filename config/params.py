@@ -1,4 +1,5 @@
 import argparse
+from argparse import BooleanOptionalAction
 
 """
 general params
@@ -6,11 +7,11 @@ general params
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
     
-    parser.add_argument("--evaluate", type = bool, default = False,
-                        help = "evaluate or train")
+    parser.add_argument("--evaluate", action=BooleanOptionalAction, default=False,
+                        help="evaluate or train")
     
     # choices: mappo or maddpg
-    parser.add_argument("--train_mode", type = str, default = "mappo",
+    parser.add_argument("--train_mode", type = str, default = "maddpg",
                         help = "training mode")
     
     parser.add_argument("--eval_seed", type = int, default = 2345,
@@ -64,13 +65,13 @@ def get_general_params():
                         help = "the energy factors of devices (J/Gcycles)")
     
     parser.add_argument("--data_size_inls", type = list, 
-                        default = [[20, 200], [20, 200], [20, 200], 
-                                   [20, 200], [20, 200]], 
+                        default = [[256*0.8, 256*1.2], [512*0.8, 512*1.2], [768*0.8, 768*1.2], 
+                                   [1024*0.8, 1024*1.2], [2048*0.8, 2048*1.2]], 
                         help = "the data-size intervals of tasks (KB)")
     
     parser.add_argument("--comp_dens_inls", type = list, 
-                        default = [[200, 2000], [200, 2000], [200, 2000],  
-                                   [200, 2000], [200, 2000]], 
+                        default = [[100, 300], [200, 500], [200, 300],  
+                                   [400, 800], [500, 2000]], 
                         help = "the computation-density intervals of tasks (cycles/bit)")
     
     parser.add_argument("--edge_comp_freq", type = float, default = 25, 
@@ -88,7 +89,7 @@ def get_general_params():
                         help = "the weights of tasks' edge computation expense")
     
     parser.add_argument("--max_data_size", type = float, 
-                        default = 200 * 1024 * 8 * pow(10, -6),
+                        default = 256 * 1024 * 8 * pow(10, -6),
                         help = "maximum data-size (Mb)")
     
     parser.add_argument("--max_comp_dens", type = float,
@@ -103,7 +104,7 @@ def get_general_params():
 mappo params
 """
 def get_mappo_params():
-    parser = argparse.ArgumentParser(description = "mappo params")
+    parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
     
     # networks
     parser.add_argument("--obs_dim", type = int, default = 11,
@@ -128,7 +129,7 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 4000,
+    parser.add_argument("--train_episodes", type = int, default = 20000,
                         help = "the number of training episodes")
     
     parser.add_argument("--train_time_slots", type = int, default = 200,
@@ -203,7 +204,7 @@ def get_mappo_params():
     parser.add_argument("--results_dir", type = str, default = "result/mappo/",
                         help = "the directory for saving training results")
     
-    params = parser.parse_args()
+    params, unknown = parser.parse_known_args()
     
     return params
 
@@ -211,7 +212,7 @@ def get_mappo_params():
 mddpg params
 """
 def get_maddpg_params():
-    parser = argparse.ArgumentParser(description = "maddpg params")
+    parser = argparse.ArgumentParser(description = "maddpg params", add_help=False, allow_abbrev=False)
     
     # networks
     parser.add_argument("--obs_dim", type = int, default = 11,
@@ -236,7 +237,7 @@ def get_maddpg_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 4000,
+    parser.add_argument("--train_episodes", type = int, default = 20000,
                         help = "the number of training episodes")
     
     parser.add_argument("--train_time_slots", type = int, default = 200,
@@ -317,6 +318,7 @@ def get_maddpg_params():
     parser.add_argument("--results_dir", type = str, default = "result/maddpg/",
                         help = "the directory for saving training results")
     
-    params = parser.parse_args()
+    params, unknown = parser.parse_known_args()
     
     return params
+

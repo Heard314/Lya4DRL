@@ -61,7 +61,7 @@ class MappoEdgeAgent():
     def train_nets(self, replay_buffer):
         '''training data'''
         # v_inputs: [train_freq x train_time_slots, state_dim]
-        # v_tags: [train_freq x train_time_slots, 1]
+        # v_tags: [train_freq x train_time_slots, 1] 价值网络的目标值
         # p_inputs: [train_freq x train_time_slots, device_num, obs_dim]
         # acts: [train_freq x train_time_slots, device_num, action_dim]
         # act_logprobs: [train_freq x train_time_slots, device_num, 1]
@@ -72,11 +72,13 @@ class MappoEdgeAgent():
         self.train_value_net(v_inputs, v_tags)
         
         for i in range(self.device_num):
+            # 训练策略网络依然只用局部信息
             self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs)
         
         if self.use_lr_decay:
             self.decay_lr()
-       
+    
+    
     def train_value_net(self, v_inputs, v_tags):
         total_size = self.train_freq * self.train_time_slots
         for e in range(self.v_epochs):
