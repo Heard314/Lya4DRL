@@ -184,13 +184,14 @@ class DeviceEnv():
             else:
                 task.l_comp_dly = total_local_comp / self.device_comp_freq
                 task.l_csum_engy = self.engy_fac * local_comp
-                                
+            
         # update computation-queue length
         self.comp_ql = max(0, total_local_comp - self.device_comp_freq * self.delta)
         
         # update channel gain
         self.channel_gain = self.path_loss * np.random.exponential(1)
-            
+        
+        # 随机生成新任务
         # update scheduling tasks
         sched_tasks = copy.copy(self.sched_tasks)
         self.sched_tasks.clear()

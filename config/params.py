@@ -70,8 +70,8 @@ def get_general_params():
                         help = "the data-size intervals of tasks (KB)")
     
     parser.add_argument("--comp_dens_inls", type = list, 
-                        default = [[100, 300], [200, 500], [200, 300],  
-                                   [400, 800], [500, 2000]], 
+                        default = [[100, 150], [150, 200], [200, 300],  
+                                 [300, 500],[250, 350]], 
                         help = "the computation-density intervals of tasks (cycles/bit)")
     
     parser.add_argument("--edge_comp_freq", type = float, default = 25, 
@@ -89,17 +89,16 @@ def get_general_params():
                         help = "the weights of tasks' edge computation expense")
     
     parser.add_argument("--max_data_size", type = float, 
-                        default = 256 * 1024 * 8 * pow(10, -6),
+                        default = 2560 * 1024 * 8 * pow(10, -6),
                         help = "maximum data-size (Mb)")
     
     parser.add_argument("--max_comp_dens", type = float,
-                        default = 2000 * pow(10, -9),
+                        default = 512 * pow(10, -9),
                         help = "maximum computation density (Gcycles/bit)")
     
     params = parser.parse_args()
     
     return params
-
 """
 mappo params
 """
@@ -129,7 +128,7 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 20000,
+    parser.add_argument("--train_episodes", type = int, default = 8000,
                         help = "the number of training episodes")
     
     parser.add_argument("--train_time_slots", type = int, default = 200,
@@ -237,7 +236,7 @@ def get_maddpg_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 20000,
+    parser.add_argument("--train_episodes", type = int, default = 8000,
                         help = "the number of training episodes")
     
     parser.add_argument("--train_time_slots", type = int, default = 200,

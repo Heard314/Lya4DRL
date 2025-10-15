@@ -1,5 +1,6 @@
 from env.device_env import DeviceEnv
 from env.edge_env import EdgeEnv
+import torch
 
 class MECEnv():
     def __init__(self, gen_params):
@@ -56,12 +57,16 @@ class MECEnv():
                 device_costs[i] += self.energy_weights[i] * csum_engy + \
                                    self.expense_weights[i] * comp_expn
                 
+                # 计算超时惩罚，其中task.dly_cons是按照设备计算能力为2Gcycles/s计算的，实际的设备计算能力在2.1~2.4Gcycles/s之间
                 if comp_dly > task.dly_cons:
-                    device_rewards[i] += -5000
+                    #! 考虑到每个任务的超时程度会影响到任务的执行效果，在原有惩罚的基础上多乘一个log函数（表示超时程度）
+                    device_rewards[i] += -5000 * torch.log(torch.exp(1) -1.3 + comp_dly / task.dly_cons)
+                    # device_rewards[i] += -5000
                     device_overtime_nums[i] += 1
                 else:
                     norm_csum_engy = task.norm_csum_engy
                     norm_comp_expn = task.norm_comp_expn
+                    # 奖励函数 能耗比重 *实际总能耗 / 标准化能耗 + 成本比重 *实际总成本 / 标准化成本
                     device_rewards[i] += -1000 * (self.energy_weights[i] * 
                                                   csum_engy / norm_csum_engy +
                                                   self.expense_weights[i] * 
