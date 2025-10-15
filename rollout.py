@@ -18,7 +18,7 @@ class Rollout:
         
         # MEC env
         self.mec_env = MECEnv(gen_params)
-        
+
         # device agents
         self.device_agents = []
         for i in range(self.device_num):

@@ -25,11 +25,12 @@ class MECEnv():
         return edge_obs, device_obss
     
     def step(self, device_acts):
+        # 首先每个设备对待执行任务做出卸载决策，然后执行任务的本地计算部分，返回远程卸载部分（以下代码中的sched_tasks）
         device_sched_tasks = [None for i in range(self.device_num)]
         for i in range(self.device_num):
             sched_tasks = self.device_envs[i].compute(device_acts[i])
             device_sched_tasks[i] = sched_tasks
-                
+        # 边缘服务器执行任务的远程卸载部分
         self.edge_env.compute(device_sched_tasks)
         
         # reward

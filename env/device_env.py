@@ -78,6 +78,10 @@ class DeviceEnv():
         # unit: Gcycles
         self.comp_ql = 0
         self.sched_tasks = []
+
+        #!动态时间阈值调整
+        self.dynamic_delay_thre_coeff = 1
+        #TODO 后续可以考虑对动态时间阈值对超时程度的影响做进一步研究
     
     def reset(self):
         # reset computation-queue length
@@ -88,6 +92,10 @@ class DeviceEnv():
         
         # reset scheduling tasks
         self.sched_tasks.clear()
+
+        #!动态时间阈值调整
+        self.dynamic_delay_thre_coeff = 1
+
         for i in range(self.task_num):
             # unit: Mb
             data_size = np.random.uniform(self.data_size_inl[0],
@@ -115,13 +123,15 @@ class DeviceEnv():
     def get_obs(self):
         comp_ql = self.comp_ql
         cgnp_rto = self.channel_gain / self.noise_power
+        #!动态时间阈值也作为输入参数
+        dynamic_delay_thre_coeff = self.dynamic_delay_thre_coeff
         task_msgs = []
         for i in range(self.task_num):
             data_size = self.sched_tasks[i].data_size
             comp_dens = self.sched_tasks[i].comp_dens
             dly_cons = self.sched_tasks[i].dly_cons
             task_msgs += [data_size, comp_dens, dly_cons]
-        obs = [comp_ql, cgnp_rto] + task_msgs
+        obs = [comp_ql, cgnp_rto, dynamic_delay_thre_coeff] + task_msgs
         
         return obs
 

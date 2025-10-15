@@ -3,7 +3,7 @@
 echo start training...
 echo.
 
-for /L %%i in (1,1,3) do (
+for /L %%i in (1,1,1) do (
     echo ========================================
     echo run %%i times
     echo ========================================
