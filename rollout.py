@@ -99,6 +99,8 @@ class Rollout:
                 + str(self.seed)
                 + "_t_"
                 + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                + "_d_"
+                + gen_params.run_desc
             )
         self.writer = SummaryWriter(log_dir=f"{self.log_dir_name}/")
         self.joint_reward = None
@@ -181,7 +183,7 @@ class Rollout:
             joint_cost, device_costs, \
             device_comp_dlys, device_csum_engys, \
             device_comp_expns, device_overtime_nums, \
-            next_edge_obs, next_device_obss = self.mec_env.step(device_acts_)
+            next_edge_obs, next_device_obss = self.mec_env.step(device_acts_, e_id, t_id)
             
             self.average(t_id, joint_reward, device_rewards,
                                joint_cost, device_costs,

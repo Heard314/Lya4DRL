@@ -7,6 +7,9 @@ general params
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
     
+    parser.add_argument("--run_desc", type = str, default = "",
+                    help = "the description of the running experiment")
+
     parser.add_argument("--evaluate", action=BooleanOptionalAction, default=False,
                         help="evaluate or train")
     
@@ -218,6 +221,7 @@ def get_maddpg_params():
                         help = "the dimension of agents' observations")
     
     parser.add_argument("--state_action_dim", type = int, default = 256,
+    # parser.add_argument("--state_action_dim", type = int, default = 256,
                         help = "the dimension of global states")
     
     parser.add_argument("--action_dim", type = int, default = 40,

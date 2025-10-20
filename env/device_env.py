@@ -79,8 +79,8 @@ class DeviceEnv():
         self.comp_ql = 0
         self.sched_tasks = []
 
-        #!动态时间阈值调整
-        self.dynamic_delay_thre_coeff = 1
+        #! 动态时间阈值调整
+        self.dynamic_delay_adjust_coef = 1.0
         #TODO 后续可以考虑对动态时间阈值对超时程度的影响做进一步研究
     
     def reset(self):
@@ -93,8 +93,8 @@ class DeviceEnv():
         # reset scheduling tasks
         self.sched_tasks.clear()
 
-        #!动态时间阈值调整
-        self.dynamic_delay_thre_coeff = 1
+        #! 重置动态时间阈值
+        self.dynamic_delay_adjust_coef = 1.0
 
         for i in range(self.task_num):
             # unit: Mb
@@ -109,10 +109,11 @@ class DeviceEnv():
             task = Task(data_size, comp_dens)
             
             comp = data_size * pow(10, 6) * comp_dens
-            task.dly_cons = comp / self.std_comp_freq
+            task.dly_cons = comp / self.std_comp_freq * self.dynamic_delay_adjust_coef
             task.norm_csum_engy = comp * self.engy_fac
             task.norm_comp_expn = comp * self.service_price
-            
+            print("[DEBUG] The norm_csum_engy is: ", task.norm_csum_engy)
+            print("[DEBUG] The norm_comp_expn is: ", task.norm_comp_expn)
             self.sched_tasks.append(task)
         
         # obs
@@ -123,15 +124,13 @@ class DeviceEnv():
     def get_obs(self):
         comp_ql = self.comp_ql
         cgnp_rto = self.channel_gain / self.noise_power
-        #!动态时间阈值也作为输入参数
-        dynamic_delay_thre_coeff = self.dynamic_delay_thre_coeff
         task_msgs = []
         for i in range(self.task_num):
             data_size = self.sched_tasks[i].data_size
             comp_dens = self.sched_tasks[i].comp_dens
             dly_cons = self.sched_tasks[i].dly_cons
             task_msgs += [data_size, comp_dens, dly_cons]
-        obs = [comp_ql, cgnp_rto, dynamic_delay_thre_coeff] + task_msgs
+        obs = [comp_ql, cgnp_rto] + task_msgs
         
         return obs
 
@@ -218,10 +217,14 @@ class DeviceEnv():
             task = Task(data_size, comp_dens)
             
             comp = data_size * pow(10, 6) * comp_dens
-            task.dly_cons = comp / self.std_comp_freq
+            task.dly_cons = comp / self.std_comp_freq * self.dynamic_delay_adjust_coef
             task.norm_csum_engy = comp * self.engy_fac
             task.norm_comp_expn = comp * self.service_price
             
             self.sched_tasks.append(task)
         
         return sched_tasks
+
+    def adjust_delay_threshold_coef(self, overtime_coef):
+        exp_arg = min(overtime_coef - 1.5, 10.0)# 限制指数参数范围
+        self.dynamic_delay_adjust_coef = max(4.0, self.dynamic_delay_adjust_coef + 0.01 * exp_arg * exp_arg)

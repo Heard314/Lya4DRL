@@ -1,7 +1,7 @@
 from env.device_env import DeviceEnv
 from env.edge_env import EdgeEnv
 import torch
-
+import math
 class MECEnv():
     def __init__(self, gen_params):
         self.device_num = gen_params.device_num
@@ -24,7 +24,7 @@ class MECEnv():
         
         return edge_obs, device_obss
     
-    def step(self, device_acts):
+    def step(self, device_acts, e_id, t_id):
         # 首先每个设备对待执行任务做出卸载决策，然后执行任务的本地计算部分，返回远程卸载部分（以下代码中的sched_tasks）
         device_sched_tasks = [None for i in range(self.device_num)]
         for i in range(self.device_num):
@@ -40,6 +40,7 @@ class MECEnv():
         device_csum_engys = [0 for i in range(self.device_num)]
         device_comp_expns = [0 for i in range(self.device_num)]
         device_overtime_nums = [0 for i in range(self.device_num)]
+        device_delay_adjust_coefs = [1.0 for i in range(self.device_num)]
         for i in range(self.device_num):
             sched_tasks = device_sched_tasks[i]
             task_num = len(sched_tasks)
@@ -51,19 +52,30 @@ class MECEnv():
                 
                 csum_engy = task.l_csum_engy + task.e_csum_engy
                 device_csum_engys[i] += 1 / (j + 1) * (csum_engy - device_csum_engys[i])
-                
                 comp_expn = task.comp_expn
                 device_comp_expns[i] += 1 / (j + 1) * (comp_expn - device_comp_expns[i])
                 
                 device_costs[i] += self.energy_weights[i] * csum_engy + \
                                    self.expense_weights[i] * comp_expn
-                
+                if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
+                    print("[DEBUG] The device index is: ", i)
+                    print("[DEBUG] The task", j ,"'s dly_cons is: ", task.dly_cons, " The comp_dly is: ", comp_dly)
+                    print("[DEBUG] The task", j ,"'s norm_csum_engy is: ", task.norm_csum_engy, " The csum_engy is: ", csum_engy)
+                    print("[DEBUG] The task", j ,"'s norm_comp_expn is: ", task.norm_comp_expn, " The comp_expn is: ", comp_expn)
                 # 计算超时惩罚，其中task.dly_cons是按照设备计算能力为2Gcycles/s计算的，实际的设备计算能力在2.1~2.4Gcycles/s之间
                 if comp_dly > task.dly_cons:
                     #! 考虑到每个任务的超时程度会影响到任务的执行效果，在原有惩罚的基础上多乘一个log函数（表示超时程度）
-                    device_rewards[i] += -5000 * torch.log(torch.exp(1) -1.3 + comp_dly / task.dly_cons)
+                    device_rewards[i] += -5000 * torch.log(torch.exp(torch.tensor(1.0)) -1.0 + comp_dly / task.dly_cons)
                     # device_rewards[i] += -5000
                     device_overtime_nums[i] += 1
+                    #! 当设备i超时严重时，其他设备的动态时间阈值调整系数应适当增大
+                    if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
+                        print("[DEBUG] The ratio of comp_dly to task.dly_cons in device", i, "is: ", comp_dly / task.dly_cons)
+                    if comp_dly > 1.5 * task.dly_cons:
+                        for k in range(self.device_num):
+                            if k == i:
+                                continue
+                            device_delay_adjust_coefs[k] = max(device_delay_adjust_coefs[k], comp_dly / task.dly_cons)
                 else:
                     norm_csum_engy = task.norm_csum_engy
                     norm_comp_expn = task.norm_comp_expn
@@ -80,7 +92,11 @@ class MECEnv():
         next_device_obss = [None for i in range(self.device_num)]
         for i in range(self.device_num):
             next_device_obss[i] = self.device_envs[i].get_obs()
-                    
+        
+        #! 更新其他设备的动态时间阈值调整系数
+        for i in range(self.device_num):
+            self.device_envs[i].adjust_delay_threshold_coef(device_delay_adjust_coefs[i])
+
         return joint_reward, device_rewards, \
                joint_cost, device_costs, \
                device_comp_dlys, device_csum_engys, \
