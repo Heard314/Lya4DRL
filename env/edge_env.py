@@ -22,7 +22,7 @@ class EdgeEnv():
         
         return obs
     
-    def compute(self, device_sched_tasks):
+    def compute(self, device_sched_tasks, isPrint):
         device_sched_tasks_ = []
         for sched_tasks in device_sched_tasks:
             device_sched_tasks_ += sched_tasks
@@ -36,6 +36,8 @@ class EdgeEnv():
             else:
                 task.e_comp_dly = max(comp_dly, task.trans_time) + task.offl_dz * \
                                   pow(10, 6) * task.comp_dens / self.edge_comp_freq
+                if isPrint:
+                    print("[DEBUG] the actual edge compute delay of ", task.device_id , " is", task.e_comp_dly)
                 self.comp_ql += max(0, task.offl_dz * pow(10, 6) * task.comp_dens - 
                                     self.edge_comp_freq * max(0, self.delta - 
                                                               max(comp_dly, task.trans_time)))

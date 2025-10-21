@@ -105,6 +105,7 @@ class Controller:
         device_overtime_nums = np.zeros([self.device_num], dtype = np.float32)
         
         for e_id in range(1, self.eval_episodes + 1):
+            print("------------------evaluate episode: " + str(e_id) + "------------------")
             joint_reward_, device_rewards_, \
             joint_cost_, device_costs_, \
             edge_comp_ql_, device_comp_qls_, \

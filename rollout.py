@@ -8,6 +8,7 @@ from agent.edge_agent import MappoEdgeAgent, MaddpgEdgeAgent
 from util.replay_buffer import MappoReplayBuffer, MaddpgReplayBuffer
 from util.utils import ObsScaling, RewardScaling
 from torch.utils.tensorboard import SummaryWriter
+import sys, atexit
 class Rollout:
     def __init__(self, gen_params, alg_params):
         self.device_num = gen_params.device_num
@@ -91,18 +92,35 @@ class Rollout:
         
         import datetime
         self.log_dir_name = (
-                "runs/"
+                "runs/train/device_num_20_251021/"
                 + (self.evaluate and "evaluate" or "train")
                 + "/"
                 + (self.evaluate and self.eval_mode or self.train_mode)
                 + "_s_"
                 + str(self.seed)
                 + "_t_"
-                + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
                 + "_d_"
                 + gen_params.run_desc
             )
         self.writer = SummaryWriter(log_dir=f"{self.log_dir_name}/")
+        self.log_txt_dir_name = (
+                "log/"
+                + (self.evaluate and "evaluate" or "train")
+                + "/"
+                + (self.evaluate and self.eval_mode or self.train_mode)
+                + "_s_"
+                + str(self.seed)
+                + "_t_"
+                + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+                + "_d_"
+                + gen_params.run_desc
+            )
+        log_txt_file = open(self.log_txt_dir_name + ".txt", "w", encoding = "utf-8")
+        sys.stdout = log_txt_file
+        sys.stderr = log_txt_file
+        atexit.register(log_txt_file.close)
+
         self.joint_reward = None
         self.device_rewards = None
         self.joint_cost = None

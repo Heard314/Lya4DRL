@@ -1,9 +1,14 @@
 import argparse
 from argparse import BooleanOptionalAction
+from multiprocessing.connection import deliver_challenge
+
+from torch import device
 
 """
 general params
 """
+device_num = 20
+
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
     
@@ -34,8 +39,17 @@ def get_general_params():
     parser.add_argument("--delta", type = float, default = 0.5, 
                         help = "the duration of each time-slot (s)")
     
-    parser.add_argument("--device_num", type = int, default = 5,
+    parser.add_argument("--device_num", type = int, default = device_num,
                         help = "the number of devices")
+
+    parser.add_argument("--device_types", type = list, default = [0, 0, 0, 0, 0, \
+                                                                  0, 1, 1, 1, 1, \
+                                                                  2, 2, 2, 2, 3, \
+                                                                  3, 3, 3, 4, 4],\
+                        help = "the types of devices")
+    
+    parser.add_argument("--device_type_num", type = int, default = 5,
+                        help = "the number of device types")
     
     parser.add_argument("--task_num", type = int, default = 3,
                         help = "the number of arrival tasks at each time-slot")
@@ -112,7 +126,7 @@ def get_mappo_params():
     parser.add_argument("--obs_dim", type = int, default = 11,
                         help = "the dimension of agents' observations")
     
-    parser.add_argument("--state_dim", type = int, default = 56,
+    parser.add_argument("--state_dim", type = int, default = 1+11*device_num,
                         help = "the dimension of global states")
     
     parser.add_argument("--action_dim", type = int, default = 4,
@@ -220,7 +234,7 @@ def get_maddpg_params():
     parser.add_argument("--obs_dim", type = int, default = 11,
                         help = "the dimension of agents' observations")
     
-    parser.add_argument("--state_action_dim", type = int, default = 256,
+    parser.add_argument("--state_action_dim", type = int, default = 1+51*device_num,
     # parser.add_argument("--state_action_dim", type = int, default = 256,
                         help = "the dimension of global states")
     

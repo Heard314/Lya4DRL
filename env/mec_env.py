@@ -7,7 +7,7 @@ class MECEnv():
         self.device_num = gen_params.device_num
         self.expense_weights = gen_params.expense_weights
         self.energy_weights = gen_params.energy_weights
-        
+        self.isPrint = False
         # edge env
         self.edge_env = EdgeEnv(gen_params)
         # device envs
@@ -28,10 +28,16 @@ class MECEnv():
         # 首先每个设备对待执行任务做出卸载决策，然后执行任务的本地计算部分，返回远程卸载部分（以下代码中的sched_tasks）
         device_sched_tasks = [None for i in range(self.device_num)]
         for i in range(self.device_num):
-            sched_tasks = self.device_envs[i].compute(device_acts[i])
+            isPrint = False
+            if t_id % 5 == 0 and e_id % 5 == 0:
+                isPrint = True
+            sched_tasks = self.device_envs[i].compute(device_acts[i],isPrint)
             device_sched_tasks[i] = sched_tasks
         # 边缘服务器执行任务的远程卸载部分
-        self.edge_env.compute(device_sched_tasks)
+        isPrint = False
+        if t_id % 20 == 0 and e_id % 20 == 0:
+            isPrint = True
+        self.edge_env.compute(device_sched_tasks, isPrint)
         
         # reward
         device_rewards = [0 for i in range(self.device_num)]
@@ -44,6 +50,7 @@ class MECEnv():
         for i in range(self.device_num):
             sched_tasks = device_sched_tasks[i]
             task_num = len(sched_tasks)
+            device_type = self.device_envs[i].device_type
             for j in range(task_num):
                 task = sched_tasks[j]
                 
@@ -55,8 +62,9 @@ class MECEnv():
                 comp_expn = task.comp_expn
                 device_comp_expns[i] += 1 / (j + 1) * (comp_expn - device_comp_expns[i])
                 
-                device_costs[i] += self.energy_weights[i] * csum_engy + \
-                                   self.expense_weights[i] * comp_expn
+                device_costs[i] += self.energy_weights[device_type] * csum_engy + \
+                                   self.expense_weights[device_type] * comp_expn
+                
                 if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
                     print("[DEBUG] The device index is: ", i)
                     print("[DEBUG] The task", j ,"'s dly_cons is: ", task.dly_cons, " The comp_dly is: ", comp_dly)
@@ -80,9 +88,9 @@ class MECEnv():
                     norm_csum_engy = task.norm_csum_engy
                     norm_comp_expn = task.norm_comp_expn
                     # 奖励函数 能耗比重 *实际总能耗 / 标准化能耗 + 成本比重 *实际总成本 / 标准化成本
-                    device_rewards[i] += -1000 * (self.energy_weights[i] * 
+                    device_rewards[i] += -1000 * (self.energy_weights[device_type] * 
                                                   csum_engy / norm_csum_engy +
-                                                  self.expense_weights[i] * 
+                                                  self.expense_weights[device_type] * 
                                                   comp_expn / norm_comp_expn)
         joint_reward = sum(device_rewards)
         joint_cost = sum(device_costs)

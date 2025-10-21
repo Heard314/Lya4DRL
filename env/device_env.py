@@ -3,8 +3,10 @@ import math
 import numpy as np
 
 class Task():
-    def __init__(self, data_size, comp_dens):
+    def __init__(self, data_size, comp_dens, device_id):
         '''attributes'''
+        # The device id for publishing the task
+        self.device_id = device_id
         # unit: Mb
         self.data_size = data_size
         # unit: Gcycles/bit
@@ -49,36 +51,36 @@ class DeviceEnv():
     def __init__(self, env_id, gen_params):
         # env id
         self.env_id = env_id
+        self.device_type = gen_params.device_types[env_id]
         # unit: s
         self.delta = gen_params.delta
         self.task_num = gen_params.task_num
         # unit: Hz
         self.bandwidth = gen_params.total_bandwidth / gen_params.device_num
         # unit: mW
-        self.trans_power = gen_params.device_trans_powers[env_id]
-        self.path_loss = gen_params.device_path_loss[env_id]
+        self.trans_power = gen_params.device_trans_powers[self.device_type]
+        self.path_loss = gen_params.device_path_loss[self.device_type]
         self.channel_gain = None
         # unit: mW
         self.noise_power = gen_params.spec_dens * self.bandwidth
         # unit: Mb/s
         self.trans_rate = None
         # unit: Gcycles/s
-        self.device_comp_freq = gen_params.device_comp_freqs[env_id]
+        self.device_comp_freq = gen_params.device_comp_freqs[self.device_type]
         # unit: Gcycles/s
         self.std_comp_freq = gen_params.std_comp_freq
         # unit: J/Gcycles
-        self.engy_fac = gen_params.device_engy_facs[env_id]
+        self.engy_fac = gen_params.device_engy_facs[self.device_type]
         # unit: KB
-        self.data_size_inl = gen_params.data_size_inls[env_id]
+        self.data_size_inl = gen_params.data_size_inls[self.device_type]
         # unit: cycles/bit
-        self.comp_dens_inl = gen_params.comp_dens_inls[env_id]
+        self.comp_dens_inl = gen_params.comp_dens_inls[self.device_type]
         # unit: $/Gcycles
         self.service_price = gen_params.service_price
         
         # unit: Gcycles
         self.comp_ql = 0
         self.sched_tasks = []
-
         #! 动态时间阈值调整
         self.dynamic_delay_adjust_coef = 1.0
         #TODO 后续可以考虑对动态时间阈值对超时程度的影响做进一步研究
@@ -106,14 +108,14 @@ class DeviceEnv():
                                           self.comp_dens_inl[1])
             comp_dens = comp_dens * pow(10, -9)
             
-            task = Task(data_size, comp_dens)
+            task = Task(data_size, comp_dens,self.env_id)
             
             comp = data_size * pow(10, 6) * comp_dens
             task.dly_cons = comp / self.std_comp_freq * self.dynamic_delay_adjust_coef
             task.norm_csum_engy = comp * self.engy_fac
             task.norm_comp_expn = comp * self.service_price
-            print("[DEBUG] The norm_csum_engy is: ", task.norm_csum_engy)
-            print("[DEBUG] The norm_comp_expn is: ", task.norm_comp_expn)
+            # print("[DEBUG] The norm_csum_engy is: ", task.norm_csum_engy)
+            # print("[DEBUG] The norm_comp_expn is: ", task.norm_comp_expn)
             self.sched_tasks.append(task)
         
         # obs
@@ -134,7 +136,7 @@ class DeviceEnv():
         
         return obs
 
-    def compute(self, act):
+    def compute(self, act, isPrint):
         '''offloading'''
         # offloading data-size
         offl_dzs = {}
@@ -193,6 +195,10 @@ class DeviceEnv():
             else:
                 task.l_comp_dly = total_local_comp / self.device_comp_freq
                 task.l_csum_engy = self.engy_fac * local_comp
+            if isPrint:
+                print("[DEBUG] the actual previous local compute amount of ", self.env_id," is", total_local_comp)
+                print("[DEBUG] the actual local compute freq of ", self.env_id," is", self.device_comp_freq)
+                print("[DEBUG] the actual local compute delay of ", self.env_id," is", task.l_comp_dly)
             
         # update computation-queue length
         self.comp_ql = max(0, total_local_comp - self.device_comp_freq * self.delta)
@@ -214,7 +220,7 @@ class DeviceEnv():
                                           self.comp_dens_inl[1])
             comp_dens = comp_dens * pow(10, -9)
             
-            task = Task(data_size, comp_dens)
+            task = Task(data_size, comp_dens, self.env_id)
             
             comp = data_size * pow(10, 6) * comp_dens
             task.dly_cons = comp / self.std_comp_freq * self.dynamic_delay_adjust_coef
