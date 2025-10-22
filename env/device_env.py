@@ -80,6 +80,8 @@ class DeviceEnv():
         
         # unit: Gcycles
         self.comp_ql = 0
+        # self.virtual_comp_ql = 0
+        # self.virtual_comp_ql_growth = 
         self.sched_tasks = []
         #! 动态时间阈值调整
         self.dynamic_delay_adjust_coef = 1.0
@@ -136,6 +138,7 @@ class DeviceEnv():
         
         return obs
 
+    # act: [offl_rto_1, offl_rto_2, ..., offl_rto_n, tspw_rto], all offl_rto are in [0, 1] and tspw_rto is in [0, 1]
     def compute(self, act, isPrint):
         '''offloading'''
         # offloading data-size
@@ -196,6 +199,7 @@ class DeviceEnv():
                 task.l_comp_dly = total_local_comp / self.device_comp_freq
                 task.l_csum_engy = self.engy_fac * local_comp
             if isPrint:
+                print("[DEBUG] The action of ", self.env_id, " is:", act)
                 print("[DEBUG] the actual previous local compute amount of ", self.env_id," is", total_local_comp)
                 print("[DEBUG] the actual local compute freq of ", self.env_id," is", self.device_comp_freq)
                 print("[DEBUG] the actual local compute delay of ", self.env_id," is", task.l_comp_dly)

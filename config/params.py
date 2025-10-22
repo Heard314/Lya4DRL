@@ -113,6 +113,12 @@ def get_general_params():
                         default = 512 * pow(10, -9),
                         help = "maximum computation density (Gcycles/bit)")
     
+    # parser.add_argument("--lyaV", type = float,
+    #                     default = 0.6,
+    #                     help = "任务奖励的权重")
+
+
+
     params = parser.parse_args()
     
     return params

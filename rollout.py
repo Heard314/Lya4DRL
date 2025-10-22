@@ -116,7 +116,7 @@ class Rollout:
                 + "_d_"
                 + gen_params.run_desc
             )
-        log_txt_file = open(self.log_txt_dir_name + ".txt", "w", encoding = "utf-8")
+        log_txt_file = open(self.log_txt_dir_name + ".log", "w", encoding = "utf-8")
         sys.stdout = log_txt_file
         sys.stderr = log_txt_file
         atexit.register(log_txt_file.close)
@@ -231,7 +231,7 @@ class Rollout:
             # update obs
             edge_obs = next_edge_obs
             device_obss = next_device_obss
-                    
+            
             if not self.evaluate and self.train_mode == "maddpg":
                 total_time_slots = (e_id - 1) * self.train_time_slots + t_id
                 

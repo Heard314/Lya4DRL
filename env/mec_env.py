@@ -92,6 +92,7 @@ class MECEnv():
                                                   csum_engy / norm_csum_engy +
                                                   self.expense_weights[device_type] * 
                                                   comp_expn / norm_comp_expn)
+                             
         joint_reward = sum(device_rewards)
         joint_cost = sum(device_costs)
         
