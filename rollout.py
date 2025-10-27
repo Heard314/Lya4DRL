@@ -8,7 +8,7 @@ from agent.edge_agent import MappoEdgeAgent, MaddpgEdgeAgent
 from util.replay_buffer import MappoReplayBuffer, MaddpgReplayBuffer
 from util.utils import ObsScaling, RewardScaling
 from torch.utils.tensorboard import SummaryWriter
-import sys, atexit
+import sys, atexit, os
 class Rollout:
     def __init__(self, gen_params, alg_params):
         self.device_num = gen_params.device_num
@@ -91,9 +91,8 @@ class Rollout:
                     self.device_agents[i].load_net(path)
         
         import datetime
-        self.log_dir_name = (
-                "runs/train/device_num_20_251021/"
-                + (self.evaluate and "evaluate" or "train")
+        file_subpath =  (
+                (self.evaluate and "evaluate" or "train")
                 + "/"
                 + (self.evaluate and self.eval_mode or self.train_mode)
                 + "_s_"
@@ -102,21 +101,19 @@ class Rollout:
                 + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
                 + "_d_"
                 + gen_params.run_desc
+        )
+        self.log_dir_name = (
+                "runs/"
+                + file_subpath
             )
         self.writer = SummaryWriter(log_dir=f"{self.log_dir_name}/")
         self.log_txt_dir_name = (
                 "log/"
-                + (self.evaluate and "evaluate" or "train")
-                + "/"
-                + (self.evaluate and self.eval_mode or self.train_mode)
-                + "_s_"
-                + str(self.seed)
-                + "_t_"
-                + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
-                + "_d_"
-                + gen_params.run_desc
+                + file_subpath
             )
-        log_txt_file = open(self.log_txt_dir_name + ".log", "w", encoding = "utf-8")
+        log_path = self.log_txt_dir_name + ".log"
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        log_txt_file = open(log_path, "w", encoding = "utf-8")
         sys.stdout = log_txt_file
         sys.stderr = log_txt_file
         atexit.register(log_txt_file.close)

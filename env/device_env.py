@@ -73,15 +73,17 @@ class DeviceEnv():
         self.engy_fac = gen_params.device_engy_facs[self.device_type]
         # unit: KB
         self.data_size_inl = gen_params.data_size_inls[self.device_type]
-        # unit: cycles/bit
+        # un0it: cycles/bit
         self.comp_dens_inl = gen_params.comp_dens_inls[self.device_type]
         # unit: $/Gcycles
         self.service_price = gen_params.service_price
         
         # unit: Gcycles
         self.comp_ql = 0
-        # self.virtual_comp_ql = 0
-        # self.virtual_comp_ql_growth = 
+        self.virtual_comp_ql = 0
+        data_size_mean = (self.data_size_inl[0] + self.data_size_inl[1]) / 2 * 1024 * 8 * pow(10, -6)
+        comp_dens_mean = (self.comp_dens_inl[0] + self.comp_dens_inl[1]) / 2 * pow(10, -9)
+        self.virtual_comp_ql_growth = gen_params.vir_comp_ql_growth_rate * data_size_mean * comp_dens_mean
         self.sched_tasks = []
         #! 动态时间阈值调整
         self.dynamic_delay_adjust_coef = 1.0
@@ -90,7 +92,8 @@ class DeviceEnv():
     def reset(self):
         # reset computation-queue length
         self.comp_ql = 0
-        
+        self.virtual_comp_ql = 0
+
         # reset channel gain
         self.channel_gain = self.path_loss * np.random.exponential(1)
         
@@ -143,6 +146,7 @@ class DeviceEnv():
         '''offloading'''
         # offloading data-size
         offl_dzs = {}
+        
         for i in range(self.task_num):
             # offloading ratio
             offl_rto = act[i]
@@ -158,15 +162,17 @@ class DeviceEnv():
                                                self.noise_power, 2) * pow(10, -6)
         total_trans_dz = trans_rate * self.delta
         total_offl_dz = 0
+        total_offl_comp = 0
         # local computation
         local_comps = {}
         for task_id, offl_dz in offl_dzs:
             offl_dz = min(offl_dz, total_trans_dz)
             total_trans_dz -= offl_dz
             total_offl_dz += offl_dz
-            
+
             task = self.sched_tasks[task_id]
             task.offl_dz = offl_dz
+            total_offl_comp += offl_dz * task.comp_dens
             # if offl_dz = 0, there is no need to queue
             if task.offl_dz == 0:
                 task.trans_time = 0
@@ -205,8 +211,10 @@ class DeviceEnv():
                 print("[DEBUG] the actual local compute delay of ", self.env_id," is", task.l_comp_dly)
             
         # update computation-queue length
+        self.completed_comp = total_offl_comp + self.device_comp_freq * self.delta
         self.comp_ql = max(0, total_local_comp - self.device_comp_freq * self.delta)
-        
+        self.virtual_comp_ql = max(0, self.virtual_comp_ql - self.completed_comp + self.virtual_comp_ql_growth)
+
         # update channel gain
         self.channel_gain = self.path_loss * np.random.exponential(1)
         

@@ -113,11 +113,13 @@ def get_general_params():
                         default = 512 * pow(10, -9),
                         help = "maximum computation density (Gcycles/bit)")
     
-    # parser.add_argument("--lyaV", type = float,
-    #                     default = 0.6,
-    #                     help = "任务奖励的权重")
+    parser.add_argument("--lyaV", type = float,
+                        default = 0.6,
+                        help = "The lya algorithm weights for task rewards")
 
-
+    parser.add_argument("--vir_comp_ql_growth_rate", type = float,
+                        default = 0.15,
+                        help = "The length growth rate of the virtual computing queue on the device")
 
     params = parser.parse_args()
     

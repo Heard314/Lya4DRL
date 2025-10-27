@@ -1,3 +1,4 @@
+from env import device_env
 from env.device_env import DeviceEnv
 from env.edge_env import EdgeEnv
 import torch
@@ -14,7 +15,8 @@ class MECEnv():
         self.device_envs = []
         for i in range(self.device_num):
             self.device_envs.append(DeviceEnv(i, gen_params))
-    
+        self.lyaV = gen_params.lyaV
+
     def reset(self):
         edge_obs = self.edge_env.reset()
         
@@ -92,6 +94,9 @@ class MECEnv():
                                                   csum_engy / norm_csum_engy +
                                                   self.expense_weights[device_type] * 
                                                   comp_expn / norm_comp_expn)
+                    # device_rewards[i] = -self.lyaV * device_rewards[i] + \
+                    #                     (self.device_envs[i].comp_ql + self.device_envs[i].virtual_comp_ql) * \
+                    #                     self.device_envs[i].completed_comp
                              
         joint_reward = sum(device_rewards)
         joint_cost = sum(device_costs)

@@ -7,8 +7,8 @@ for /L %%i in (1,1,1) do (
     echo ========================================
     echo run %%i times
     echo ========================================
-    python main.py --train_mode maddpg --run_desc "dynamic_delay"
-    python main.py --train_mode mappo --run_desc "dynamic_delay"
+    python main.py --train_mode maddpg --run_desc "no_netUpdate_no_COMA_no_Lya"
+    python main.py --train_mode mappo --run_desc "no_netUpdate_no_COMA_no_Lya"
     echo run %%i times finished
     echo.
     if %%i LSS 5 (
