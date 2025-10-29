@@ -72,6 +72,8 @@ class MECEnv():
                     print("[DEBUG] The task", j ,"'s dly_cons is: ", task.dly_cons, " The comp_dly is: ", comp_dly)
                     print("[DEBUG] The task", j ,"'s norm_csum_engy is: ", task.norm_csum_engy, " The csum_engy is: ", csum_engy)
                     print("[DEBUG] The task", j ,"'s norm_comp_expn is: ", task.norm_comp_expn, " The comp_expn is: ", comp_expn)
+                    print("[DEBUG] The device", i, "'s virtual comp ql is: ", self.device_envs[i].virtual_comp_ql)
+                    print("[DEBUG] The device", i, "'s completed comp is: ", self.device_envs[i].completed_comp)
                 # 计算超时惩罚，其中task.dly_cons是按照设备计算能力为2Gcycles/s计算的，实际的设备计算能力在2.1~2.4Gcycles/s之间
                 if comp_dly > task.dly_cons:
                     #! 考虑到每个任务的超时程度会影响到任务的执行效果，在原有惩罚的基础上多乘一个log函数（表示超时程度）
@@ -94,10 +96,15 @@ class MECEnv():
                                                   csum_engy / norm_csum_engy +
                                                   self.expense_weights[device_type] * 
                                                   comp_expn / norm_comp_expn)
-                    # device_rewards[i] = -self.lyaV * device_rewards[i] + \
-                    #                     (self.device_envs[i].comp_ql + self.device_envs[i].virtual_comp_ql) * \
-                    #                     self.device_envs[i].completed_comp
-                             
+                if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
+                    print("[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
+                device_rewards[i] = self.lyaV * device_rewards[i] + \
+                                    (self.device_envs[i].comp_ql + self.device_envs[i].virtual_comp_ql) * \
+                                    self.device_envs[i].completed_comp
+                if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
+                    print("[DEBUG] The device", i, "'s lya reward is: ", (self.device_envs[i].comp_ql + self.device_envs[i].virtual_comp_ql) * \
+                                    self.device_envs[i].completed_comp)
+                    print("[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
         joint_reward = sum(device_rewards)
         joint_cost = sum(device_costs)
         

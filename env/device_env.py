@@ -83,7 +83,7 @@ class DeviceEnv():
         self.virtual_comp_ql = 0
         data_size_mean = (self.data_size_inl[0] + self.data_size_inl[1]) / 2 * 1024 * 8 * pow(10, -6)
         comp_dens_mean = (self.comp_dens_inl[0] + self.comp_dens_inl[1]) / 2 * pow(10, -9)
-        self.virtual_comp_ql_growth = gen_params.vir_comp_ql_growth_rate * data_size_mean * comp_dens_mean
+        self.virtual_comp_ql_growth = gen_params.vir_comp_ql_growth_rate * data_size_mean * comp_dens_mean * pow(10, 6)
         self.sched_tasks = []
         #! 动态时间阈值调整
         self.dynamic_delay_adjust_coef = 1.0
@@ -152,8 +152,9 @@ class DeviceEnv():
             offl_rto = act[i]
             offl_dz = self.sched_tasks[i].data_size * offl_rto
             offl_dzs[i] = offl_dz
-        # ascending order
-        offl_dzs = sorted(offl_dzs.items(), key = lambda x: x[1])
+        #! 处理的任务的顺序为FIFO
+        # ascending order 
+        # offl_dzs = sorted(offl_dzs.items(), key = lambda x: x[1])
         # transmission-power ratio
         tspw_rto = act[-1]
         trans_power = self.trans_power * tspw_rto
@@ -213,6 +214,8 @@ class DeviceEnv():
         # update computation-queue length
         self.completed_comp = total_offl_comp + self.device_comp_freq * self.delta
         self.comp_ql = max(0, total_local_comp - self.device_comp_freq * self.delta)
+        print("[DEBUG] The virtual comp qs growth is: ", self.virtual_comp_ql_growth)
+        print("[DEBUG] The completed comp is: ", self.completed_comp)
         self.virtual_comp_ql = max(0, self.virtual_comp_ql - self.completed_comp + self.virtual_comp_ql_growth)
 
         # update channel gain

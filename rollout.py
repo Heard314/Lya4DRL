@@ -283,6 +283,8 @@ class Rollout:
             print(f"device_cost_{i}: {device_costs[i]}")
             writer.add_scalar("device_comp_ql_"+str(i), device_comp_qls[i], e_id)
             print(f"device_comp_ql_{i}: {device_comp_qls[i]}")
+            writer.add_scalar("device_virtual_comp_ql_"+str(i), self.mec_env.device_envs[i].virtual_comp_ql, e_id)
+            print(f"device_virtual_comp_ql_{i}: {self.mec_env.device_envs[i].virtual_comp_ql}")
             writer.add_scalar("device_comp_dlys_"+str(i), device_comp_dlys[i], e_id)
             print(f"device_comp_dlys_{i}: {device_comp_dlys[i]}")
             writer.add_scalar("device_csum_engys_"+str(i), device_csum_engys[i], e_id)

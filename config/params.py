@@ -87,11 +87,11 @@ def get_general_params():
                         help = "the data-size intervals of tasks (KB)")
     
     parser.add_argument("--comp_dens_inls", type = list, 
-                        default = [[100, 150], [150, 200], [200, 300],  
-                                 [300, 500],[250, 350]], 
+                        default = [[10, 15], [15, 20], [20, 30],  
+                                 [30, 50],[25, 35]], 
                         help = "the computation-density intervals of tasks (cycles/bit)")
     
-    parser.add_argument("--edge_comp_freq", type = float, default = 25, 
+    parser.add_argument("--edge_comp_freq", type = float, default = 10240, 
                         help = "the computation frequency of MEC server (Gcycles/s)")
     
     parser.add_argument("--service_price", type = float, default = 0.1, 
@@ -114,11 +114,11 @@ def get_general_params():
                         help = "maximum computation density (Gcycles/bit)")
     
     parser.add_argument("--lyaV", type = float,
-                        default = 0.6,
+                        default = 0.2,
                         help = "The lya algorithm weights for task rewards")
 
     parser.add_argument("--vir_comp_ql_growth_rate", type = float,
-                        default = 0.15,
+                        default = 0.95,
                         help = "The length growth rate of the virtual computing queue on the device")
 
     params = parser.parse_args()

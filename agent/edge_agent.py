@@ -58,6 +58,39 @@ class MappoEdgeAgent():
                 p_path = self.weights_dir + "p_net_params_" + str(i) + ".pkl"
                 self.p_nets[i].load_state_dict(torch.load(p_path))
     
+    # @torch.no_grad()
+    # def compute_coma_advantage(self, agent_id, joint_obs, joint_acts,
+    #                         p_inputs_i, baseline_samples=8):
+    #     """
+    #     返回 A_i^{COMA}(s, A) = Q(s,A) - E_{a_i'~pi_i}[Q(s,(A^{-i},a_i'))]
+    #     joint_obs:     [N, obs_dim_total]
+    #     joint_acts:    [N, act_dim_total]  —— 真实执行的联合动作
+    #     p_inputs_i:    [N, ...]            —— 第 i 个 agent 的策略输入 (它自己的观测/历史)
+    #     """
+    #     # 当前真实联合动作下的Q
+    #     q_sa = self.q_net(joint_obs, joint_acts).squeeze(-1)  # [N]
+
+    #     # 采样自身动作，替换联合动作中的第 i 段
+    #     mean, std = self.p_nets[agent_id](p_inputs_i)         # [N, act_dim_i] each
+    #     dist = Normal(mean, std)
+
+    #     # 为连续动作做蒙特卡洛期望
+    #     q_baselines = 0.0
+    #     for _ in range(baseline_samples):
+    #         a_i_prime = dist.sample()                         # [N, act_dim_i]
+    #         # 构造 (A^{-i}, a_i') 的联合动作副本
+    #         joint_acts_cf = joint_acts.clone()
+    #         # 假设你维护了每个 agent 在联合动作向量中的切片范围:
+    #         # self.act_slices[agent_id] = slice(start, end)
+    #         s = self.act_slices[agent_id]
+    #         joint_acts_cf[:, s] = a_i_prime
+    #         q_cf = self.q_net(joint_obs, joint_acts_cf).squeeze(-1)  # [N]
+    #         q_baselines += q_cf
+
+    #     q_baselines = q_baselines / float(baseline_samples)          # [N]
+    #     adv_i = q_sa - q_baselines                                   # [N]
+    #     return adv_i
+    
     def train_nets(self, replay_buffer):
         '''training data'''
         # v_inputs: [train_freq x train_time_slots, state_dim]
@@ -78,6 +111,26 @@ class MappoEdgeAgent():
         if self.use_lr_decay:
             self.decay_lr()
     
+    # def train_nets_coma(self, replay_buffer):
+    #     '''training data'''
+    #     # v_inputs: [train_freq x train_time_slots, state_dim]
+    #     # v_tags: [train_freq x train_time_slots, 1] 价值网络的目标值
+    #     # p_inputs: [train_freq x train_time_slots, device_num, obs_dim]
+    #     # acts: [train_freq x train_time_slots, device_num, action_dim]
+    #     # act_logprobs: [train_freq x train_time_slots, device_num, 1]
+    #     # advs: [train_freq x train_time_slots, 1]
+    #     v_inputs, v_tags, p_inputs, \
+    #     acts, act_logprobs, advs = replay_buffer.get_training_data(self.v_net)
+
+    #     self.train_value_net_coma(v_inputs, v_tags)
+        
+    #     for i in range(self.device_num):
+    #         # 训练策略网络依然只用局部信息
+    #         coma_advs = self.compute_coma_advantage(i, v_inputs[:, i], acts[:, i], p_inputs[:, i])
+    #         self.train_policy_net_coma(i, p_inputs[:, i], acts[:, i], coma_advs)
+        
+    #     if self.use_lr_decay:
+    #         self.decay_lr()
     
     def train_value_net(self, v_inputs, v_tags):
         total_size = self.train_freq * self.train_time_slots
@@ -96,7 +149,49 @@ class MappoEdgeAgent():
                     torch.nn.utils.clip_grad_norm_(self.v_net.parameters(), 
                                                    self.v_grad_clip)
                 self.v_optimizer.step()
-        
+
+    # def train_value_net_coma(self, v_inputs, v_tags):
+    #     total_size = self.train_freq * self.train_time_slots
+    #     for e in range(self.v_epochs):
+    #         for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
+    #                                 self.train_batch_size, False):
+    #             vs = self.v_net(v_inputs[ids])
+                
+    #             loss = F.mse_loss(v_tags[ids], vs)
+                
+    #             self.v_optimizer.zero_grad()
+    #             loss.backward()
+
+    #             # gradient clip
+    #             if self.use_grad_clip:
+    #                 torch.nn.utils.clip_grad_norm_(self.v_net.parameters(), 
+    #                                                self.v_grad_clip)
+    #             self.v_optimizer.step()
+
+    # def train_policy_net_coma(self, agent_id, p_inputs, acts, coma_advs):
+    #     total_size = self.train_freq * self.train_time_slots
+    #     for e in range(self.p_epochs):
+    #         for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
+    #                                 self.train_batch_size, False):
+    #             mean, std = self.p_nets[agent_id](p_inputs[ids])
+    #             dist = Normal(mean, std)
+    #             enty = dist.entropy().sum(-1)
+                
+    #             # 策略对真实动作的 log π(a_i|o_i)
+    #             new_act_logprobs = dist.log_prob(acts[ids]).sum(-1)
+    #             ent = dist.entropy().sum(-1)
+    #             # COMA: - E[ logπ * A_i ]  （加熵正则）
+    #             adv = coma_advs[ids].detach()                       # [B]
+    #             loss = -(new_act_logprobs * adv + self.enty_coef * ent)
+
+    #             self.p_optimizers[agent_id].zero_grad()
+    #             loss.mean().backward()
+    #             if self.use_grad_clip:
+    #                 torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
+    #                                             self.p_grad_clip)
+    #             self.p_optimizers[agent_id].step()
+                
+
     def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs):
         total_size = self.train_freq * self.train_time_slots
         for e in range(self.p_epochs):

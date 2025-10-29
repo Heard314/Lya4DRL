@@ -26,8 +26,9 @@ class EdgeEnv():
         device_sched_tasks_ = []
         for sched_tasks in device_sched_tasks:
             device_sched_tasks_ += sched_tasks
-        device_sched_tasks_ = sorted(device_sched_tasks_, 
-                                     key = lambda x: x.trans_time)
+        #! 处理任务的顺序为FIFO
+        # device_sched_tasks_ = sorted(device_sched_tasks_, 
+        #                              key = lambda x: x.trans_time)
         comp_dly = self.comp_ql / self.edge_comp_freq
         self.comp_ql = max(0, self.comp_ql - self.edge_comp_freq * self.delta)
         for task in device_sched_tasks_:
