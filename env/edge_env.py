@@ -7,7 +7,15 @@ class EdgeEnv():
         
         # unit: Gcycles
         self.comp_ql = None
-        
+
+        self.device_num = general_params.device_num
+        self.device_comp_qls = []
+        self.device_sched_tasks = []
+        self.device_sched_
+        for i in range(self.device_num):
+            self.device_comp_qls.append(0)
+            self.device_sched_tasks.append([])
+
     def reset(self):
         # reset computation-queue length
         self.comp_ql = 0
@@ -22,24 +30,51 @@ class EdgeEnv():
         
         return obs
     
-    def compute(self, device_sched_tasks, isPrint):
-        device_sched_tasks_ = []
-        for sched_tasks in device_sched_tasks:
-            device_sched_tasks_ += sched_tasks
-        #! 处理任务的顺序为FIFO
-        # device_sched_tasks_ = sorted(device_sched_tasks_, 
-        #                              key = lambda x: x.trans_time)
-        comp_dly = self.comp_ql / self.edge_comp_freq
-        self.comp_ql = max(0, self.comp_ql - self.edge_comp_freq * self.delta)
-        for task in device_sched_tasks_:
-            if task.trans_time == 0:
-                task.e_comp_dly = 0
-            else:
-                task.e_comp_dly = max(comp_dly, task.trans_time) + task.offl_dz * \
-                                  pow(10, 6) * task.comp_dens / self.edge_comp_freq
-                if isPrint:
-                    print("[DEBUG] the actual edge compute delay of ", task.device_id , " is", task.e_comp_dly)
-                self.comp_ql += max(0, task.offl_dz * pow(10, 6) * task.comp_dens - 
-                                    self.edge_comp_freq * max(0, self.delta - 
-                                                              max(comp_dly, task.trans_time)))
-                comp_dly = task.e_comp_dly
+    def compute(self, new_sched_tasks, isPrint):
+        available_ql_num = 0
+        device_enable = [0 for i in range(self.device_num)]
+        for i in range(self.device_num):
+            for task in self.device_sched_tasks[i]:
+                if task.offl_dz > 0:
+                    device_enable[i] = 1
+                    break
+            for task in new_sched_tasks[i]:
+                if task.offl_dz > 0:
+                    self.device_sched_tasks[i].append(task)
+                    device_enable[i] = 1
+                    break
+            available_ql_num += device_enable[i]
+            
+        if available_ql_num == 0:
+            return
+        
+        comp_freq_mean = self.edge_comp_freq / available_ql_num
+        #每个设备各自有一个计算队列，按照FIFO顺序计算
+        for i in range(self.device_num):
+            if device_enable[i] == 0:
+                continue
+            comp_dly = 0
+            if len(self.device_sched_tasks[i]) > 0:
+                suf_process = False
+                for task in self.device_sched_tasks[i][:]:
+                    if task.offl_dz == 0:
+                        task.e_comp_dly = 0
+                        continue
+                    task_comp = task.offl_dz * task.comp_dens
+                    if ((self.delay - max(comp_dly, task.edge_trans_time) * comp_freq_mean)) >= task_comp:
+                        task.e_comp_dly += max(task.edge_trans_time, comp_dly) + \
+                            task.offl_dz * task.comp_dens / comp_freq_mean
+                        task.edge_trans_time = 0
+                        task.offl_dz = 0
+                        self.device_sched_tasks[i].pop(0)
+                        
+                    elif suf_process == False:
+                        task.e_comp_dly += self.delay
+                        task.edge_trans_time = 0
+                        task.offl_dz -= (self.delay - max(comp_dly, task.edge_trans_time) * comp_freq_mean) / task.comp_dens
+                        suf_process = True
+                    else:
+                        task.e_comp_dly += self.delay
+                        task.edge_trans_time = 0
+                        break
+            self.device_comp_qls[i] = max(0, self.device_comp_qls[i] - comp_freq_mean * self.delta)

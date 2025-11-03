@@ -21,18 +21,18 @@ class RunningMeanStd():
             self.mean = old_mean + (x - old_mean) / self.n
             self.S = self.S + (x - old_mean) * (x - self.mean)
             self.std = np.sqrt(self.S / self.n)
-            
+
 class ObsScaling():
-    def __init__(self, task_num, max_data_size, max_comp_dens, std_comp_freq):
-        self.task_num = task_num
+    def __init__(self,max_task_num, max_data_size, max_comp_dens, std_comp_freq):
+        self.max_task_num = max_task_num
         # unit: Mb
         self.max_data_size = max_data_size
-        # unit: Gcycles/bit
+        # unit: Gcycles/Mb
         self.max_comp_dens = max_comp_dens
         # unit: Gcycles/s 
         self.std_comp_freq = std_comp_freq
         # unit: s
-        self.max_dly_cons = self.max_data_size * pow(10, 6) * self.max_comp_dens \
+        self.max_dly_cons = self.max_data_size * self.max_comp_dens \
                             / self.std_comp_freq
                             
     def __call__(self, edge_obs, device_obss):
@@ -40,7 +40,7 @@ class ObsScaling():
         for i in range(len(device_obss)):
             device_obss[i][0] = np.clip(device_obss[i][0], 0, 20) / 10
             device_obss[i][1] = np.clip(device_obss[i][1], 0, 20) / 10
-            for j in range(self.task_num):
+            for j in range(self.max_task_num):
                 device_obss[i][2 + j * 3] /= self.max_data_size
                 device_obss[i][2 + j * 3 + 1] /= self.max_comp_dens
                 device_obss[i][2 + j * 3 + 2] /= self.max_dly_cons

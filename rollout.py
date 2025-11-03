@@ -12,7 +12,7 @@ import sys, atexit, os
 class Rollout:
     def __init__(self, gen_params, alg_params):
         self.device_num = gen_params.device_num
-        self.task_num = gen_params.task_num
+        self.task_arrival_prob = gen_params.task_arrival_prob
         self.evaluate = gen_params.evaluate
         self.train_mode = gen_params.train_mode
         self.eval_mode = gen_params.eval_mode
@@ -49,7 +49,7 @@ class Rollout:
         # obs scaling
         if not self.evaluate or (self.evaluate and self.eval_mode[0] == "m"):
             if alg_params.use_obs_scaling:
-                self.obs_scaling = ObsScaling(gen_params.task_num, 
+                self.obs_scaling = ObsScaling(gen_params.max_task_num,
                                               gen_params.max_data_size,
                                               gen_params.max_comp_dens,
                                               gen_params.std_comp_freq)
@@ -159,9 +159,9 @@ class Rollout:
         
         # rollout
         time_slots = self.train_time_slots + 1 if not self.evaluate else self.eval_time_slots
+        cur_t_id = 1
         for t_id in range(1, time_slots + 1):
             # print("-------------time slot: " + str(t_id) + "-------------")
-            
             # choose action (use deterministic strategy during evaluation)
             device_acts = [None for i in range(self.device_num)]
             if "Mappo" in type(self.device_agents[0]).__name__:
@@ -170,23 +170,27 @@ class Rollout:
                 if not self.evaluate:
                     device_act_logprobs = [None for i in range(self.device_num)]
                 for i in range(self.device_num):
+                    task_num = self.mec_env.device_envs[i].task_num
+                    if task_num == 0:
+                        continue
                     act, act_logprob = self.device_agents[i].choose_action(device_obss[i])
                     device_acts[i] = act
-                    for j in range(self.task_num + 1):
-                        device_acts_[i].append(act[j] / 10)
+                    device_acts_[i] = act[0]
                     if not (act_logprob == None):
                         device_act_logprobs[i] = act_logprob
             if "Maddpg" in type(self.device_agents[0]).__name__:
                 # store actions used for interacting with the MEC env
                 device_acts_ = [[] for i in range(self.device_num)]
                 for i in range(self.device_num):
+                    task_num = self.mec_env.device_envs[i].task_num
+                    if task_num == 0:
+                        continue
                     act = self.device_agents[i].choose_action(device_obss[i])
                     device_acts[i] = act
-                    for j in range(self.task_num + 1):
-                        device_acts_[i].append((act[j * 10] + act[j * 10 + 1] + act[j * 10 + 2] + 
-                                                act[j * 10 + 3] + act[j * 10 + 4] + act[j * 10 + 5] +
-                                                act[j * 10 + 6] + act[j * 10 + 7] + act[j * 10 + 8] +
-                                                act[j * 10 + 9]) / 20)
+                    device_acts_[i] = ((act[0] + act[1] + act[2] + 
+                                                act[3] + act[4] + act[5] +
+                                                act[6] + act[7] + act[8] +
+                                                act[9]) / 10)
             if "Computing" in type(self.device_agents[0]).__name__:
                 for i in range(self.device_num):
                     act = self.device_agents[i].choose_action()
@@ -200,6 +204,8 @@ class Rollout:
             device_comp_expns, device_overtime_nums, \
             next_edge_obs, next_device_obss = self.mec_env.step(device_acts_, e_id, t_id)
             
+            if 
+
             self.average(t_id, joint_reward, device_rewards,
                                joint_cost, device_costs,
                                edge_comp_ql, device_comp_qls,
@@ -303,6 +309,9 @@ class Rollout:
                device_comp_dlys, device_csum_engys, \
                device_comp_expns, device_overtime_nums
     
+    def postProcess(self, e_id, t_id):
+        
+
     def average(self, t_id, joint_reward, device_rewards, 
                             joint_cost, device_costs, 
                             edge_comp_ql, device_comp_qls, 

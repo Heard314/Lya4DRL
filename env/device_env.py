@@ -9,7 +9,7 @@ class Task():
         self.device_id = device_id
         # unit: Mb
         self.data_size = data_size
-        # unit: Gcycles/bit
+        # unit: Gcycles/Mb
         self.comp_dens = comp_dens
         # unit: s
         self.dly_cons = None
@@ -33,6 +33,9 @@ class Task():
         self.norm_csum_engy = None
         self.norm_comp_expn = None
 
+        # 为了方便处理任务等待延时中的传输时间部分
+        self.edge_trans_time = None
+
     def __str__(self):
         return "data_size: " + str(self.data_size) + \
                "\ncomp_dens: " + str(self.comp_dens) + \
@@ -54,7 +57,7 @@ class DeviceEnv():
         self.device_type = gen_params.device_types[env_id]
         # unit: s
         self.delta = gen_params.delta
-        self.task_num = gen_params.task_num
+        self.task_arrival_prob = gen_params.task_arrival_prob[self.device_type]
         # unit: Hz
         self.bandwidth = gen_params.total_bandwidth / gen_params.device_num
         # unit: mW
@@ -71,23 +74,28 @@ class DeviceEnv():
         self.std_comp_freq = gen_params.std_comp_freq
         # unit: J/Gcycles
         self.engy_fac = gen_params.device_engy_facs[self.device_type]
-        # unit: KB
+        # unit: Mb
         self.data_size_inl = gen_params.data_size_inls[self.device_type]
-        # un0it: cycles/bit
+        # unit: cycles/Mb
         self.comp_dens_inl = gen_params.comp_dens_inls[self.device_type]
         # unit: $/Gcycles
         self.service_price = gen_params.service_price
         
+        self.max_task_num = gen_params.max_task_num
+
+        self.trans_ql = []
+
         # unit: Gcycles
         self.comp_ql = 0
         self.virtual_comp_ql = 0
-        data_size_mean = (self.data_size_inl[0] + self.data_size_inl[1]) / 2 * 1024 * 8 * pow(10, -6)
-        comp_dens_mean = (self.comp_dens_inl[0] + self.comp_dens_inl[1]) / 2 * pow(10, -9)
-        self.virtual_comp_ql_growth = gen_params.vir_comp_ql_growth_rate * data_size_mean * comp_dens_mean * pow(10, 6)
+        # unit: Mb
+        data_size_mean = (self.data_size_inl[0] + self.data_size_inl[1]) / 2 
+        # unit: Gcycles/Mb
+        comp_dens_mean = (self.comp_dens_inl[0] + self.comp_dens_inl[1]) / 2 
+        self.virtual_comp_ql_growth = gen_params.vir_comp_ql_growth_rate * data_size_mean * comp_dens_mean
         self.sched_tasks = []
         #! 动态时间阈值调整
         self.dynamic_delay_adjust_coef = 1.0
-        #TODO 后续可以考虑对动态时间阈值对超时程度的影响做进一步研究
     
     def reset(self):
         # reset computation-queue length
@@ -100,22 +108,25 @@ class DeviceEnv():
         # reset scheduling tasks
         self.sched_tasks.clear()
 
+        # reset transmission-queue
+        self.trans_ql.clear()
+
         #! 重置动态时间阈值
         self.dynamic_delay_adjust_coef = 1.0
-
+        
+        self.task_num = np.random.binomial(1, self.task_arrival_prob)
         for i in range(self.task_num):
             # unit: Mb
             data_size = np.random.uniform(self.data_size_inl[0],
                                           self.data_size_inl[1])
-            data_size = data_size * 1024 * 8 * pow(10, -6)
-            # unit: Gcycles/bit
+            # unit: Gcycles/Mb
             comp_dens = np.random.uniform(self.comp_dens_inl[0],
                                           self.comp_dens_inl[1])
-            comp_dens = comp_dens * pow(10, -9)
+            comp_dens = comp_dens
             
-            task = Task(data_size, comp_dens,self.env_id)
+            task = Task(data_size, comp_dens, self.env_id)
             
-            comp = data_size * pow(10, 6) * comp_dens
+            comp = data_size * comp_dens
             task.dly_cons = comp / self.std_comp_freq * self.dynamic_delay_adjust_coef
             task.norm_csum_engy = comp * self.engy_fac
             task.norm_comp_expn = comp * self.service_price
@@ -141,110 +152,118 @@ class DeviceEnv():
         
         return obs
 
-    # act: [offl_rto_1, offl_rto_2, ..., offl_rto_n, tspw_rto], all offl_rto are in [0, 1] and tspw_rto is in [0, 1]
+    # act: [offl_rto], offl_rto is in [0, 1] is in [0, 1]
     def compute(self, act, isPrint):
         '''offloading'''
         # offloading data-size
         offl_dzs = {}
-        
-        for i in range(self.task_num):
-            # offloading ratio
-            offl_rto = act[i]
-            offl_dz = self.sched_tasks[i].data_size * offl_rto
+        local_comps = {}
+        for i in range(self.max_task_num):
+            # offloading decision 0 or 1
+            is_offl = act[i]
+            if is_offl == 0:
+                offl_dz = 0
+                local_dz = self.sched_tasks[i].data_size
+            else:
+                offl_dz = self.sched_tasks[i].data_size
+                local_dz = 0
+                self.trans_ql.append(self.sched_tasks[i])
             offl_dzs[i] = offl_dz
+            local_comps[i] = local_dz * self.sched_tasks[i].comp_dens
+        
         #! 处理的任务的顺序为FIFO
-        # ascending order 
-        # offl_dzs = sorted(offl_dzs.items(), key = lambda x: x[1])
-        # transmission-power ratio
-        tspw_rto = act[-1]
-        trans_power = self.trans_power * tspw_rto
+        trans_power = self.trans_power
         # unit: Mb/s
         trans_rate = self.bandwidth * math.log(1 + trans_power * self.channel_gain / 
                                                self.noise_power, 2) * pow(10, -6)
+        if isPrint:
+            print("[DEBUG] The trans_rate is: ", trans_rate)
         total_trans_dz = trans_rate * self.delta
         total_offl_dz = 0
         total_offl_comp = 0
-        # local computation
-        local_comps = {}
-        for task_id, offl_dz in offl_dzs:
-            offl_dz = min(offl_dz, total_trans_dz)
-            total_trans_dz -= offl_dz
-            total_offl_dz += offl_dz
 
-            task = self.sched_tasks[task_id]
-            task.offl_dz = offl_dz
-            total_offl_comp += offl_dz * task.comp_dens
-            # if offl_dz = 0, there is no need to queue
-            if task.offl_dz == 0:
-                task.trans_time = 0
-                task.e_csum_engy = 0
-                task.comp_expn = 0
-            else:
-                task.trans_time = total_offl_dz / trans_rate
-                task.e_csum_engy = trans_power * pow(10, -3) * \
-                                   task.offl_dz / trans_rate
-                task.comp_expn = task.offl_dz * pow(10, 6) * task.comp_dens * \
+        prepared_trans_tasks = []
+        # process the transmission-queue
+        for i in len(self.trans_ql):
+            task = self.trans_ql[i]
+            if total_trans_dz >= task.offl_dz:
+                total_trans_dz -= task.offl_dz
+                total_offl_dz += task.offl_dz
+                task.trans_time += total_offl_dz / trans_rate
+                task.e_csum_engy += trans_power * pow(10, -3) * \
+                    task.offl_dz / trans_rate
+                task.comp_expn += task.offl_dz * task.comp_dens * \
                                  self.service_price
-            
-            local_comps[task_id] = (task.data_size - task.offl_dz) * pow(10, 6) * \
-                                    task.comp_dens
-            
+                total_offl_comp += task.comp_dens * task.offl_dz
+                task.edge_trans_time = task.offl_dz / trans_rate
+                task.offl_dz = 0
+                self.trans_ql.pop(i)
+                prepared_trans_tasks.append(task)
+            else:
+                total_offl_dz += total_trans_dz
+                task.trans_time += total_offl_dz / trans_rate
+                task.e_csum_engy += trans_power * pow(10, -3) * \
+                    total_trans_dz / trans_rate
+                task.comp_expn += total_trans_dz * task.comp_dens * \
+                                 self.service_price
+                task.offl_dz -= total_trans_dz
+                total_offl_comp += task.comp_dens * total_trans_dz
+                total_trans_dz = 0
+
         '''local computing'''
-        # ascending order
-        local_comps = sorted(local_comps.items(), key = lambda x: x[1])
         # computation-frequency ratio
         total_local_comp = self.comp_ql
         for task_id, local_comp in local_comps:
+            if local_comp == 0:
+                continue
             task = self.sched_tasks[task_id]
             total_local_comp += local_comp
             
-            # if local_comp = 0, there is no need to queue
-            if local_comp == 0:
-                task.l_comp_dly = 0
-                task.l_csum_engy = 0
-            else:
-                task.l_comp_dly = total_local_comp / self.device_comp_freq
-                task.l_csum_engy = self.engy_fac * local_comp
+            task.l_comp_dly = total_local_comp / self.device_comp_freq
+            task.l_csum_engy = self.engy_fac * local_comp
             if isPrint:
                 print("[DEBUG] The action of ", self.env_id, " is:", act)
                 print("[DEBUG] the actual previous local compute amount of ", self.env_id," is", total_local_comp)
                 print("[DEBUG] the actual local compute freq of ", self.env_id," is", self.device_comp_freq)
                 print("[DEBUG] the actual local compute delay of ", self.env_id," is", task.l_comp_dly)
-            
+        
+        #! Lya相关代码，修改完再启用
         # update computation-queue length
-        self.completed_comp = total_offl_comp + self.device_comp_freq * self.delta
+        # self.completed_comp = total_offl_comp + self.device_comp_freq * self.delta
         self.comp_ql = max(0, total_local_comp - self.device_comp_freq * self.delta)
-        print("[DEBUG] The virtual comp qs growth is: ", self.virtual_comp_ql_growth)
-        print("[DEBUG] The completed comp is: ", self.completed_comp)
-        self.virtual_comp_ql = max(0, self.virtual_comp_ql - self.completed_comp + self.virtual_comp_ql_growth)
+        # print("[DEBUG] The virtual comp qs growth is: ", self.virtual_comp_ql_growth)
+        # print("[DEBUG] The completed comp is: ", self.completed_comp)
+        # self.virtual_comp_ql = max(0, self.virtual_comp_ql - self.completed_comp + self.virtual_comp_ql_growth)
 
         # update channel gain
         self.channel_gain = self.path_loss * np.random.exponential(1)
         
-        # 随机生成新任务
+        # 生成新一轮的任务
         # update scheduling tasks
         sched_tasks = copy.copy(self.sched_tasks)
         self.sched_tasks.clear()
+        self.task_num = np.random.binomial(1, self.task_arrival_prob)
         for i in range(self.task_num):
             # unit: Mb
             data_size = np.random.uniform(self.data_size_inl[0],
                                           self.data_size_inl[1])
-            data_size = data_size * 1024 * 8 * pow(10, -6)
-            # unit: Gcycles/bit
+            data_size = data_size
+            # unit: Gcycles/Mb
             comp_dens = np.random.uniform(self.comp_dens_inl[0],
                                           self.comp_dens_inl[1])
-            comp_dens = comp_dens * pow(10, -9)
+            comp_dens = comp_dens
             
             task = Task(data_size, comp_dens, self.env_id)
             
-            comp = data_size * pow(10, 6) * comp_dens
+            comp = data_size * comp_dens
             task.dly_cons = comp / self.std_comp_freq * self.dynamic_delay_adjust_coef
             task.norm_csum_engy = comp * self.engy_fac
             task.norm_comp_expn = comp * self.service_price
             
             self.sched_tasks.append(task)
         
-        return sched_tasks
+        # 暂时先返回已准备好传输完成的任务
+        return prepared_trans_tasks
 
     def adjust_delay_threshold_coef(self, overtime_coef):
         exp_arg = min(overtime_coef - 1.5, 10.0)# 限制指数参数范围

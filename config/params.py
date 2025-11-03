@@ -7,7 +7,7 @@ from torch import device
 """
 general params
 """
-device_num = 20
+device_num = 50
 
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
@@ -36,26 +36,27 @@ def get_general_params():
                         help = "the number of time-slots for evaluation")
     
     # environment
-    parser.add_argument("--delta", type = float, default = 0.5, 
+    parser.add_argument("--delta", type = float, default = 0.1, 
                         help = "the duration of each time-slot (s)")
     
     parser.add_argument("--device_num", type = int, default = device_num,
                         help = "the number of devices")
 
-    parser.add_argument("--device_types", type = list, default = [0, 0, 0, 0, 0, \
-                                                                  0, 1, 1, 1, 1, \
-                                                                  2, 2, 2, 2, 3, \
-                                                                  3, 3, 3, 4, 4],\
+    parser.add_argument("--device_types", type = list, default = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4],
                         help = "the types of devices")
     
     parser.add_argument("--device_type_num", type = int, default = 5,
                         help = "the number of device types")
     
-    parser.add_argument("--task_num", type = int, default = 3,
-                        help = "the number of arrival tasks at each time-slot")
+    parser.add_argument("--task_arrival_prob", type = int, default = [1.0, 0.6, 0.2, 0.12, 0.1],
+                        help = "the probability of task arrival at each time slot")
     
+    parser.add_argument("--max_task_num", type = int, default = 10,
+                        help = "the maximum number of tasks at each time slot")
+
+    # 修改为10-15Mbps
     parser.add_argument("--total_bandwidth", type = float, 
-                        default = 10 * pow(10, 6),
+                        default = 20 * pow(10, 6),
                         help = "total bandwidth (Hz)")
     
     parser.add_argument("--device_trans_powers", type = list, 
@@ -71,7 +72,7 @@ def get_general_params():
                         help = "the spectral density of noise power (mW/Hz)")
     
     parser.add_argument("--device_comp_freqs", type = list, 
-                        default = [2.1, 2.5, 2.8, 2.2, 2.4], 
+                        default = [2.5, 2.5, 2.5, 2.5, 2.5], 
                         help = "the computation frequencies of devices (Gcycles/s)")
     
     parser.add_argument("--std_comp_freq", type = float, default = 2, 
@@ -82,16 +83,16 @@ def get_general_params():
                         help = "the energy factors of devices (J/Gcycles)")
     
     parser.add_argument("--data_size_inls", type = list, 
-                        default = [[256*0.8, 256*1.2], [512*0.8, 512*1.2], [768*0.8, 768*1.2], 
-                                   [1024*0.8, 1024*1.2], [2048*0.8, 2048*1.2]], 
-                        help = "the data-size intervals of tasks (KB)")
+                        default = [[0.5, 1.0], [0.8, 1.5], [2.4, 3.0], 
+                                   [1.8, 2.8], [2.5, 3.5]], 
+                        help = "the data-size intervals of tasks (Mb)")
     
     parser.add_argument("--comp_dens_inls", type = list, 
-                        default = [[10, 15], [15, 20], [20, 30],  
-                                 [30, 50],[25, 35]], 
-                        help = "the computation-density intervals of tasks (cycles/bit)")
+                        default = [[0.1, 0.2], [0.2, 0.4], [0.6, 0.8],  
+                                 [1.6, 1.8],[1.2, 1.4]], 
+                        help = "the computation-density intervals of tasks (Gcycles/Mb)")
     
-    parser.add_argument("--edge_comp_freq", type = float, default = 10240, 
+    parser.add_argument("--edge_comp_freq", type = float, default = 41.8,
                         help = "the computation frequency of MEC server (Gcycles/s)")
     
     parser.add_argument("--service_price", type = float, default = 0.1, 
@@ -106,12 +107,12 @@ def get_general_params():
                         help = "the weights of tasks' edge computation expense")
     
     parser.add_argument("--max_data_size", type = float, 
-                        default = 2560 * 1024 * 8 * pow(10, -6),
+                        default = 3.5,
                         help = "maximum data-size (Mb)")
     
     parser.add_argument("--max_comp_dens", type = float,
-                        default = 512 * pow(10, -9),
-                        help = "maximum computation density (Gcycles/bit)")
+                        default = 1.8,
+                        help = "maximum computation density (Gcycles/Mb)")
     
     parser.add_argument("--lyaV", type = float,
                         default = 0.2,
@@ -136,8 +137,8 @@ def get_mappo_params():
     
     parser.add_argument("--state_dim", type = int, default = 1+11*device_num,
                         help = "the dimension of global states")
-    
-    parser.add_argument("--action_dim", type = int, default = 4,
+    # 包含一个任务卸载决策和传输功率决策
+    parser.add_argument("--action_dim", type = int, default = 1,
                         help = "the dimension of agents' actions")
     
     parser.add_argument("--v_hid_dims", type = list, default = [200, 200],   
@@ -245,8 +246,8 @@ def get_maddpg_params():
     parser.add_argument("--state_action_dim", type = int, default = 1+51*device_num,
     # parser.add_argument("--state_action_dim", type = int, default = 256,
                         help = "the dimension of global states")
-    
-    parser.add_argument("--action_dim", type = int, default = 40,
+    # 包含一个任务卸载决策和传输功率决策
+    parser.add_argument("--action_dim", type = int, default = 10,
                         help = "the dimension of agents' actions")
     
     parser.add_argument("--v_hid_dims", type = list, default = [400, 400],

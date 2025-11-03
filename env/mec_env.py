@@ -16,6 +16,8 @@ class MECEnv():
         for i in range(self.device_num):
             self.device_envs.append(DeviceEnv(i, gen_params))
         self.lyaV = gen_params.lyaV
+        self.cur_t_id = 1
+        self.device_buffer = 
 
     def reset(self):
         edge_obs = self.edge_env.reset()
@@ -58,7 +60,6 @@ class MECEnv():
                 
                 comp_dly = max(task.l_comp_dly, task.e_comp_dly)
                 device_comp_dlys[i] += 1 / (j + 1) * (comp_dly - device_comp_dlys[i])
-                
                 csum_engy = task.l_csum_engy + task.e_csum_engy
                 device_csum_engys[i] += 1 / (j + 1) * (csum_engy - device_csum_engys[i])
                 comp_expn = task.comp_expn
