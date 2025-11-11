@@ -24,14 +24,17 @@ class MappoReplayBuffer():
                                          for i in range(self.train_freq)]
        self.joint_reward = [[None for j in range(self.train_time_slots + 1)]
                                   for i in range(self.train_freq)]
+       self.device_active = [[None for j in range(self.train_time_slots + 1)]
+                                  for i in range(self.train_freq)]
        
-   def store(self, edge_obs, device_obss, device_acts, device_act_logprobs, joint_reward):
+   def store(self, edge_obs, device_obss, device_acts, device_act_logprobs, joint_reward, device_active):
        self.edge_obs[self.ps[0]][self.ps[1]] = copy.copy(edge_obs)
        self.device_obss[self.ps[0]][self.ps[1]] = copy.copy(device_obss)
        self.device_acts[self.ps[0]][self.ps[1]] = copy.copy(device_acts)
        self.device_act_logprobs[self.ps[0]][self.ps[1]] = copy.copy(device_act_logprobs)
        self.joint_reward[self.ps[0]][self.ps[1]] = copy.copy(joint_reward)
-       
+       self.device_active[self.ps[0]][self.ps[1]] = copy.copy(device_active)
+
        # update positions
        if self.ps[1] == self.train_time_slots:
            self.ps[0] = (self.ps[0] + 1) % (self.train_freq)
@@ -85,6 +88,8 @@ class MappoReplayBuffer():
                            self.device_num, self.action_dim])
        act_logprobs = torch.zeros([self.train_freq, self.train_time_slots, 
                                    self.device_num, 1])
+       device_active = torch.zeros([self.train_freq, self.train_time_slots, 
+                                   self.device_num, 1])
        for i in range(self.train_freq):
            for j in range(self.train_time_slots):
                for k in range(self.device_num):
@@ -95,15 +100,18 @@ class MappoReplayBuffer():
                                                 dtype = torch.float)
                    act_logprobs[i, j, k] = torch.tensor(self.device_act_logprobs[i][j][k],
                                                         dtype = torch.float)
+                   device_active[i, j, k] = torch.tensor(self.device_active[i][j][k],
+                                                        dtype = torch.float)
        # [train_freq x train_time_slots, device_num, obs_dim]
        p_inputs = p_inputs.reshape([-1, self.device_num, self.obs_dim])
        # [train_freq x train_time_slots, device_num, action_dim]
        acts = acts.reshape([-1, self.device_num, self.action_dim])
        # [train_freq x train_time_slots, device_num, 1]
        act_logprobs = act_logprobs.reshape([-1, self.device_num, 1])
+       device_active = device_active.reshape([-1, self.device_num, 1])
        advs = advs.reshape([-1, 1])
        
-       return v_inputs, v_tags, p_inputs, acts, act_logprobs, advs
+       return v_inputs, v_tags, p_inputs, acts, act_logprobs, advs, device_active
    
 class MaddpgReplayBuffer():
    def __init__(self, gen_params, alg_params):

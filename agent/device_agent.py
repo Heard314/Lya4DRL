@@ -14,8 +14,13 @@ class MappoDeviceAgent():
         self.p_net = MappoPolicyNet(alg_params)
         
         self.evaluate = gen_params.evaluate
+
+        self.action_dim = alg_params.action_dim
         
-    def choose_action(self, obs):
+    def choose_action(self, obs, active: bool = True):
+        if not active:
+            return [0.0] * self.action_dim, 0.0
+
         p_inputs = GetPolicyInputs(obs)
         with torch.no_grad():
             mean, std = self.p_net(p_inputs)
@@ -107,7 +112,7 @@ class StaticDeviceAgent():
     def __init__(self, agent_id, gen_params):
         # agent id
         self.agent_id = agent_id
-        self.task_num = gen_params.task_num
+        self.max_task_num = gen_params.max_task_num
     
     @abstractmethod
     def choose_action(self):
@@ -118,7 +123,7 @@ class LocalComputingDeviceAgent(StaticDeviceAgent):
         super().__init__(agent_id, gen_params)
         
     def choose_action(self):
-        act = [0 for i in range(self.task_num + 1)]
+        act = [0 for i in range(self.max_task_num + 1)]
         
         return act
 
@@ -127,7 +132,7 @@ class EdgeComputingDeviceAgent(StaticDeviceAgent):
         super().__init__(agent_id, gen_params)
         
     def choose_action(self):
-        act = [1 for i in range(self.task_num + 1)]
+        act = [1 for i in range(self.max_task_num + 1)]
         
         return act
 
@@ -136,6 +141,6 @@ class RandomComputingDeviceAgent(StaticDeviceAgent):
         super().__init__(agent_id, gen_params)
         
     def choose_action(self):
-        act = [np.random.uniform(0, 1) for i in range(self.task_num + 1)]
+        act = [np.random.uniform(0, 1) for i in range(self.max_task_num + 1)]
         
         return act

@@ -99,14 +99,15 @@ class MappoEdgeAgent():
         # acts: [train_freq x train_time_slots, device_num, action_dim]
         # act_logprobs: [train_freq x train_time_slots, device_num, 1]
         # advs: [train_freq x train_time_slots, 1]
+        # active_masks: [train_freq x train_time_slots, device_num, 1] 当前智能体是否需要处理任务
         v_inputs, v_tags, p_inputs, \
-        acts, act_logprobs, advs = replay_buffer.get_training_data(self.v_net)
+        acts, act_logprobs, advs, active_masks = replay_buffer.get_training_data(self.v_net)
                                     
         self.train_value_net(v_inputs, v_tags)
         
         for i in range(self.device_num):
             # 训练策略网络依然只用局部信息
-            self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs)
+            self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs, active_masks=active_masks[:, i])
         
         if self.use_lr_decay:
             self.decay_lr()
@@ -192,7 +193,7 @@ class MappoEdgeAgent():
     #             self.p_optimizers[agent_id].step()
                 
 
-    def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs):
+    def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs, active_masks):
         total_size = self.train_freq * self.train_time_slots
         for e in range(self.p_epochs):
             for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
@@ -210,14 +211,24 @@ class MappoEdgeAgent():
                 old_act_logprobs = act_logprobs[ids].reshape([-1])
                 ratios = torch.exp(new_act_logprobs - old_act_logprobs)
                 
-                surr1 = ratios * advs[ids].reshape([-1])
+                #! 取出子批次的mask
+                mask_b = active_masks[ids]
+                adv_b = advs[ids]
+
+                # PPO-clip
+                surr1 = ratios * adv_b.reshape([-1])
                 surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * \
-                        advs[ids].reshape([-1])
+                        adv_b.reshape([-1])
                 
-                loss = -(torch.min(surr1, surr2) + self.enty_coef * enty)
+                # 只用有效样本算平均值
+                denom = mask_b.sum().clamp_min(1.0)  # 防 0
+                policy_loss = -(torch.min(surr1, surr2) * mask_b).sum() / denom
+                ent_loss    = -(enty * self.enty_coef * mask_b).sum() / denom
+
+                loss = policy_loss + ent_loss
                 
                 self.p_optimizers[agent_id].zero_grad()
-                loss.mean().backward()
+                loss.backward()
                 
                 # gradient clip
                 if self.use_grad_clip:  
