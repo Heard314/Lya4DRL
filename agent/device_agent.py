@@ -5,6 +5,8 @@ from torch.distributions import Normal
 from network.policy_net import MappoPolicyNet, MaddpgPolicyNet
 from util.utils import GetPolicyInputs, GaussianNoise
 import math
+import config.global_params as gp
+
 class MappoDeviceAgent():
     def __init__(self, agent_id, gen_params, alg_params):
         # agent id
@@ -17,60 +19,78 @@ class MappoDeviceAgent():
 
         self.action_dim = alg_params.action_dim
         
+    # def choose_action(self, obs, active: bool = True):
+    #     if not active:
+    #         return [0.0] * self.action_dim, 0.0
+
+    #     p_inputs = GetPolicyInputs(obs)
+    #     with torch.no_grad():
+    #         mean, std = self.p_net(p_inputs)
+    #     if self.evaluate:
+    #         act = mean.squeeze(dim = 0).tolist()
+    #         act_logprob = None
+    #     else:
+    #         dist = Normal(mean, std)
+    #         act = dist.sample()
+    #         act = torch.clamp(act, 0, 10)
+    #         act_logprob = dist.log_prob(act).sum(-1)
+    #         act = act.squeeze(dim = 0).tolist()
+    #         act_logprob = float(act_logprob)
+            
+    #     return act, act_logprob
+    
     def choose_action(self, obs, active: bool = True):
+
+        enable_print = gp.settings.enable_print
+
         if not active:
             return [0.0] * self.action_dim, 0.0
 
         p_inputs = GetPolicyInputs(obs)
         with torch.no_grad():
             mean, std = self.p_net(p_inputs)
+        
+        if enable_print: print(f"[DEBUG] the p_net output: mean({mean}), std({std})")
+
+        # 数值稳定：避免 std 太小
+        std = torch.clamp(std, min=1e-6)
+
+        # ===== 逐维映射参数 =====
+        # dim0 -> [0,10]: scale=5, loc=5
+        # dim1 -> [6,10]: scale=2, loc=8
+        # dim2 -> [6,10]: scale=2, loc=8
+        scale = self.p_net.act_scale.expand_as(mean)
+        loc   = self.p_net.act_bias.expand_as(mean)
+
         if self.evaluate:
-            act = mean.squeeze(dim = 0).tolist()
+            # 确定性：用均值 -> tanh -> 分维线性映射
+            u = mean
+            a = torch.tanh(u)
+            action = a * scale + loc
+            act = action.squeeze(0).tolist()
             act_logprob = None
         else:
+            # 2) 采样未压缩动作
             dist = Normal(mean, std)
-            act = dist.sample()
-            act = torch.clamp(act, 0, 10)
-            act_logprob = dist.log_prob(act).sum(-1)
-            act = act.squeeze(dim = 0).tolist()
-            act_logprob = float(act_logprob)
-            
+            u = dist.rsample()        # 重参数化
+
+            # 3) 分维线性映射到目标区间
+            a = torch.tanh(u)
+            action = a * scale + loc
+
+            # 4) 正确的 log_prob（高斯 + tanh 的雅可比 + 线性缩放的雅可比）
+            normal_logp = (-0.5 * (
+                ((u - mean) / (std + 1e-6))**2 +
+                2*torch.log(std + 1e-6) +
+                math.log(2*math.pi)
+            )).sum(-1)
+            squash = torch.log(1 - a.pow(2) + 1e-6).sum(-1)
+            scale_logsum = torch.log(scale).sum(-1)
+            logp = normal_logp - squash - scale_logsum
+
+            act = action.squeeze(0).tolist()
+            act_logprob = float(logp)
         return act, act_logprob
-    
-    # def choose_action(self, obs):
-    #     p_inputs = GetPolicyInputs(obs)
-    #     with torch.no_grad():
-    #         mean, std = self.p_net(p_inputs)
-    #     if self.evaluate:
-    #         # 确定性：用均值 -> tanh -> 映射到 [0,10]
-    #         u = mean
-    #         a = torch.tanh(u)
-    #         action = a * 5.0 + 5.0    # [0,10]
-    #         act = action.squeeze(0).tolist()
-    #         act_logprob = None
-    #     else:
-    #         # 2) 采样未压缩动作
-    #         dist = Normal(mean, std)
-    #         u = dist.rsample()        # 重参数化
-
-    #         # 3) tanh 压缩 & 线性映射到 [0,10]
-    #         a = torch.tanh(u)
-    #         action = a * 5.0 + 5.0
-
-    #         # 4) 正确的 log_prob（高斯 + tanh 的雅可比 + 线性缩放的雅可比）
-    #         normal_logp = (-0.5 * (
-    #             ((u - mean) / (std + 1e-6))**2 +
-    #             2*torch.log(std + 1e-6) +
-    #             math.log(2*math.pi)
-    #         )).sum(-1)
-    #         squash = torch.log(1 - a.pow(2) + 1e-6).sum(-1)
-    #         scale  = math.log(5.0) * mean.shape[-1]  # 每维 scale=5，求和后是常数
-    #         logp = normal_logp - squash - scale
-
-    #         act = action.squeeze(0).tolist()
-    #         act_logprob = float(logp)
-
-    #     return act, act_logprob
 
     def update_net(self, params):
         self.p_net.load_state_dict(params)

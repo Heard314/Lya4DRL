@@ -100,14 +100,13 @@ class MECEnv():
                                                   csum_engy / norm_csum_engy +
                                                   self.expense_weights[device_type] * 
                                                   comp_expn / norm_comp_expn)
-                if(enable_print): print(f"[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
+                # if(enable_print): print(f"[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
                 # device_rewards[i] = self.lyaV * device_rewards[i] + \
                 #                     (self.device_envs[i].comp_ql + self.device_envs[i].virtual_comp_ql) * \
                 #                     self.device_envs[i].completed_comp
-                # if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
-                #     print("[DEBUG] The device", i, "'s lya reward is: ", (self.device_envs[i].comp_ql + self.device_envs[i].virtual_comp_ql) * \
+                
+                # if(enable_print): print(f"[DEBUG] The device", i, "'s lya reward is: ", (self.device_envs[i].comp_ql + self.device_envs[i].virtual_comp_ql) * \
                 #                     self.device_envs[i].completed_comp)
-                #     print("[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
         joint_reward = sum(device_rewards)
         joint_cost = sum(device_costs)
         

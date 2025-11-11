@@ -94,19 +94,30 @@ $$
 \begin{aligned}
 (\mathrm{P1}):\ & \min_{\mathcal{P},\,\Theta}\ \mathbb{E} \left\{ 
 \lim_{T \to \infty} \frac{1}{T} 
-\sum_{t=1}^{T} \sum_{i=1}^{N} c_{i}(t)
+\sum_{t=1}^{T} \sum_{i=1}^{N} cost_{i}(t)
 \right\} \\
+&= \\
 \text{s.t.}\quad 
 & (\mathrm{C1}):\ p_i(t) \in [0,\, p_i^{\max}], \quad 1 \le i \le N.\\
 & (\mathrm{C2}):\ \theta_{i}(t) \in [0,\,1], \quad 1 \le i \le N.\\
 & (\mathrm{C3}):\ d_{i}(t) \le d^c_{i}(t), \quad 1 \le i \le N.\\
-& (\mathrm{C4}):\ \lim_{t\to\infty}\frac{\mathbb{E}\!\left[Q_{local,i}(t)\right]}{t}=0,  1 \le n \le N.\\
-& (\mathrm{C5}):\ \lim_{t\to\infty}\frac{\mathbb{E}\!\left[H_{local,i}(t)\right]}{t}=0,  1 \le n \le N.\\
-& (\mathrm{C6}):\ \lim_{t\to\infty}\frac{\mathbb{E}\!\left[Q_{edge,i}(t)\right]}{t}=0,  1 \le n \le N.\\
-& (\mathrm{C7}):\ \lim_{t\to\infty}\frac{\mathbb{E}\!\left[H_{edge,i}(t)\right]}{t}=0,  1 \le n \le N.\\
+& (\mathrm{C4}):\ f_{local,i}(t) \leq f_{local,i}^{\max}, \quad 1 \le i \le N. \\
+& (\mathrm{C4}):\ \lim_{t\to\infty}\frac{\mathbb{E}\!\left[Q_{local,i}(t)\right]}{t}=0,  1 \le i \le N.\\
+& (\mathrm{C5}):\ \lim_{t\to\infty}\frac{\mathbb{E}\!\left[H_{local,i}(t)\right]}{t}=0,  1 \le i \le N.\\
+& (\mathrm{C6}):\ \lim_{t\to\infty}\frac{\mathbb{E}\!\left[Q_{edge,i}(t)\right]}{t}=0,  1 \le i \le N.\\
+& (\mathrm{C7}):\ \lim_{t\to\infty}\frac{\mathbb{E}\!\left[H_{edge,i}(t)\right]}{t}=0,  1 \le i \le N.\\
 \end{aligned}
 $$
-C1为传输速率约束，C2为任务卸载率约束，C3旨在确保任务的延迟不超过指定的阈值，C4~C7为队列稳定性保证。
+其中：
+$$
+\begin{aligned}
+cost_i(t)
+&=\lambda_e e_{i}(t)+\lambda_c c_{i}(t) \\
+\end{aligned}
+$$
+其中$\lambda_e$和$\lambda_c$是控制本地计算能耗与远程服务器耗费的权重。
+
+C1为传输速率约束，C2为任务卸载率约束，C3旨在确保任务的延迟不超过指定的阈值，C4为本地计算变量约束，C4~C7为队列稳定性保证。
 
 通过引入Lyapunov优化，可以将C4-C7转换为Lyapunov漂移项放入优化目标中。
 
@@ -131,20 +142,36 @@ $$
 \Delta L (H_{local}(t))
 &= \mathbb{E}[L (H_{local,i}(t+1))-L (H_{local,i}(t))\mid Q(t)]\\
 &= \mathbb{E}[\frac{1}{2}(\sum_{i=1}^{N} H_{local,i}(t+1)^2-\sum_{i=1}^{N} H_{local,i}(t)^2)\mid Q(t)]\\
-&\leq  \mathbb{E}[\frac{1}{2}\sum_{i=1}^{N}(H_{edge,i}(t)+\epsilon_{edge,i}-A_{edge,i}(t))^2-H_{local,i}(t)^2\mid Q(t)]\\
+&\leq  \mathbb{E}[\frac{1}{2}\sum_{i=1}^{N}(H_{local,i}(t)+\epsilon_{local,i}-A_{local,i}(t))^2-H_{local,i}(t)^2\mid Q(t)]\\
 &=\mathbb{E} [ \sum_{i=1}^{N}\big(\frac{1}{2}(\epsilon_{edge,i}-A_{edge,i}(t))^2 + H_{local,i}(t)\big(\epsilon_{edge,i}-A_{edge,i}(t)\big)\mid Q(t)]\\
 &\leq Z_{local,H} +  \mathbb{E}\!\left[\sum_{i=1}^{N} H_{local,i}(t)\big(\epsilon_{edge,i}-A_{edge,i}(t)\big)\,\middle|\, Q(t)\right] \\
 \end{aligned}
 $$
 
+
+
+
+
+
 $$
 \begin{aligned}
-\Delta L (Q_{local,i}(t))
-&= \mathbb{E}[L (Q_{local,i}(t+1))-L (Q_{local,i}(t))\mid Q(t)]\\
-&= \mathbb{E}[\frac{1}{2}(\sum_{i=1}^{N} Q_{local,i}(t+1)^2-\sum_{i=1}^{N} Q_{local,i}(t)^2)\mid Q(t)]\\
-&\leq  \mathbb{E}[\frac{1}{2}\sum_{i=1}^{N}(Q_{local,i}(t)+C_{local,i}(t)-A_{local,i}(t))^2-Q_{local,i}(t)^2\mid Q(t)]\\
-&=\mathbb{E} [ \sum_{i=1}^{N}\big(\frac{1}{2}(C_{local,i}(t)-A_{local,i}(t)^2) + Q_{local,i}(t)\big(C_{local,i}(t)-A_{local,i}(t)\big)\mid Q(t)]\\
-&\leq Z_{local,i} +  \mathbb{E}\!\left[\sum_{i=1}^{N} Q_{local,i}(t)\big(C_{local,i}(t)-A_{local,i}(t)\big)\,\middle|\, Q(t)\right] \\
+\Delta L (Q_{edge,i}(t))
+&= \mathbb{E}[L (Q_{edge,i}(t+1))-L (Q_{edge,i}(t))\mid Q(t)]\\
+&= \mathbb{E}[\frac{1}{2}(\sum_{i=1}^{N} Q_{edge,i}(t+1)^2-\sum_{i=1}^{N} Q_{edge,i}(t)^2)\mid Q(t)]\\
+&\leq  \mathbb{E}[\frac{1}{2}\sum_{i=1}^{N}(Q_{edge,i}(t)+\sum_{j \in S_i} C_{edge,j}(t)-A_{edge,i}(t))^2-Q_{edge,i}(t)^2\mid Q(t)]\\
+&=\mathbb{E} [ \sum_{i=1}^{N}\big(\frac{1}{2}(\sum_{j \in S_i} C_{edge,j}(t)-A_{edge,i}(t))^2 + Q_{edge,i}(t)\big(\sum_{j \in S_i} C_{edge,j}(t)-A_{edge,i}(t)\big)\mid Q(t)]\\
+&\leq Z_{edge,Q} +  \mathbb{E}\!\left[\sum_{i=1}^{N} Q_{edge,i}(t)\big(\sum_{j \in S_i} C_{edge,j}(t)-A_{edge,i}(t)\big)\,\middle|\, Q(t)\right] \\
+\end{aligned}
+$$
+
+$$
+\begin{aligned}
+\Delta L (H_{edge,i}(t))
+&= \mathbb{E}[L (H_{edge,i}(t+1))-L (H_{edge,i}(t))\mid Q(t)]\\
+&= \mathbb{E}[\frac{1}{2}(\sum_{i=1}^{N} H_{edge,i}(t+1)^2-\sum_{i=1}^{N} H_{edge,i}(t)^2)\mid Q(t)]\\
+&\leq  \mathbb{E}[\frac{1}{2}\sum_{i=1}^{N}(H_{edge,i}(t)+\epsilon_{edge,i}-A_{edge,i}(t))^2-H_{edge,i}(t)^2\mid Q(t)]\\
+&=\mathbb{E} [ \sum_{i=1}^{N}\big(\frac{1}{2}(\epsilon_{edge,i}-A_{edge,i}(t))^2 + Q_{edge,i}(t)\big(\epsilon_{edge,i}-A_{edge,i}(t)\big)\mid Q(t)]\\
+&\leq Z_{edge,Q} +  \mathbb{E}\!\left[\sum_{i=1}^{N} Q_{edge,i}(t)\big(\epsilon_{edge,i}-A_{edge,i}(t)\big)\,\middle|\, Q(t)\right] \\
 \end{aligned}
 $$
 
@@ -153,11 +180,9 @@ $$
 
 
 
-
-
 $$
 \begin{aligned}
-\Delta (\mathbf{Q}(t)) 
+\Delta L(\mathbf{Q}(t)) 
 &= \mathbb{E}\!\left[\,L(\mathbf{Q}(t+1)) - L(\mathbf{Q}(t)) \,\middle|\, \mathbf{Q}(t)\right]\\
 &\leq Z + \mathbb{E}\!\left[
 \sum_{i=1}^{N} Q_{local,i}(t)\big(C_{local,i}(t)-A_{local,i}(t)\big)
@@ -173,15 +198,55 @@ $$
 \,\middle|\, Q(t)\right].
 \end{aligned}
 $$
-
-
-
-
 其中$Z$为一个常数。
 
-带漂移惩罚的优化目标$\mathrm{P2}$如下式所示：
+可得到优化目标Drift-Plus-Penalty (DPP)，如下式所示：
 $$
-\Gamma \mathrm{P1} + \Delta (\mathbf{Q}(t))
+\begin{aligned}
+\Gamma \mathbb{E}[\sum_{i=1}^{N} cost_{i}(t)\mid Q(t)]  + \Delta L (\mathbf{Q}(t))
+&\leq \Gamma \mathbb{E}[\sum_{i=1}^{N} cost_{i}(t)\mid Q(t)] + Z\\
+&\quad + \mathbb{E}\!\left[
+\sum_{i=1}^{N} Q_{local,i}(t)\big(C_{local,i}(t)-A_{local,i}(t)\big)
+\,\middle|\, Q(t)\right] \\
+&\quad + \mathbb{E}\!\left[
+\sum_{i=1}^{N} H_{local,i}(t)\big(\epsilon_{local,i}-A_{local,i}(t)\big)
+\,\middle|\, Q(t)\right] \\
+&\quad + \mathbb{E}\!\left[
+\sum_{i=1}^{K} Q_{edge,i}(t)\big(C_{edge,i}-A_{edge,i}(t)\big)
+\,\middle|\, Q(t)\right] \\
+&\quad + \mathbb{E}\!\left[
+\sum_{i=1}^{K} H_{edge,i}(t)\big(\epsilon_{edge,i}-A_{edge,i}(t)\big)
+\,\middle|\, Q(t)\right].
+\end{aligned}
+$$
+
+将其转换为每个设备的奖励函数：
+$$
+\begin{aligned}
+r_i(t) 
+&=r_{i,cost}(t)+r_{i,Q}(t)
+\end{aligned}
+$$
+
+$$
+r_{i,cost}(t) =
+\begin{cases}
+-C_1\, cost^{\mathrm{norm}}_{i}(t), & d_{m,n}(t)
+\end{cases}
+
+
+r_{m,n}(t) =
+\begin{cases}
+ -C_1\, c^{\mathrm{norm}}_{m,n}(t), & d_i(t) \le d^{c}_{i}(t), \\
+ C_2,\log(\frac{d_i(t)}{d_i^c(t)}-1+e) & d_{i}(t) > d^{c}_{i}(t)
+\end{cases}
+$$
+
+$$
+\begin{aligned}
+r_{i,Q}(t) &=\omega_{1}\big(Q_{local,i}(t)(C_{local,i}(t)-A_{local,i}(t)) + H_{local,i}(t)(\epsilon_{local,i}-A_{local,i}(t))\big)\\
+&\quad + \omega_{2}\big(Q_{edge,i}(t)(C_{edge,i}-A_{edge,i}(t)) + H_{edge,i}(t)(\epsilon_{edge,i}-A_{edge,i}(t))\big)
+\end{aligned}
 $$
 
 

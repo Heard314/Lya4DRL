@@ -91,7 +91,9 @@ class DeviceEnv():
         self.trans_ql = 0
         data_size_mean = (self.data_size_inl[0] + self.data_size_inl[1]) / 2
         comp_dens_mean = (self.comp_dens_inl[0] + self.comp_dens_inl[1]) / 2
-        self.virtual_comp_ql_growth = gen_params.vir_comp_ql_growth_rate * data_size_mean * comp_dens_mean
+        task_arrival_prob = gen_params.task_arrival_prob[self.device_type]
+        comp_dly_cons = gen_params.comp_dly_cons[self.device_type]
+        self.virtual_comp_ql_growth = gen_params.vir_local_ql_growth_rate * data_size_mean * comp_dens_mean * task_arrival_prob / comp_dly_cons
         self.sched_tasks = []
         #! 动态时间阈值调整
         self.dynamic_delay_adjust_coef = 1.0
@@ -139,6 +141,7 @@ class DeviceEnv():
         obs = self.get_obs()
         
         return obs
+
     # 只考虑有一个任务的情况
     def get_obs(self):
         device_type = [1 if i == self.device_type else 0 for i in range(self.device_type_num)] #onehot编码
@@ -165,23 +168,33 @@ class DeviceEnv():
         return obs
 
     #! 目前每个时隙至多只传输一个任务的数据
-    # act: [offl_rto], all in [0, 1]
+    # act: [offl_rto, trans_rto, local_comp_rto], all in [0, 1]
     def compute(self, act):
         enable_print = gp.settings.enable_print
         '''offloading'''
         # offloading data-size
         offl_dzs = []
+        trans_power = self.trans_power
+        device_comp_freq = self.device_comp_freq
         if(enable_print): print(f"[DEBUG] The action of device {self.env_id} is {act}")
-        for i in range(self.task_num):
+        if self.task_num>=1:
             # offloading ratio
-            offl_rto = act[i]
-            offl_dz = self.sched_tasks[i].data_size * offl_rto
+            offl_rto = act[0]
+            offl_dz = self.sched_tasks[0].data_size * offl_rto
             offl_dzs.append(offl_dz)
+            # transmission-power ratio
+            trpw_rto = act[1]
+            trans_power = self.trans_power * trpw_rto
+            # local compute ratio
+            device_comp_rto = act[2]
+            device_comp_freq = self.device_comp_freq * device_comp_rto
         #! 处理的任务的顺序为FIFO
         # ascending order 
         # offl_dzs = sorted(offl_dzs.items(), key = lambda x: x[1])
-        trans_power = self.trans_power # 传输功耗是满的
+        # trans_power = self.trans_power # 传输功耗是满的
         # unit: Mb/s
+        # print(f"[DEBUG] the full ratio trans_rate is {self.bandwidth * math.log(1 + self.trans_power * self.channel_gain / self.noise_power, 2) * pow(10, -6)}")
+        # print(f"[DEBUG] bandwidth: {self.bandwidth}, trans_power: {self.trans_power}, channel_gain: {self.channel_gain}, noise_power: {self.noise_power}")
         trans_rate = self.bandwidth * math.log(1 + trans_power * self.channel_gain / 
                                                self.noise_power, 2) * pow(10, -6)
         delta_trans_dz = trans_rate * self.delta
@@ -228,20 +241,20 @@ class DeviceEnv():
                 task.l_comp_dly = 0
                 task.l_csum_engy = 0
             else:
-                task.l_comp_dly = total_local_comp / self.device_comp_freq
+                task.l_comp_dly = total_local_comp / device_comp_freq
                 task.l_csum_engy = self.engy_fac * local_comp
             if(enable_print): print(f"[DEBUG] the local comp_dly in device {self.env_id} is {task.l_comp_dly}")
             # if isPrint:
             #     print("[DEBUG] The action of ", self.env_id, " is:", act)
             #     print("[DEBUG] the actual previous local compute amount of ", self.env_id," is", total_local_comp)
-            #     print("[DEBUG] the actual local compute freq of ", self.env_id," is", self.device_comp_freq)
+            #     print("[DEBUG] the actual local compute freq of ", self.env_id," is", device_comp_freq)
             #     print("[DEBUG] the actual local compute delay of ", self.env_id," is", task.l_comp_dly)
         
         #! 后面再改队列相关的部分
         # update computation-queue length
-        self.completed_comp = total_offl_comp + self.device_comp_freq * self.delta
-        self.comp_ql = max(0, total_local_comp - self.device_comp_freq * self.delta)
-        # if(enable_print): print(f"[DEBUG] The calculated amount in device {self.env_id} in this episode is {self.device_comp_freq * self.delta}")
+        self.completed_comp = total_offl_comp + device_comp_freq * self.delta
+        self.comp_ql = max(0, total_local_comp - device_comp_freq * self.delta)
+        # if(enable_print): print(f"[DEBUG] The calculated amount in device {self.env_id} in this episode is {device_comp_freq * self.delta}")
         if(enable_print): print(f"[DEBUG] After compute, the comp_ql in device {self.env_id} is {self.comp_ql}")
         # print("[DEBUG] The virtual comp qs growth is: ", self.virtual_comp_ql_growth)
         # print("[DEBUG] The completed comp is: ", self.completed_comp)

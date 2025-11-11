@@ -52,6 +52,8 @@ class Rollout:
             if self.evaluate and self.eval_mode == "random_comp":
                 self.device_agents.append(RandomComputingDeviceAgent(i, gen_params))
 
+        self.action_dim = alg_params.action_dim
+
         # training
         if not self.evaluate:
             # fix random seed
@@ -182,8 +184,9 @@ class Rollout:
                     act, act_logprob = self.device_agents[i].choose_action(device_obss[i], active=device_active[i])
                     device_acts[i] = act
                     # 当不需要处理其他任务时设为0
-                    for j in range(task_num):
-                        device_acts_[i].append(act[j] / 10)
+                    if task_num >= 1:
+                        for j in range(self.action_dim):
+                            device_acts_[i].append(act[j] / 10)
                     if not (act_logprob == None):
                         device_act_logprobs[i] = act_logprob
             if "Maddpg" in type(self.device_agents[0]).__name__:

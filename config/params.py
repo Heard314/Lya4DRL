@@ -58,7 +58,7 @@ def get_general_params():
 
     # 修改为10-15Mbps
     parser.add_argument("--total_bandwidth", type = float, 
-                        default = 20 * pow(10, 6),
+                        default = 40 * pow(10, 6),
                         help = "total bandwidth (Hz)")
     
     parser.add_argument("--device_trans_powers", type = list, 
@@ -125,9 +125,21 @@ def get_general_params():
                         default = 0.2,
                         help = "The lya algorithm weights for task rewards")
 
-    parser.add_argument("--vir_comp_ql_growth_rate", type = float,
+    parser.add_argument("--vir_local_ql_growth_rate", type = float,
                         default = 0.95,
-                        help = "The length growth rate of the virtual computing queue on the device")
+                        help = "The length growth rate of the virtual computing queue on the local device")
+
+    parser.add_argument("--vir_edge_ql_growth_rate", type = float,
+                        default = 0.95,
+                        help = "The length growth rate of the virtual computing queue on the edge server")
+
+    parser.add_argument("--local_reward_weight", type = float,
+                        default = 0.4,
+                        help = "The Lyapunov Drift-Plus-Penalty weight for local queues")
+
+    parser.add_argument("--edge_reward_weight", type = float,
+                        default = 0.3,
+                        help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     params = parser.parse_args()
     
@@ -145,8 +157,8 @@ def get_mappo_params():
     parser.add_argument("--state_dim", type = int, default = 10 + deivce_obs_dim*device_num,
                         help = "the dimension of global states")
     
-    # 包含一个任务卸载决策和传输功率决策
-    parser.add_argument("--action_dim", type = int, default = 1,
+    # 包含：任务远程卸载率、传输能耗利用率、本地计算频率利用率
+    parser.add_argument("--action_dim", type = int, default = 3,
                         help = "the dimension of agents' actions")
     
     parser.add_argument("--v_hid_dims", type = list, default = [200, 200],   
