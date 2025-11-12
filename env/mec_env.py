@@ -10,14 +10,16 @@ class MECEnv():
         self.expense_weights = gen_params.expense_weights
         self.energy_weights = gen_params.energy_weights
         self.time_slots = time_slots
+        self.device_type_num = gen_params.device_type_num
         # edge env
         self.edge_env = EdgeEnv(gen_params)
         # device envs
         self.device_envs = []
         for i in range(self.device_num):
             self.device_envs.append(DeviceEnv(i, gen_params))
-        self.lyaV = gen_params.lyaV
-
+        # self.lyaV = gen_params.lyaV
+        self.local_reward_weight = gen_params.local_reward_weight
+        self.edge_reward_weight = gen_params.edge_reward_weight
     def reset(self):
         edge_obs = self.edge_env.reset()
         
@@ -29,7 +31,7 @@ class MECEnv():
     
     def step(self, device_acts, e_id, t_id):
 
-        if e_id % 10 == 0:
+        if e_id % 10 == 1:
             gp.settings.enable_print = True
         else:
             gp.settings.enable_print = False
@@ -44,6 +46,8 @@ class MECEnv():
         
         # reward
         device_rewards = [0 for i in range(self.device_num)]
+        edge_queue_num = self.device_type_num
+        edge_rewards = [0 for i in range(edge_queue_num)]
         device_costs = [0 for i in range(self.device_num)]
         device_comp_dlys = [0 for i in range(self.device_num)]
         device_csum_engys = [0 for i in range(self.device_num)]
@@ -100,14 +104,37 @@ class MECEnv():
                                                   csum_engy / norm_csum_engy +
                                                   self.expense_weights[device_type] * 
                                                   comp_expn / norm_comp_expn)
-                # if(enable_print): print(f"[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
-                # device_rewards[i] = self.lyaV * device_rewards[i] + \
-                #                     (self.device_envs[i].comp_ql + self.device_envs[i].virtual_comp_ql) * \
-                #                     self.device_envs[i].completed_comp
-                
-                # if(enable_print): print(f"[DEBUG] The device", i, "'s lya reward is: ", (self.device_envs[i].comp_ql + self.device_envs[i].virtual_comp_ql) * \
-                #                     self.device_envs[i].completed_comp)
-        joint_reward = sum(device_rewards)
+                if(enable_print): print(f"[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
+                device_rewards[i] = device_rewards[i] + \
+                                    self.local_reward_weight * \
+                                    (self.device_envs[i].comp_ql * (self.device_envs[i].new_local_comp - self.device_envs[i].completed_comp) + \
+                                    self.device_envs[i].virtual_comp_ql * (self.device_envs[i].virtual_comp_ql_growth - self.device_envs[i].completed_comp))
+                if(enable_print): print(f"[DEBUG] The device", i, "'s old_comp_ql is: ", self.device_envs[i].old_comp_ql)
+                if(enable_print): print(f"[DEBUG] The device", i, "'s old_virtual_comp_ql is: ", self.device_envs[i].old_virtual_comp_ql)
+                if(enable_print): print(f"[DEBUG] The device", i, "'s new_local_comp is: ", self.device_envs[i].new_local_comp)
+                if(enable_print): print(f"[DEBUG] The device", i, "'s completed_comp is: ", self.device_envs[i].completed_comp)
+                if(enable_print): print(f"[DEBUG] The device", i, "'s virtual_comp_ql_growth is: ", self.device_envs[i].virtual_comp_ql_growth)
+                if(enable_print): print(f"[DEBUG] The device", i, "'s comp_ql is: ", self.device_envs[i].comp_ql)
+                if(enable_print): print(f"[DEBUG] The device", i, "'s virtual_comp_ql is: ", self.device_envs[i].virtual_comp_ql)
+                if(enable_print): print(f"[DEBUG] The device", i, "'s lya reward is: ", self.local_reward_weight * \
+                                    (self.device_envs[i].comp_ql * (self.device_envs[i].new_local_comp - self.device_envs[i].completed_comp) + \
+                                    self.device_envs[i].virtual_comp_ql * (self.device_envs[i].virtual_comp_ql_growth - self.device_envs[i].completed_comp)))
+        
+
+        for i in range(edge_queue_num):
+            edge_rewards[i] = self.edge_reward_weight * \
+                            (self.edge_env.edge_queue_comp_ql[i] * (self.edge_env.new_edge_comp[i] - self.edge_env.completed_comp[i]) + \
+                            self.edge_env.virtual_edge_queue_comp_ql[i] * (self.edge_env.virtual_edge_comp_ql_growth[i] - self.edge_env.completed_comp[i]))
+            
+            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s old_edge_queue_comp_ql is: ", self.edge_env.old_edge_queue_comp_ql[i])
+            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s old_virtual_edge_queue_comp_ql is: ", self.edge_env.old_virtual_edge_queue_comp_ql[i])
+            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s new_edge_comp is: ", self.edge_env.new_edge_comp[i])
+            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s completed_comp is: ", self.edge_env.completed_comp[i])
+            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s virtual_edge_comp_ql_growth is: ", self.edge_env.virtual_edge_comp_ql_growth[i])
+            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_comp_ql is: ", self.edge_env.edge_queue_comp_ql[i])
+            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s virtual_edge_queue_comp_ql is: ", self.edge_env.virtual_edge_queue_comp_ql[i])
+
+        joint_reward = sum(device_rewards) + sum(edge_rewards)
         joint_cost = sum(device_costs)
         
         # next obs

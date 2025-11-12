@@ -45,6 +45,15 @@ def get_general_params():
     parser.add_argument("--device_types", type = list, default = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4],
                         help = "the types of devices")
 
+    parser.add_argument("--device_in_types", type = list, default = [
+                            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+                            [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
+                            [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
+                            [40, 41, 42, 43, 44],
+                            [45, 46, 47, 48, 49]
+                        ],
+                        help = "all devices nums for each types")
+
     parser.add_argument("--device_num_per_type", type = list, default = [20,10,10,5,5])
 
     parser.add_argument("--device_type_num", type = int, default = 5,
@@ -120,10 +129,11 @@ def get_general_params():
     parser.add_argument("--max_comp_dens", type = float,
                         default = 1.8,
                         help = "maximum computation density (Gcycles/Mb)")
-    
-    parser.add_argument("--lyaV", type = float,
-                        default = 0.2,
-                        help = "The lya algorithm weights for task rewards")
+
+    # 暂时用local_reward_weight和edge_reward_weight替代其作用
+    # parser.add_argument("--lyaV", type = float,
+    #                     default = 0.2,
+    #                     help = "The lya algorithm weights for task rewards")
 
     parser.add_argument("--vir_local_ql_growth_rate", type = float,
                         default = 0.95,
@@ -174,7 +184,7 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 8000,
+    parser.add_argument("--train_episodes", type = int, default = 1,
                         help = "the number of training episodes")
     
     parser.add_argument("--train_time_slots", type = int, default = 200,

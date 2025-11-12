@@ -176,10 +176,6 @@ $$
 $$
 
 
-
-
-
-
 $$
 \begin{aligned}
 \Delta L(\mathbf{Q}(t)) 

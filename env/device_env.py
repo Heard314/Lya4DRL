@@ -86,7 +86,11 @@ class DeviceEnv():
         self.task_num = 0
         # unit: Gcycles
         self.comp_ql = 0
+        self.old_comp_ql = 0
         self.virtual_comp_ql = 0
+        self.old_virtual_comp_ql = 0
+        self.completed_comp = 0
+        self.new_local_comp = 0
         # unit: Mb
         self.trans_ql = 0
         data_size_mean = (self.data_size_inl[0] + self.data_size_inl[1]) / 2
@@ -102,6 +106,7 @@ class DeviceEnv():
     def reset(self):
         # reset computation-queue length
         self.comp_ql = 0
+        self.old_comp_ql = 0
         self.virtual_comp_ql = 0
 
         # reset transmission-queue length
@@ -225,16 +230,21 @@ class DeviceEnv():
                                  self.service_price
             local_comps.append((task.data_size - task.offl_dz) * \
                                     task.comp_dens)
+            if(enable_print): print(f"[DEBUG] the local_comp in device {self.env_id} is {(task.data_size - task.offl_dz) * task.comp_dens}")
+            if(enable_print): print(f"[DEBUG] the offl_comp in device {self.env_id} is {task.offl_dz * task.comp_dens}")
+
         # 每个时隙，无论有没有新任务到达，都改变传输队列长度
         self.trans_ql = max(0, total_trans_dz - delta_trans_dz)
-
         '''local computing'''
         # 以FIFO的顺序进行
         if(enable_print): print(f"[DEBUG] Before compute, the comp_ql in device {self.env_id} is {self.comp_ql}")
-        total_local_comp = self.comp_ql
+        self.old_comp_ql = self.comp_ql
+        total_local_comp = self.comp_ql #计算队列剩余的计算量
+        new_local_comp = 0
         for task_id, local_comp in enumerate(local_comps):
             task = self.sched_tasks[task_id]
             total_local_comp += local_comp
+            new_local_comp += local_comp
             # if(enable_print): print(f"[DEBUG] The local comp of task {task_id} in device {self.env_id} is {local_comp}")
             # if local_comp = 0, there is no need to queue
             if local_comp == 0:
@@ -252,12 +262,14 @@ class DeviceEnv():
         
         #! 后面再改队列相关的部分
         # update computation-queue length
-        self.completed_comp = total_offl_comp + device_comp_freq * self.delta
+        self.completed_comp = min(device_comp_freq * self.delta, total_local_comp)
+        self.new_local_comp = new_local_comp
         self.comp_ql = max(0, total_local_comp - device_comp_freq * self.delta)
         # if(enable_print): print(f"[DEBUG] The calculated amount in device {self.env_id} in this episode is {device_comp_freq * self.delta}")
         if(enable_print): print(f"[DEBUG] After compute, the comp_ql in device {self.env_id} is {self.comp_ql}")
         # print("[DEBUG] The virtual comp qs growth is: ", self.virtual_comp_ql_growth)
         # print("[DEBUG] The completed comp is: ", self.completed_comp)
+        self.old_virtual_comp_ql = self.virtual_comp_ql
         self.virtual_comp_ql = max(0, self.virtual_comp_ql - self.completed_comp + self.virtual_comp_ql_growth)
 
         # update channel gain
