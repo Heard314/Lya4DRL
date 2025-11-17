@@ -16,7 +16,7 @@ class MECEnv():
         # device envs
         self.device_envs = []
         for i in range(self.device_num):
-            self.device_envs.append(DeviceEnv(i, gen_params))
+            self.device_envs.append(DeviceEnv(i, gen_params, self.edge_env))
         # self.lyaV = gen_params.lyaV
         self.local_reward_weight = gen_params.local_reward_weight
         self.edge_reward_weight = gen_params.edge_reward_weight
@@ -31,7 +31,7 @@ class MECEnv():
     
     def step(self, device_acts, e_id, t_id):
 
-        if e_id % 10 == 1:
+        if e_id % 50 == 1:
             gp.settings.enable_print = True
         else:
             gp.settings.enable_print = False
@@ -116,15 +116,15 @@ class MECEnv():
                 if(enable_print): print(f"[DEBUG] The device", i, "'s virtual_comp_ql_growth is: ", self.device_envs[i].virtual_comp_ql_growth)
                 if(enable_print): print(f"[DEBUG] The device", i, "'s comp_ql is: ", self.device_envs[i].comp_ql)
                 if(enable_print): print(f"[DEBUG] The device", i, "'s virtual_comp_ql is: ", self.device_envs[i].virtual_comp_ql)
-                if(enable_print): print(f"[DEBUG] The device", i, "'s lya reward is: ", self.local_reward_weight * \
+                if(enable_print): print(f"[DEBUG] The device", i, "'s device_reward is: ", self.local_reward_weight * \
                                     (self.device_envs[i].comp_ql * (self.device_envs[i].new_local_comp - self.device_envs[i].completed_comp) + \
                                     self.device_envs[i].virtual_comp_ql * (self.device_envs[i].virtual_comp_ql_growth - self.device_envs[i].completed_comp)))
         
 
         for i in range(edge_queue_num):
             edge_rewards[i] = self.edge_reward_weight * \
-                            (self.edge_env.edge_queue_comp_ql[i] * (self.edge_env.new_edge_comp[i] - self.edge_env.completed_comp[i]) + \
-                            self.edge_env.virtual_edge_queue_comp_ql[i] * (self.edge_env.virtual_edge_comp_ql_growth[i] - self.edge_env.completed_comp[i]))
+                            (self.edge_env.edge_queue_comp_ql[i] * (self.edge_env.new_edge_comp[i] - self.edge_env.completed_comp[i]))
+                            # + self.edge_env.virtual_edge_queue_comp_ql[i] * (self.edge_env.virtual_edge_comp_ql_growth[i] - self.edge_env.completed_comp[i]))
             
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s old_edge_queue_comp_ql is: ", self.edge_env.old_edge_queue_comp_ql[i])
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s old_virtual_edge_queue_comp_ql is: ", self.edge_env.old_virtual_edge_queue_comp_ql[i])
@@ -133,7 +133,9 @@ class MECEnv():
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s virtual_edge_comp_ql_growth is: ", self.edge_env.virtual_edge_comp_ql_growth[i])
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_comp_ql is: ", self.edge_env.edge_queue_comp_ql[i])
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s virtual_edge_queue_comp_ql is: ", self.edge_env.virtual_edge_queue_comp_ql[i])
-
+            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_reward is: ", self.edge_reward_weight * \
+                            (self.edge_env.edge_queue_comp_ql[i] * (self.edge_env.new_edge_comp[i] - self.edge_env.completed_comp[i])))
+                            # + self.edge_env.virtual_edge_queue_comp_ql[i] * (self.edge_env.virtual_edge_comp_ql_growth[i] - self.edge_env.completed_comp[i])))
         joint_reward = sum(device_rewards) + sum(edge_rewards)
         joint_cost = sum(device_costs)
         

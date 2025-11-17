@@ -48,7 +48,9 @@ class Task():
                "\nnorm_comp_expn: " + str(self.norm_comp_expn)
 
 class DeviceEnv():
-    def __init__(self, env_id, gen_params):
+    def __init__(self, env_id, gen_params, edge_env):
+
+        self.edge_env = edge_env
         # env id
         self.env_id = env_id
         self.device_type = gen_params.device_types[env_id]
@@ -97,7 +99,12 @@ class DeviceEnv():
         comp_dens_mean = (self.comp_dens_inl[0] + self.comp_dens_inl[1]) / 2
         task_arrival_prob = gen_params.task_arrival_prob[self.device_type]
         comp_dly_cons = gen_params.comp_dly_cons[self.device_type]
-        self.virtual_comp_ql_growth = gen_params.vir_local_ql_growth_rate * data_size_mean * comp_dens_mean * task_arrival_prob / comp_dly_cons
+        device_num_this_type = gen_params.device_num_per_type[self.device_type]
+        ideal_offl_rto = (data_size_mean * comp_dens_mean * task_arrival_prob-self.delta * self.device_comp_freq) / (data_size_mean * comp_dens_mean * task_arrival_prob)
+        self.virtual_comp_ql_growth = gen_params.vir_local_ql_growth_rate * \
+                                    (1-ideal_offl_rto) * min(data_size_mean * comp_dens_mean * task_arrival_prob, self.delta * self.device_comp_freq)
+                                    # self.device_comp_freq*device_num_this_type/(self.edge_env.alloc_edge_freq[self.device_type]+self.device_comp_freq*device_num_this_type) * \
+                                    # data_size_mean * comp_dens_mean * task_arrival_prob
         self.sched_tasks = []
         #! 动态时间阈值调整
         self.dynamic_delay_adjust_coef = 1.0

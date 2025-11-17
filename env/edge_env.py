@@ -18,9 +18,11 @@ class EdgeEnv():
         
         for i in range(self.edge_queue_num):
             dz_mean = (data_size_inls[i][0]+data_size_inls[i][1])/2
+            # dz_mean = data_size_inls[i][1]
             dens_mean = (comp_dens_inls[i][0]+comp_dens_inls[i][1])/2
+            # dens_mean = comp_dens_inls[i][1]
             device_num = device_num_per_type[i]
-            edge_freq_weights.append(dz_mean*dens_mean*task_arrival_prob[i]*device_num)
+            edge_freq_weights.append((dz_mean*dens_mean*task_arrival_prob[i]-self.delta*general_params.device_comp_freqs[i])*device_num)
 
         total_weight = sum(edge_freq_weights)
         self.alloc_edge_freq = [w/total_weight*self.edge_comp_freq for w in edge_freq_weights]
@@ -39,10 +41,13 @@ class EdgeEnv():
         for i in range(self.edge_queue_num):
             dz_mean = (data_size_inls[i][0]+data_size_inls[i][1])/2
             dens_mean = (comp_dens_inls[i][0]+comp_dens_inls[i][1])/2
+            device_num = device_num_per_type[i]
             for j in general_params.device_in_types[i]:
+                ideal_offl_rto = (dz_mean * dens_mean * task_arrival_prob[i]-self.delta * general_params.device_comp_freqs[i]) / (dz_mean * dens_mean * task_arrival_prob[i])
                 self.virtual_edge_comp_ql_growth[i] += general_params.vir_edge_ql_growth_rate * \
-                                            self.alloc_edge_freq[i]/(self.alloc_edge_freq[i]+device_comp_freqs[i]) * \
-                                            dz_mean * dens_mean * task_arrival_prob[i] / comp_dly_cons[i]
+                                            ideal_offl_rto * (dz_mean * dens_mean * task_arrival_prob[i] - self.delta*device_comp_freqs[i])
+                                            # self.alloc_edge_freq[i]/(self.alloc_edge_freq[i]+device_comp_freqs[i]*device_num) * \
+                                            # dz_mean * dens_mean * task_arrival_prob[i]
 
 
 

@@ -94,7 +94,7 @@ def get_general_params():
                         help = "the energy factors of devices (J/Gcycles)")
     
     parser.add_argument("--data_size_inls", type = list, 
-                        default = [[0.5, 1.0], [0.8, 1.5], [2.4, 3.0], 
+                        default = [[1.0, 1.4], [1.2, 1.6], [2.4, 3.0], 
                                    [1.8, 2.8], [2.5, 3.5]], 
                         help = "the data-size intervals of tasks (Mb)")
     
@@ -136,19 +136,19 @@ def get_general_params():
     #                     help = "The lya algorithm weights for task rewards")
 
     parser.add_argument("--vir_local_ql_growth_rate", type = float,
-                        default = 0.95,
+                        default = 0.6,
                         help = "The length growth rate of the virtual computing queue on the local device")
 
     parser.add_argument("--vir_edge_ql_growth_rate", type = float,
-                        default = 0.95,
+                        default = 0.6,
                         help = "The length growth rate of the virtual computing queue on the edge server")
 
     parser.add_argument("--local_reward_weight", type = float,
-                        default = 0.4,
+                        default = -5000,
                         help = "The Lyapunov Drift-Plus-Penalty weight for local queues")
 
     parser.add_argument("--edge_reward_weight", type = float,
-                        default = 0.3,
+                        default = -5000,
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     params = parser.parse_args()
@@ -176,7 +176,7 @@ def get_mappo_params():
     
     parser.add_argument("--p_hid_dims", type = list, default = [200, 200],   
                         help = "the dimension of policy network's hidden layers")
-    
+
     parser.add_argument("--use_orthogonal_init", type = bool, default = True,
                         help = "whether to use orthogonal-initialization")
     
@@ -184,13 +184,13 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 1,
+    parser.add_argument("--train_episodes", type = int, default = 32,
                         help = "the number of training episodes")
     
     parser.add_argument("--train_time_slots", type = int, default = 200,
                         help = "the number of training time-slots")
     
-    parser.add_argument("--train_freq", type = int, default = 4,     
+    parser.add_argument("--train_freq", type = int, default = 32,     
                         help = "training frequency")
     
     parser.add_argument("--train_batch_size", type = int, default = 800,

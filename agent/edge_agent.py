@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 from torch.distributions import Normal
 from network.value_net import MappoValueNet, MaddpgValueNet
-from network.policy_net import MappoPolicyNet, MaddpgPolicyNet
+from network.policy_net import MappoPolicyNet, MaddpgPolicyNet, MappoPolicyNetLSTM
 
 class MappoEdgeAgent():
     def __init__(self, gen_params, alg_params):
@@ -38,11 +38,14 @@ class MappoEdgeAgent():
         self.v_optimizer = torch.optim.Adam(self.v_net.parameters(),
                                             lr = self.v_lr)
         
+        # LSTM hidden dim
+        self.lstm_hidden_dim = alg_params.p_hid_dims[1]
         # policy networks
         self.p_nets = []
         self.p_optimizers = []
         for i in range(self.device_num):
-            p_net = MappoPolicyNet(alg_params)
+            # p_net = MappoPolicyNet(alg_params)
+            p_net = MappoPolicyNetLSTM(alg_params)
             self.p_nets.append(p_net)
                 
             p_optimizer = torch.optim.Adam(p_net.parameters(),
@@ -58,39 +61,27 @@ class MappoEdgeAgent():
                 p_path = self.weights_dir + "p_net_params_" + str(i) + ".pkl"
                 self.p_nets[i].load_state_dict(torch.load(p_path))
     
-    # @torch.no_grad()
-    # def compute_coma_advantage(self, agent_id, joint_obs, joint_acts,
-    #                         p_inputs_i, baseline_samples=8):
-    #     """
-    #     返回 A_i^{COMA}(s, A) = Q(s,A) - E_{a_i'~pi_i}[Q(s,(A^{-i},a_i'))]
-    #     joint_obs:     [N, obs_dim_total]
-    #     joint_acts:    [N, act_dim_total]  —— 真实执行的联合动作
-    #     p_inputs_i:    [N, ...]            —— 第 i 个 agent 的策略输入 (它自己的观测/历史)
-    #     """
-    #     # 当前真实联合动作下的Q
-    #     q_sa = self.q_net(joint_obs, joint_acts).squeeze(-1)  # [N]
+    # def train_nets(self, replay_buffer):
+    #     '''training data'''
+    #     # v_inputs: [train_freq x train_time_slots, state_dim]
+    #     # v_tags: [train_freq x train_time_slots, 1] 价值网络的目标值
+    #     # p_inputs: [train_freq x train_time_slots, device_num, obs_dim]
+    #     # acts: [train_freq x train_time_slots, device_num, action_dim]
+    #     # act_logprobs: [train_freq x train_time_slots, device_num, 1]
+    #     # advs: [train_freq x train_time_slots, 1]
+    #     # active_masks: [train_freq x train_time_slots, device_num, 1] 当前智能体是否需要处理任务
+    #     v_inputs, v_tags, p_inputs, \
+    #     acts, act_logprobs, advs, active_masks = replay_buffer.get_training_data(self.v_net)
+                                    
+    #     self.train_value_net(v_inputs, v_tags)
+        
+    #     for i in range(self.device_num):
+    #         # 训练策略网络依然只用局部信息
+    #         self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs, active_masks=active_masks[:, i])
+        
+    #     if self.use_lr_decay:
+    #         self.decay_lr()
 
-    #     # 采样自身动作，替换联合动作中的第 i 段
-    #     mean, std = self.p_nets[agent_id](p_inputs_i)         # [N, act_dim_i] each
-    #     dist = Normal(mean, std)
-
-    #     # 为连续动作做蒙特卡洛期望
-    #     q_baselines = 0.0
-    #     for _ in range(baseline_samples):
-    #         a_i_prime = dist.sample()                         # [N, act_dim_i]
-    #         # 构造 (A^{-i}, a_i') 的联合动作副本
-    #         joint_acts_cf = joint_acts.clone()
-    #         # 假设你维护了每个 agent 在联合动作向量中的切片范围:
-    #         # self.act_slices[agent_id] = slice(start, end)
-    #         s = self.act_slices[agent_id]
-    #         joint_acts_cf[:, s] = a_i_prime
-    #         q_cf = self.q_net(joint_obs, joint_acts_cf).squeeze(-1)  # [N]
-    #         q_baselines += q_cf
-
-    #     q_baselines = q_baselines / float(baseline_samples)          # [N]
-    #     adv_i = q_sa - q_baselines                                   # [N]
-    #     return adv_i
-    
     def train_nets(self, replay_buffer):
         '''training data'''
         # v_inputs: [train_freq x train_time_slots, state_dim]
@@ -100,38 +91,17 @@ class MappoEdgeAgent():
         # act_logprobs: [train_freq x train_time_slots, device_num, 1]
         # advs: [train_freq x train_time_slots, 1]
         # active_masks: [train_freq x train_time_slots, device_num, 1] 当前智能体是否需要处理任务
-        v_inputs, v_tags, p_inputs, \
+        v_inputs, v_tags, p_inputs, lstm_hidden_hs, lstm_hidden_cs, \
         acts, act_logprobs, advs, active_masks = replay_buffer.get_training_data(self.v_net)
                                     
         self.train_value_net(v_inputs, v_tags)
         
         for i in range(self.device_num):
             # 训练策略网络依然只用局部信息
-            self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs, active_masks=active_masks[:, i])
+            self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs, active_masks=active_masks[:, i],lstm_hidden_hs=lstm_hidden_hs[:, i], lstm_hidden_cs=lstm_hidden_cs[:, i])
         
         if self.use_lr_decay:
             self.decay_lr()
-    
-    # def train_nets_coma(self, replay_buffer):
-    #     '''training data'''
-    #     # v_inputs: [train_freq x train_time_slots, state_dim]
-    #     # v_tags: [train_freq x train_time_slots, 1] 价值网络的目标值
-    #     # p_inputs: [train_freq x train_time_slots, device_num, obs_dim]
-    #     # acts: [train_freq x train_time_slots, device_num, action_dim]
-    #     # act_logprobs: [train_freq x train_time_slots, device_num, 1]
-    #     # advs: [train_freq x train_time_slots, 1]
-    #     v_inputs, v_tags, p_inputs, \
-    #     acts, act_logprobs, advs = replay_buffer.get_training_data(self.v_net)
-
-    #     self.train_value_net_coma(v_inputs, v_tags)
-        
-    #     for i in range(self.device_num):
-    #         # 训练策略网络依然只用局部信息
-    #         coma_advs = self.compute_coma_advantage(i, v_inputs[:, i], acts[:, i], p_inputs[:, i])
-    #         self.train_policy_net_coma(i, p_inputs[:, i], acts[:, i], coma_advs)
-        
-    #     if self.use_lr_decay:
-    #         self.decay_lr()
     
     def train_value_net(self, v_inputs, v_tags):
         total_size = self.train_freq * self.train_time_slots
@@ -151,90 +121,236 @@ class MappoEdgeAgent():
                                                    self.v_grad_clip)
                 self.v_optimizer.step()
 
-    # def train_value_net_coma(self, v_inputs, v_tags):
-    #     total_size = self.train_freq * self.train_time_slots
-    #     for e in range(self.v_epochs):
-    #         for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
-    #                                 self.train_batch_size, False):
-    #             vs = self.v_net(v_inputs[ids])
-                
-    #             loss = F.mse_loss(v_tags[ids], vs)
-                
-    #             self.v_optimizer.zero_grad()
-    #             loss.backward()
-
-    #             # gradient clip
-    #             if self.use_grad_clip:
-    #                 torch.nn.utils.clip_grad_norm_(self.v_net.parameters(), 
-    #                                                self.v_grad_clip)
-    #             self.v_optimizer.step()
-
-    # def train_policy_net_coma(self, agent_id, p_inputs, acts, coma_advs):
-    #     total_size = self.train_freq * self.train_time_slots
-    #     for e in range(self.p_epochs):
-    #         for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
-    #                                 self.train_batch_size, False):
-    #             mean, std = self.p_nets[agent_id](p_inputs[ids])
-    #             dist = Normal(mean, std)
-    #             enty = dist.entropy().sum(-1)
-                
-    #             # 策略对真实动作的 log π(a_i|o_i)
-    #             new_act_logprobs = dist.log_prob(acts[ids]).sum(-1)
-    #             ent = dist.entropy().sum(-1)
-    #             # COMA: - E[ logπ * A_i ]  （加熵正则）
-    #             adv = coma_advs[ids].detach()                       # [B]
-    #             loss = -(new_act_logprobs * adv + self.enty_coef * ent)
-
-    #             self.p_optimizers[agent_id].zero_grad()
-    #             loss.mean().backward()
-    #             if self.use_grad_clip:
-    #                 torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
-    #                                             self.p_grad_clip)
-    #             self.p_optimizers[agent_id].step()
-                
-
-    def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs, active_masks):
+    def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs,
+                        active_masks, lstm_hidden_hs=None, lstm_hidden_cs=None):
         total_size = self.train_freq * self.train_time_slots
+
+        # ========= 1. 预先根据 active_masks 做一次划分 =========  #
+        # 展平成 [total_size]
+        mask_flat = active_masks.reshape(-1)
+        # 索引 [0, 1, ..., total_size-1]
+        all_ids = torch.arange(total_size, device=mask_flat.device)
+
+        active_ids = all_ids[mask_flat > 0]      # 有任务样本
+        inactive_ids = all_ids[mask_flat <= 0]   # 无任务样本
+
+        # 如果 inactive 太少/没有，避免后面出错
+        if inactive_ids.numel() == 0:
+            inactive_ids = active_ids  # 退化成只用 active，但逻辑仍然成立
+
+        # 样本比值 active : inactive ≈ 8 : 2
+        active_ratio = 0.8
+        batch_size = self.train_batch_size
+
         for e in range(self.p_epochs):
-            for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
-                                    self.train_batch_size, False):
+            # ========= 2. 每个 epoch 重新打乱 active / inactive =========  #
+            perm_active = active_ids[torch.randperm(active_ids.numel(), device=active_ids.device)]
+            perm_inactive = inactive_ids[torch.randperm(inactive_ids.numel(), device=inactive_ids.device)]
+
+            pa = 0
+            pi = 0
+
+            # ========= 3. 自己“手动”组成一堆 mini-batch =========  #
+            while pa < perm_active.numel() or pi < perm_inactive.numel():
+                # 理想中：每个 batch 希望拿多少 active / inactive
+                ideal_active = int(batch_size * active_ratio)
+                ideal_inactive = batch_size - ideal_active
+
+                take_active = min(ideal_active, perm_active.numel() - pa)
+                take_inactive = min(ideal_inactive, perm_inactive.numel() - pi)
+
+                if take_active + take_inactive == 0:
+                    break
+
+                remaining = batch_size - (take_active + take_inactive)
+                if remaining > 0:
+                    extra_a = min(remaining, perm_active.numel() - (pa + take_active))
+                    take_active += extra_a
+                    remaining -= extra_a
+
+                if remaining > 0:
+                    # 再尝试多拿 inactive
+                    extra_i = min(remaining, perm_inactive.numel() - (pi + take_inactive))
+                    take_inactive += extra_i
+                    remaining -= extra_i
+
+                if take_active + take_inactive == 0:
+                    break
+                print(f"[DEBUG] For the agent {agent_id}, the active samples number is {take_active}, the inactive samples number is {take_inactive}.")
+                batch_ids = torch.cat([
+                    perm_active[pa:pa + take_active],
+                    perm_inactive[pi:pi + take_inactive]
+                ], dim=0)
+
+                pa += take_active
+                pi += take_inactive
+                ids = batch_ids
+
                 # mean: [train_batch_size, p_out_dim]
-                # std: [train_batch_size, p_out_dim]
-                mean, std = self.p_nets[agent_id](p_inputs[ids])
+                # std:  [train_batch_size, p_out_dim]
+                p_in = p_inputs[ids]
+
+                if lstm_hidden_hs is not None:
+                    h0 = lstm_hidden_hs[ids]      # [B, hid_dim]
+                    h0 = h0.unsqueeze(0)          # [1, B, hid_dim]
+                else:
+                    h0 = None
+
+                if lstm_hidden_cs is not None:
+                    c0 = lstm_hidden_cs[ids]      # [B, hid_dim]
+                    c0 = c0.unsqueeze(0)          # [1, B, hid_dim]
+                else:
+                    c0 = None
+
+                mean, std, _ = self.p_nets[agent_id](p_in, (h0, c0))
                 dist = Normal(mean, std)
-                # [train_batch_size]
+
+                # [batch]
                 enty = dist.entropy().sum(-1)
-                
-                # [train_batch_size]
+                # [batch]
                 new_act_logprobs = dist.log_prob(acts[ids]).sum(-1)
-                # [train_batch_size]
+                # [batch]
                 old_act_logprobs = act_logprobs[ids].reshape([-1])
                 ratios = torch.exp(new_act_logprobs - old_act_logprobs)
-                
+
                 #! 取出子批次的mask
-                mask_b = active_masks[ids]
-                adv_b = advs[ids]
+                mask_b = active_masks[ids].reshape([-1]).to(acts.device, dtype=acts.dtype)
+                adv_b = advs[ids].reshape([-1])
+
+                # m = (mask_b > 0)
+                # if m.any():
+                #     adv_sel = adv_b[m]
+                #     adv_sel = (adv_sel - adv_sel.mean()).div(adv_sel.std().clamp_min(1e-8))
+                #     adv_b = adv_b.clone()
+                #     adv_b[m] = adv_sel
 
                 # PPO-clip
-                surr1 = ratios * adv_b.reshape([-1])
-                surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * \
-                        adv_b.reshape([-1])
-                
+                surr1 = ratios * adv_b
+                surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * adv_b
+
                 # 只用有效样本算平均值
-                denom = mask_b.sum().clamp_min(1.0)  # 防 0
+                denom = mask_b.sum().clamp_min(1.0)
                 policy_loss = -(torch.min(surr1, surr2) * mask_b).sum() / denom
                 ent_loss    = -(enty * self.enty_coef * mask_b).sum() / denom
 
                 loss = policy_loss + ent_loss
-                
+
                 self.p_optimizers[agent_id].zero_grad()
                 loss.backward()
-                
-                # gradient clip
-                if self.use_grad_clip:  
+
+                if self.use_grad_clip:
                     torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
-                                                   self.p_grad_clip)
+                                                self.p_grad_clip)
                 self.p_optimizers[agent_id].step()
+
+    # 原始版本（样本均衡）
+    # def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs, active_masks):
+    #     total_size = self.train_freq * self.train_time_slots
+    #     for e in range(self.p_epochs):
+    #         for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
+    #                                     self.train_batch_size, False):
+    #             # mean: [train_batch_size, p_out_dim]
+    #             # std: [train_batch_size, p_out_dim]
+    #             p_in = p_inputs[ids] 
+    #             h0 = torch.zeros(1, len(ids), self.lstm_hidden_dim, device=p_in.device)
+    #             c0 = torch.zeros(1, len(ids), self.lstm_hidden_dim, device=p_in.device)
+    #             mean, std, _ = self.p_nets[agent_id](p_in, (h0, c0))
+    #             dist = Normal(mean, std)
+    #             # [train_batch_size]
+    #             enty = dist.entropy().sum(-1)
+    #             # [train_batch_size]
+    #             new_act_logprobs = dist.log_prob(acts[ids]).sum(-1)
+    #             # [train_batch_size]
+    #             old_act_logprobs = act_logprobs[ids].reshape([-1])
+    #             ratios = torch.exp(new_act_logprobs - old_act_logprobs)
+                
+    #             #! 取出子批次的mask
+    #             mask_b = active_masks[ids].reshape([-1]).to(acts.device, dtype=acts.dtype)
+    #             adv_b = advs[ids].reshape([-1])
+    #             m = (mask_b > 0)
+    #             if m.any():
+    #                 adv_sel = adv_b[m]
+    #                 adv_sel = (adv_sel - adv_sel.mean()).div(adv_sel.std().clamp_min(1e-8))
+    #                 adv_b = adv_b.clone()
+    #                 adv_b[m] = adv_sel
+    #             # PPO-clip
+    #             surr1 = ratios * adv_b
+    #             surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * \
+    #                     adv_b
+                
+    #             # 只用有效样本算平均值
+    #             denom = mask_b.sum().clamp_min(1.0)
+    #             policy_loss = -(torch.min(surr1, surr2) * mask_b).sum() / denom
+    #             ent_loss    = -(enty * self.enty_coef * mask_b).sum() / denom
+
+    #             loss = policy_loss + ent_loss
+                
+    #             self.p_optimizers[agent_id].zero_grad()
+    #             loss.backward()
+                
+    #             # gradient clip
+    #             if self.use_grad_clip:  
+    #                 torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
+    #                                                self.p_grad_clip)
+    #             self.p_optimizers[agent_id].step()
+
+    # 只使用active的样本
+    # def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs, active_masks, lstm_hidden_hs=None, lstm_hidden_cs=None):
+    #     total_size = self.train_freq * self.train_time_slots
+    #     for e in range(self.p_epochs):
+    #         for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
+    #                                     self.train_batch_size, False):
+    #             # mean: [train_batch_size, p_out_dim]
+    #             # std: [train_batch_size, p_out_dim]
+    #             p_in = p_inputs[ids]
+    #             if lstm_hidden_hs != None:
+    #                 h0 = lstm_hidden_hs[ids]
+    #                 h0 = h0.unsqueeze(0) 
+    #             if lstm_hidden_cs != None:
+    #                 c0 = lstm_hidden_cs[ids]
+    #                 c0 = c0.unsqueeze(0)
+
+    #             mean, std, _ = self.p_nets[agent_id](p_in, (h0, c0))
+    #             dist = Normal(mean, std)
+    #             # [train_batch_size]
+    #             enty = dist.entropy().sum(-1)
+    #             # [train_batch_size]
+    #             new_act_logprobs = dist.log_prob(acts[ids]).sum(-1)
+    #             # [train_batch_size]
+    #             old_act_logprobs = act_logprobs[ids].reshape([-1])
+    #             ratios = torch.exp(new_act_logprobs - old_act_logprobs)
+                
+    #             #! 取出子批次的mask
+    #             mask_b = active_masks[ids].reshape([-1]).to(acts.device, dtype=acts.dtype)
+    #             adv_b = advs[ids].reshape([-1])
+    #             m = (mask_b > 0)
+    #             if m.any():
+    #                 adv_sel = adv_b[m]
+    #                 adv_sel = (adv_sel - adv_sel.mean()).div(adv_sel.std().clamp_min(1e-8))
+    #                 adv_b = adv_b.clone()
+    #                 adv_b[m] = adv_sel
+    #             # PPO-clip
+    #             surr1 = ratios * adv_b
+    #             surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * \
+    #                     adv_b
+                
+    #             # 只用有效样本算平均值
+    #             denom = mask_b.sum().clamp_min(1.0)
+    #             policy_loss = -(torch.min(surr1, surr2) * mask_b).sum() / denom
+    #             ent_loss    = -(enty * self.enty_coef * mask_b).sum() / denom
+
+    #             loss = policy_loss + ent_loss
+                
+    #             self.p_optimizers[agent_id].zero_grad()
+    #             loss.backward()
+                
+    #             # gradient clip
+    #             if self.use_grad_clip:  
+    #                 torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
+    #                                                self.p_grad_clip)
+    #             self.p_optimizers[agent_id].step()
+
+
                 
     def decay_lr(self):
        if self.v_lr > self.min_v_lr:  

@@ -2,7 +2,7 @@ from abc import abstractmethod
 import numpy as np
 import torch
 from torch.distributions import Normal
-from network.policy_net import MappoPolicyNet, MaddpgPolicyNet
+from network.policy_net import MappoPolicyNet, MaddpgPolicyNet, MappoPolicyNetLSTM
 from util.utils import GetPolicyInputs, GaussianNoise
 import math
 import config.global_params as gp
@@ -13,12 +13,14 @@ class MappoDeviceAgent():
         self.agent_id = agent_id
         
         # policy network
-        self.p_net = MappoPolicyNet(alg_params)
+        # self.p_net = MappoPolicyNet(alg_params)
+        self.p_net = MappoPolicyNetLSTM(alg_params)
         
         self.evaluate = gen_params.evaluate
 
         self.action_dim = alg_params.action_dim
         
+        self.lstm_hidden_dim = alg_params.p_hid_dims[1]
     # def choose_action(self, obs, active: bool = True):
     #     if not active:
     #         return [0.0] * self.action_dim, 0.0
@@ -39,16 +41,36 @@ class MappoDeviceAgent():
             
     #     return act, act_logprob
     
-    def choose_action(self, obs, active: bool = True):
+    def choose_action(self, obs, lstm_hidden_h, lstm_hidden_c, active: bool = True):
 
         enable_print = gp.settings.enable_print
 
-        if not active:
-            return [0.0] * self.action_dim, 0.0
-
         p_inputs = GetPolicyInputs(obs)
+
+        # process the lstm hidden state
+        hid_dim = self.p_net.lstm.hidden_size
+        batch_size = p_inputs.size(0)  
+        def to_hidden(h):
+            # 如果是 None，就初始化为 0
+            if h is None:
+                return torch.zeros(1, batch_size, hid_dim)
+            # 如果是 list -> 转成 tensor
+            if isinstance(h, list):
+                h = torch.tensor(h, dtype=torch.float32)
+            # 如果是一维 [hid_dim] -> [1,1,hid_dim]
+            if h.dim() == 1:
+                h = h.view(1, 1, -1)
+            # 如果是二维 [1,hid_dim] -> [1,1,hid_dim]
+            elif h.dim() == 2:
+                h = h.unsqueeze(1)
+            # 如果已经是 [1,B,hid_dim] -> 不动
+            return h
+
+        lstm_hidden_h = to_hidden(lstm_hidden_h)
+        lstm_hidden_c = to_hidden(lstm_hidden_c)
+
         with torch.no_grad():
-            mean, std = self.p_net(p_inputs)
+            mean, std, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
         
         if enable_print: print(f"[DEBUG] the p_net output: mean({mean}), std({std})")
 
@@ -90,7 +112,10 @@ class MappoDeviceAgent():
 
             act = action.squeeze(0).tolist()
             act_logprob = float(logp)
-        return act, act_logprob
+        if not active:
+            return [0.0] * self.action_dim, 0.0, next_lstm_hidden_h, next_lstm_hidden_c
+        else:
+            return act, act_logprob, next_lstm_hidden_h, next_lstm_hidden_c
 
     def update_net(self, params):
         self.p_net.load_state_dict(params)

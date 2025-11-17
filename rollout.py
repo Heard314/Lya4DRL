@@ -53,6 +53,7 @@ class Rollout:
                 self.device_agents.append(RandomComputingDeviceAgent(i, gen_params))
 
         self.action_dim = alg_params.action_dim
+        self.lstm_hidden_dim = alg_params.p_hid_dims[1]
 
         # training
         if not self.evaluate:
@@ -102,6 +103,7 @@ class Rollout:
                 + "_d_"
                 + gen_params.run_desc
         )
+
         self.log_dir_name = (
                 "runs/"
                 + file_subpath
@@ -117,6 +119,7 @@ class Rollout:
         sys.stdout = log_txt_file
         sys.stderr = log_txt_file
         atexit.register(log_txt_file.close)
+
         self.time_slots = self.train_time_slots + 1 if not self.evaluate else self.eval_time_slots
 
         # MEC env
@@ -159,7 +162,12 @@ class Rollout:
         self.reset()
         
         edge_obs, device_obss = self.mec_env.reset()
+        lstm_hidden_hs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
+        lstm_hidden_cs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
+        next_lstm_hidden_hs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
+        next_lstm_hidden_cs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
         edge_comp_qls = [edge_obs[i] for i in range(self.device_type_num,2*self.device_type_num)]
+
         device_comp_qls = [obs[7] for obs in device_obss]
         # obs scaling
         if hasattr(self, "obs_scaling"):
@@ -181,7 +189,7 @@ class Rollout:
                 for i in range(self.device_num):
                     task_num = self.mec_env.device_envs[i].task_num
                     device_active[i] = task_num >= 1    
-                    act, act_logprob = self.device_agents[i].choose_action(device_obss[i], active=device_active[i])
+                    act, act_logprob, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_obss[i], lstm_hidden_hs[i], lstm_hidden_cs[i], active=device_active[i])
                     device_acts[i] = act
                     # 当不需要处理其他任务时设为0
                     if task_num >= 1:
@@ -189,22 +197,22 @@ class Rollout:
                             device_acts_[i].append(act[j] / 10)
                     if not (act_logprob == None):
                         device_act_logprobs[i] = act_logprob
-            if "Maddpg" in type(self.device_agents[0]).__name__:
-                # store actions used for interacting with the MEC env
-                device_acts_ = [[] for i in range(self.device_num)]
-                for i in range(self.device_num):
-                    act = self.device_agents[i].choose_action(device_obss[i])
-                    device_acts[i] = act
-                    for j in range(self.task_num):
-                        device_acts_[i].append((act[j * 10] + act[j * 10 + 1] + act[j * 10 + 2] + 
-                                                act[j * 10 + 3] + act[j * 10 + 4] + act[j * 10 + 5] +
-                                                act[j * 10 + 6] + act[j * 10 + 7] + act[j * 10 + 8] +
-                                                act[j * 10 + 9]) / 20)
-            if "Computing" in type(self.device_agents[0]).__name__:
-                for i in range(self.device_num):
-                    act = self.device_agents[i].choose_action()
-                    device_acts[i] = act
-                device_acts_ = device_acts
+            # if "Maddpg" in type(self.device_agents[0]).__name__:
+            #     # store actions used for interacting with the MEC env
+            #     device_acts_ = [[] for i in range(self.device_num)]
+            #     for i in range(self.device_num):
+            #         act = self.device_agents[i].choose_action(device_obss[i])
+            #         device_acts[i] = act
+            #         for j in range(self.task_num):
+            #             device_acts_[i].append((act[j * 10] + act[j * 10 + 1] + act[j * 10 + 2] + 
+            #                                     act[j * 10 + 3] + act[j * 10 + 4] + act[j * 10 + 5] +
+            #                                     act[j * 10 + 6] + act[j * 10 + 7] + act[j * 10 + 8] +
+            #                                     act[j * 10 + 9]) / 20)
+            # if "Computing" in type(self.device_agents[0]).__name__:
+            #     for i in range(self.device_num):
+            #         act = self.device_agents[i].choose_action()
+            #         device_acts[i] = act
+            #     device_acts_ = device_acts
             
             # step
             joint_reward, device_rewards, \
@@ -232,7 +240,7 @@ class Rollout:
                 self.obs_scaling(next_edge_obs, next_device_obss)
             
             if not self.evaluate and self.train_mode == "mappo":
-                self.replay_buffer.store(edge_obs, device_obss,
+                self.replay_buffer.store(edge_obs, device_obss,lstm_hidden_hs,lstm_hidden_cs,
                                          device_acts, device_act_logprobs,
                                          joint_reward, device_active)
             if not self.evaluate and self.train_mode == "maddpg":
@@ -243,7 +251,9 @@ class Rollout:
             # update obs
             edge_obs = next_edge_obs
             device_obss = next_device_obss
-            
+            lstm_hidden_hs = next_lstm_hidden_hs
+            lstm_hidden_cs = next_lstm_hidden_cs
+
             if not self.evaluate and self.train_mode == "maddpg":
                 total_time_slots = (e_id - 1) * self.train_time_slots + t_id
                 
