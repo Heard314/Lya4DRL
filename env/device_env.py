@@ -98,11 +98,13 @@ class DeviceEnv():
         data_size_mean = (self.data_size_inl[0] + self.data_size_inl[1]) / 2
         comp_dens_mean = (self.comp_dens_inl[0] + self.comp_dens_inl[1]) / 2
         task_arrival_prob = gen_params.task_arrival_prob[self.device_type]
-        comp_dly_cons = gen_params.comp_dly_cons[self.device_type]
-        device_num_this_type = gen_params.device_num_per_type[self.device_type]
-        ideal_offl_rto = (data_size_mean * comp_dens_mean * task_arrival_prob-self.delta * self.device_comp_freq) / (data_size_mean * comp_dens_mean * task_arrival_prob)
-        self.virtual_comp_ql_growth = gen_params.vir_local_ql_growth_rate * \
-                                    (1-ideal_offl_rto) * min(data_size_mean * comp_dens_mean * task_arrival_prob, self.delta * self.device_comp_freq)
+        # comp_dly_cons = gen_params.comp_dly_cons[self.device_type]
+        # device_num_this_type = gen_params.device_num_per_type[self.device_type]
+        # ideal_offl_rto = (data_size_mean * comp_dens_mean * task_arrival_prob-self.delta * self.device_comp_freq) / (data_size_mean * comp_dens_mean * task_arrival_prob)
+        self.avg_local_comp = 0
+        self.avail_task_num = 0
+        # self.virtual_comp_ql_growth = gen_params.vir_local_ql_growth_rate * \
+        #                             (1-ideal_offl_rto) * min(data_size_mean * comp_dens_mean * task_arrival_prob, self.delta * self.device_comp_freq)
                                     # self.device_comp_freq*device_num_this_type/(self.edge_env.alloc_edge_freq[self.device_type]+self.device_comp_freq*device_num_this_type) * \
                                     # data_size_mean * comp_dens_mean * task_arrival_prob
         self.sched_tasks = []
@@ -113,6 +115,8 @@ class DeviceEnv():
     def reset(self):
         # reset computation-queue length
         self.comp_ql = 0
+        self.avg_local_comp = 0
+        self.avail_task_num = 0
         self.old_comp_ql = 0
         self.virtual_comp_ql = 0
 
@@ -237,6 +241,8 @@ class DeviceEnv():
                                  self.service_price
             local_comps.append((task.data_size - task.offl_dz) * \
                                     task.comp_dens)
+            self.avail_task_num += 1
+            self.avg_local_comp = (self.avg_local_comp * (self.avail_task_num - 1) + (task.data_size - task.offl_dz) * task.comp_dens) / self.avail_task_num
             if(enable_print): print(f"[DEBUG] the local_comp in device {self.env_id} is {(task.data_size - task.offl_dz) * task.comp_dens}")
             if(enable_print): print(f"[DEBUG] the offl_comp in device {self.env_id} is {task.offl_dz * task.comp_dens}")
 
@@ -277,7 +283,9 @@ class DeviceEnv():
         # print("[DEBUG] The virtual comp qs growth is: ", self.virtual_comp_ql_growth)
         # print("[DEBUG] The completed comp is: ", self.completed_comp)
         self.old_virtual_comp_ql = self.virtual_comp_ql
-        self.virtual_comp_ql = max(0, self.virtual_comp_ql - self.completed_comp + self.virtual_comp_ql_growth)
+        EPS = 1e-6
+        if self.avg_local_comp > EPS:
+            self.virtual_comp_ql = max(0, self.virtual_comp_ql + self.comp_ql/self.avg_local_comp - self.task_timeout_thre)
 
         # update channel gain
         self.channel_gain = self.path_loss * np.random.exponential(1)
