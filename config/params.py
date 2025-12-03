@@ -8,10 +8,16 @@ from torch import device
 general params
 """
 device_num = 50
-
+edge_queue_num = 5
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
     
+    parser.add_argument("--enable_actual_queue_reward", action="store_true",
+                        help = "whether to add actual queue punishment to reward")
+
+    parser.add_argument("--enable_virtual_queue_reward", action="store_true",
+                        help = "whether to add virtual queue punishment to reward")
+
     parser.add_argument("--run_desc", type = str, default = "",
                     help = "the description of the running experiment")
 
@@ -59,7 +65,10 @@ def get_general_params():
     parser.add_argument("--device_type_num", type = int, default = 5,
                         help = "the number of device types")
     
-    parser.add_argument("--task_arrival_prob", type = int, default = [1.0, 0.6, 0.2, 0.12, 0.1],
+    # parser.add_argument("--task_arrival_prob", type = int, default = [1.0, 0.6, 0.2, 0.12, 0.1],
+    #                     help = "the probability of task arrival at each time slot")
+
+    parser.add_argument("--task_arrival_prob", type = int, default = [1.0, 1.0, 1.0, 1.0, 1.0],
                         help = "the probability of task arrival at each time slot")
     
     parser.add_argument("--max_task_num", type = int, default = 1,
@@ -71,16 +80,57 @@ def get_general_params():
                         help = "total bandwidth (Hz)")
     
     parser.add_argument("--device_trans_powers", type = list, 
-                        default = [251, 206, 126, 227, 186], 
+                        # default = [251, 206, 126, 227, 186], 
+                        default = [300, 300, 300, 300, 300],
                         help = "the transmission powers of devices (mW)")
     
-    parser.add_argument("--device_path_loss", type = list, 
-                        default = [2.4e-10, 7.6e-11, 8.0e-11, 4.0e-10, 5.3e-10], 
-                        help = "the path loss of devices")
+    # parser.add_argument("--device_path_loss", type = list, 
+    #                     default = [2.4e-10, 7.6e-11, 8.0e-11, 4.0e-10, 5.3e-10], 
+    #                     help = "the path loss of devices")
     
     parser.add_argument("--spec_dens", type = float, 
                         default = pow(10, -174 / 10),
                         help = "the spectral density of noise power (mW/Hz)")
+    
+    parser.add_argument("--speed_max", type = float, 
+                    default = 5.0,
+                    help = "the max speed of end device (m)")
+    
+    parser.add_argument("--speed_min", type = float, 
+                        default = 0.0,
+                        help = "the min speed of end device (m)")
+    
+    parser.add_argument("--accelerate_speed_max", type = float, 
+                    default = 2.0,
+                    help = "the max accelerate direction of end device (m/(s^2))")
+    
+    parser.add_argument("--accelerate_speed_min", type = float, 
+                        default = 0.0,
+                        help = "the min accelerate direction of end device (m/(s^2))")
+    
+    parser.add_argument("--direction_max", type = float, 
+                    default = 360.0,
+                    help = "the max direction of end device (degree/s)")
+    
+    parser.add_argument("--direction_min", type = float, 
+                        default = 0.0,
+                        help = "the min direction of end device (degree/s)")
+    
+    parser.add_argument("--accelerate_direction_max", type = float, 
+                    default = 30.0,
+                    help = "the max accelerate direction of end device (degree/(s^2))")
+    
+    parser.add_argument("--accelerate_direction_min", type = float, 
+                        default = -30.0,
+                        help = "the min accelerate direction of end device (degree/(s^2))")
+    
+    parser.add_argument("--max_distance_from_edge", type = float, 
+                    default = 500,
+                    help = "the max distance between end device and edge server. (m)")
+
+    parser.add_argument("--min_distance_from_edge", type = float, 
+                        default = 100,
+                        help = "the min distance between end device and edge server. (m)")
     
     parser.add_argument("--device_comp_freqs", type = list, 
                         default = [2.5, 2.5, 2.5, 2.5, 2.5], 
@@ -90,23 +140,33 @@ def get_general_params():
                         help = "standard computation frequency (Gcycles/s)")
     
     parser.add_argument("--device_engy_facs", type = list, 
-                        default = [1, 1, 1, 1, 1], 
+                        default = [1, 1, 1, 1, 1],
                         help = "the energy factors of devices (J/Gcycles)")
     
-    parser.add_argument("--data_size_inls", type = list, 
-                        default = [[1.0, 1.4], [1.2, 1.6], [2.4, 3.0], 
-                                   [1.8, 2.8], [2.5, 3.5]], 
-                        help = "the data-size intervals of tasks (Mb)")
-    
-    parser.add_argument("--comp_dens_inls", type = list, 
-                        default = [[0.2, 0.3], [0.3, 0.4], [0.6, 0.8],  
-                                 [1.6, 1.8],[1.2, 1.4]], 
-                        help = "the computation-density intervals of tasks (Gcycles/Mb)")
-    
-    parser.add_argument("--comp_dly_cons", type = list, 
-                        default = [1, 4, 7, 10, 10], 
-                        help = "the timeout threshold for different task types (delta 0.1s)")
+    parser.add_argument(
+        "--data_size_inls",
+        type=list,
+        default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
+                [1.4, 1.5], [0.6, 1.2]],
+        help="the data-size intervals of tasks (Mbits)"
+    )
 
+    parser.add_argument(
+        "--comp_dens_inls",
+        type=list,
+        default=[[0.3, 0.4], [0.2, 0.8], [0.25, 0.3],
+                [0.3, 0.4], [0.4, 0.5]],
+        help="the computation-density intervals of tasks (GFLOPs/Mbits)"
+    )
+    # #! 数值待修改
+    # parser.add_argument("--unit_comp_dly_thre", type = list, 
+    #                     default = [1, 4, 7, 10, 10], 
+    #                     help = "the timeout threshold of a unit(Mb) data for different task types (delta 0.1s)")
+
+    parser.add_argument("--comp_dly_thre", type = list, 
+                        # default = [1, 5, 5, 10, 10], 
+                        default = [1, 3, 3, 5, 5], 
+                        help = "the timeout threshold for different task types (delta 0.1s)")
 
     parser.add_argument("--edge_comp_freq", type = float, default = 200,
                         help = "the computation frequency of MEC server (Gcycles/s)")
@@ -115,12 +175,13 @@ def get_general_params():
                         help = "the service price of MEC server ($/Gcycles)")
     
     parser.add_argument("--energy_weights", type = list, 
-                        default = [0.8, 0.8, 0.8, 0.8, 0.8],
+                        # default = [0.8, 0.8, 0.8, 0.8, 0.8],
+                        default = [1.0, 1.0, 1.0, 1.0, 1.0],
                         help = "the weights of tasks' energy consumption")
     
-    parser.add_argument("--expense_weights", type = list, 
-                        default = [0.2, 0.2, 0.2, 0.2, 0.2], 
-                        help = "the weights of tasks' edge computation expense")
+    # parser.add_argument("--expense_weights", type = list, 
+    #                     default = [0.2, 0.2, 0.2, 0.2, 0.2], 
+    #                     help = "the weights of tasks' edge computation expense")
     
     parser.add_argument("--max_data_size", type = float, 
                         default = 3.5,
@@ -135,21 +196,45 @@ def get_general_params():
     #                     default = 0.2,
     #                     help = "The lya algorithm weights for task rewards")
 
-    parser.add_argument("--vir_local_ql_growth_rate", type = float,
-                        default = 0.6,
-                        help = "The length growth rate of the virtual computing queue on the local device")
+    parser.add_argument("--edge_weight_w", type = float,
+                        default = 1,
+                        help = "the w parameter for edge weight linear function")
 
-    parser.add_argument("--vir_edge_ql_growth_rate", type = float,
-                        default = 0.6,
-                        help = "The length growth rate of the virtual computing queue on the edge server")
+    parser.add_argument("--edge-weight_b", type = float,
+                        default = 0.1,
+                        help = "the b parameter for edge weight linear function")
+
+    parser.add_argument("--device_dly_adj_fac", type = list, 
+                        default = [1.0, 1.0, 1.0, 1.0, 1.0], 
+                        help = "the weights of tasks' edge computation expense")
+
+    parser.add_argument("--edge_dly_adj_fac", type = list, 
+                        default = [1.0, 1.0, 1.0, 1.0, 1.0], 
+                        help = "the weights of tasks' edge computation expense")
+
+    # parser.add_argument("--vir_local_ql_growth_rate", type = float,
+    #                     default = 0.6,
+    #                     help = "The length growth rate of the virtual computing queue on the local device")
+
+    # parser.add_argument("--vir_edge_ql_growth_rate", type = float,
+    #                     default = 0.6,
+    #                     help = "The length growth rate of the virtual computing queue on the edge server")
 
     parser.add_argument("--local_reward_weight", type = float,
-                        default = -5000,
+                        default = -1000*0.3,
                         help = "The Lyapunov Drift-Plus-Penalty weight for local queues")
 
+    # parser.add_argument("--local_reward_bound", type = float,
+    #                     default = 7000,
+    #                     help = "The Lyapunov Drift-Plus-Penalty reward boundary for local queues")
+
     parser.add_argument("--edge_reward_weight", type = float,
-                        default = -5000,
+                        default = -1000*0.7,
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
+    
+    # parser.add_argument("--edge_reward_bound", type = float,
+    #                     default = 3000,
+    #                     help = "The Lyapunov Drift-Plus-Penalty reward boundary for edge queues")
 
     params = parser.parse_args()
     
@@ -157,14 +242,18 @@ def get_general_params():
 """
 mappo params
 """
+deivce_obs_dim = 10 # 5(one-hot) + 2 + max_task_num * 3
+edge_queue_obs_dim = 2 # alloc_freq + comp_ql_length
 def get_mappo_params():
     parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
-    deivce_obs_dim = 14 # 5(one-hot) + 6 + max_task_num * 3
+
+
+    #! 修改后，ObsScaling类的代码也需要改
     # networks
     parser.add_argument("--obs_dim", type = int, default = deivce_obs_dim,
                         help = "the dimension of agents' observations")
     
-    parser.add_argument("--state_dim", type = int, default = 10 + deivce_obs_dim*device_num,
+    parser.add_argument("--state_dim", type = int, default = edge_queue_obs_dim*edge_queue_num + deivce_obs_dim*device_num,
                         help = "the dimension of global states")
     
     # 包含：任务远程卸载率、传输能耗利用率、本地计算频率利用率
@@ -184,7 +273,7 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 32,
+    parser.add_argument("--train_episodes", type = int, default = 8000,
                         help = "the number of training episodes")
     
     parser.add_argument("--train_time_slots", type = int, default = 200,

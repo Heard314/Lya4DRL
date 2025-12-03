@@ -122,74 +122,14 @@ class MappoEdgeAgent():
                 self.v_optimizer.step()
 
     def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs,
-                        active_masks, lstm_hidden_hs=None, lstm_hidden_cs=None):
+                          active_masks,lstm_hidden_hs=None, lstm_hidden_cs=None):
         total_size = self.train_freq * self.train_time_slots
-
-        # ========= 1. 预先根据 active_masks 做一次划分 =========  #
-        # 展平成 [total_size]
-        mask_flat = active_masks.reshape(-1)
-        # 索引 [0, 1, ..., total_size-1]
-        all_ids = torch.arange(total_size, device=mask_flat.device)
-
-        active_ids = all_ids[mask_flat > 0]      # 有任务样本
-        inactive_ids = all_ids[mask_flat <= 0]   # 无任务样本
-
-        # 如果 inactive 太少/没有，避免后面出错
-        if inactive_ids.numel() == 0:
-            inactive_ids = active_ids  # 退化成只用 active，但逻辑仍然成立
-
-        # 样本比值 active : inactive ≈ 8 : 2
-        active_ratio = 0.8
-        batch_size = self.train_batch_size
-
         for e in range(self.p_epochs):
-            # ========= 2. 每个 epoch 重新打乱 active / inactive =========  #
-            perm_active = active_ids[torch.randperm(active_ids.numel(), device=active_ids.device)]
-            perm_inactive = inactive_ids[torch.randperm(inactive_ids.numel(), device=inactive_ids.device)]
-
-            pa = 0
-            pi = 0
-
-            # ========= 3. 自己“手动”组成一堆 mini-batch =========  #
-            while pa < perm_active.numel() or pi < perm_inactive.numel():
-                # 理想中：每个 batch 希望拿多少 active / inactive
-                ideal_active = int(batch_size * active_ratio)
-                ideal_inactive = batch_size - ideal_active
-
-                take_active = min(ideal_active, perm_active.numel() - pa)
-                take_inactive = min(ideal_inactive, perm_inactive.numel() - pi)
-
-                if take_active + take_inactive == 0:
-                    break
-
-                remaining = batch_size - (take_active + take_inactive)
-                if remaining > 0:
-                    extra_a = min(remaining, perm_active.numel() - (pa + take_active))
-                    take_active += extra_a
-                    remaining -= extra_a
-
-                if remaining > 0:
-                    # 再尝试多拿 inactive
-                    extra_i = min(remaining, perm_inactive.numel() - (pi + take_inactive))
-                    take_inactive += extra_i
-                    remaining -= extra_i
-
-                if take_active + take_inactive == 0:
-                    break
-                print(f"[DEBUG] For the agent {agent_id}, the active samples number is {take_active}, the inactive samples number is {take_inactive}.")
-                batch_ids = torch.cat([
-                    perm_active[pa:pa + take_active],
-                    perm_inactive[pi:pi + take_inactive]
-                ], dim=0)
-
-                pa += take_active
-                pi += take_inactive
-                ids = batch_ids
-
+            for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
+                                        self.train_batch_size, False):
                 # mean: [train_batch_size, p_out_dim]
-                # std:  [train_batch_size, p_out_dim]
-                p_in = p_inputs[ids]
-
+                # std: [train_batch_size, p_out_dim]
+                p_in = p_inputs[ids] 
                 if lstm_hidden_hs is not None:
                     h0 = lstm_hidden_hs[ids]      # [B, hid_dim]
                     h0 = h0.unsqueeze(0)          # [1, B, hid_dim]
@@ -201,47 +141,169 @@ class MappoEdgeAgent():
                     c0 = c0.unsqueeze(0)          # [1, B, hid_dim]
                 else:
                     c0 = None
-
                 mean, std, _ = self.p_nets[agent_id](p_in, (h0, c0))
                 dist = Normal(mean, std)
-
-                # [batch]
+                # [train_batch_size]
                 enty = dist.entropy().sum(-1)
-                # [batch]
+                # [train_batch_size]
                 new_act_logprobs = dist.log_prob(acts[ids]).sum(-1)
-                # [batch]
+                # [train_batch_size]
                 old_act_logprobs = act_logprobs[ids].reshape([-1])
                 ratios = torch.exp(new_act_logprobs - old_act_logprobs)
-
+                
                 #! 取出子批次的mask
                 mask_b = active_masks[ids].reshape([-1]).to(acts.device, dtype=acts.dtype)
                 adv_b = advs[ids].reshape([-1])
-
-                # m = (mask_b > 0)
-                # if m.any():
-                #     adv_sel = adv_b[m]
-                #     adv_sel = (adv_sel - adv_sel.mean()).div(adv_sel.std().clamp_min(1e-8))
-                #     adv_b = adv_b.clone()
-                #     adv_b[m] = adv_sel
-
+                m = (mask_b > 0)
+                if m.any():
+                    adv_sel = adv_b[m]
+                    adv_sel = (adv_sel - adv_sel.mean()).div(adv_sel.std().clamp_min(1e-8))
+                    adv_b = adv_b.clone()
+                    adv_b[m] = adv_sel
                 # PPO-clip
                 surr1 = ratios * adv_b
-                surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * adv_b
-
+                surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * \
+                        adv_b
+                
                 # 只用有效样本算平均值
                 denom = mask_b.sum().clamp_min(1.0)
                 policy_loss = -(torch.min(surr1, surr2) * mask_b).sum() / denom
                 ent_loss    = -(enty * self.enty_coef * mask_b).sum() / denom
 
                 loss = policy_loss + ent_loss
-
+                
                 self.p_optimizers[agent_id].zero_grad()
                 loss.backward()
-
-                if self.use_grad_clip:
+                
+                # gradient clip
+                if self.use_grad_clip:  
                     torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
-                                                self.p_grad_clip)
+                                                   self.p_grad_clip)
                 self.p_optimizers[agent_id].step()
+
+    # 按比例分配样本
+    # def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs,
+    #                     active_masks, lstm_hidden_hs=None, lstm_hidden_cs=None):
+    #     total_size = self.train_freq * self.train_time_slots
+
+    #     # ========= 1. 预先根据 active_masks 做一次划分 =========  #
+    #     # 展平成 [total_size]
+    #     mask_flat = active_masks.reshape(-1)
+    #     # 索引 [0, 1, ..., total_size-1]
+    #     all_ids = torch.arange(total_size, device=mask_flat.device)
+
+    #     active_ids = all_ids[mask_flat > 0]      # 有任务样本
+    #     inactive_ids = all_ids[mask_flat <= 0]   # 无任务样本
+
+    #     # 如果 inactive 太少/没有，避免后面出错
+    #     if inactive_ids.numel() == 0:
+    #         inactive_ids = active_ids  # 退化成只用 active，但逻辑仍然成立
+
+    #     # 样本比值 active : inactive ≈ 8 : 2
+    #     active_ratio = 0.8
+    #     batch_size = self.train_batch_size
+
+    #     for e in range(self.p_epochs):
+    #         # ========= 2. 每个 epoch 重新打乱 active / inactive =========  #
+    #         perm_active = active_ids[torch.randperm(active_ids.numel(), device=active_ids.device)]
+    #         perm_inactive = inactive_ids[torch.randperm(inactive_ids.numel(), device=inactive_ids.device)]
+
+    #         print(f"[DEBUG] For the agent {agent_id}, the total active samples number is {perm_active.numel()}, the total inactive samples number is {perm_inactive.numel()}.")
+    #         pa = 0
+    #         pi = 0
+
+    #         # ========= 3. 自己“手动”组成一堆 mini-batch =========  #
+    #         while pa < perm_active.numel() or pi < perm_inactive.numel():
+    #             # 理想中：每个 batch 希望拿多少 active / inactive
+    #             ideal_active = int(batch_size * active_ratio)
+    #             ideal_inactive = batch_size - ideal_active
+
+    #             take_active = min(ideal_active, perm_active.numel() - pa)
+    #             take_inactive = min(ideal_inactive, perm_inactive.numel() - pi)
+
+    #             if take_active + take_inactive == 0:
+    #                 break
+
+    #             remaining = batch_size - (take_active + take_inactive)
+    #             if remaining > 0:
+    #                 extra_a = min(remaining, perm_active.numel() - (pa + take_active))
+    #                 take_active += extra_a
+    #                 remaining -= extra_a
+
+    #             if remaining > 0:
+    #                 # 再尝试多拿 inactive
+    #                 extra_i = min(remaining, perm_inactive.numel() - (pi + take_inactive))
+    #                 take_inactive += extra_i
+    #                 remaining -= extra_i
+
+    #             if take_active + take_inactive == 0:
+    #                 break
+    #             print(f"[DEBUG] For the agent {agent_id}, the active samples number is {take_active}, the inactive samples number is {take_inactive}.")
+    #             batch_ids = torch.cat([
+    #                 perm_active[pa:pa + take_active],
+    #                 perm_inactive[pi:pi + take_inactive]
+    #             ], dim=0)
+
+    #             pa += take_active
+    #             pi += take_inactive
+    #             ids = batch_ids
+
+    #             # mean: [train_batch_size, p_out_dim]
+    #             # std:  [train_batch_size, p_out_dim]
+    #             p_in = p_inputs[ids]
+
+    #             if lstm_hidden_hs is not None:
+    #                 h0 = lstm_hidden_hs[ids]      # [B, hid_dim]
+    #                 h0 = h0.unsqueeze(0)          # [1, B, hid_dim]
+    #             else:
+    #                 h0 = None
+
+    #             if lstm_hidden_cs is not None:
+    #                 c0 = lstm_hidden_cs[ids]      # [B, hid_dim]
+    #                 c0 = c0.unsqueeze(0)          # [1, B, hid_dim]
+    #             else:
+    #                 c0 = None
+
+    #             mean, std, _ = self.p_nets[agent_id](p_in, (h0, c0))
+    #             dist = Normal(mean, std)
+
+    #             # [batch]
+    #             enty = dist.entropy().sum(-1)
+    #             # [batch]
+    #             new_act_logprobs = dist.log_prob(acts[ids]).sum(-1)
+    #             # [batch]
+    #             old_act_logprobs = act_logprobs[ids].reshape([-1])
+    #             ratios = torch.exp(new_act_logprobs - old_act_logprobs)
+
+    #             #! 取出子批次的mask
+    #             mask_b = active_masks[ids].reshape([-1]).to(acts.device, dtype=acts.dtype)
+    #             adv_b = advs[ids].reshape([-1])
+
+    #             # m = (mask_b > 0)
+    #             # if m.any():
+    #             #     adv_sel = adv_b[m]
+    #             #     adv_sel = (adv_sel - adv_sel.mean()).div(adv_sel.std().clamp_min(1e-8))
+    #             #     adv_b = adv_b.clone()
+    #             #     adv_b[m] = adv_sel
+
+    #             # PPO-clip
+    #             surr1 = ratios * adv_b
+    #             surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * adv_b
+
+    #             # 只用有效样本算平均值
+    #             denom = mask_b.sum().clamp_min(1.0)
+    #             policy_loss = -(torch.min(surr1, surr2) * mask_b).sum() / denom
+    #             ent_loss    = -(enty * self.enty_coef * mask_b).sum() / denom
+
+    #             loss = policy_loss + ent_loss
+
+    #             self.p_optimizers[agent_id].zero_grad()
+    #             loss.backward()
+
+    #             if self.use_grad_clip:
+    #                 torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
+    #                                             self.p_grad_clip)
+    #             self.p_optimizers[agent_id].step()
 
     # 原始版本（样本均衡）
     # def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs, active_masks):

@@ -43,12 +43,10 @@ class ObsScaling():
         for i in range(len(device_obss)):
             device_obss[i][5] = np.clip(device_obss[i][0], 0, 20) / 10
             device_obss[i][6] = np.clip(device_obss[i][1], 0, 20) / 10
-            device_obss[i][7] = np.clip(device_obss[i][1], 0, 20) / 10
-            device_obss[i][8] = np.clip(device_obss[i][1], 0, 20) / 10
             for j in range(self.max_task_num):
-                device_obss[i][10 + j * 3] /= self.max_data_size
-                device_obss[i][10 + j * 3 + 1] /= self.max_comp_dens
-                device_obss[i][10 + j * 3 + 2] /= self.max_dly_cons
+                device_obss[i][7 + j * 3] /= self.max_data_size
+                device_obss[i][7 + j * 3 + 1] /= self.max_comp_dens
+                device_obss[i][7 + j * 3 + 2] /= self.max_dly_cons
                 
 class RewardScaling():
     def __init__(self, gamma):

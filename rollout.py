@@ -9,7 +9,7 @@ from util.replay_buffer import MappoReplayBuffer, MaddpgReplayBuffer
 from util.utils import ObsScaling, RewardScaling
 from torch.utils.tensorboard import SummaryWriter
 import sys, atexit, os
-
+import config.global_params as gp
 class Rollout:
     def __init__(self, gen_params, alg_params):
         self.device_num = gen_params.device_num
@@ -90,7 +90,7 @@ class Rollout:
                 for i in range(self.device_num):
                     path = alg_params.weights_dir + "p_net_params_" + str(i) + ".pkl"
                     self.device_agents[i].load_net(path)
-        
+        root_path = gp.settings.project_root
         import datetime
         file_subpath =  (
                 (self.evaluate and "evaluate" or "train")
@@ -105,12 +105,14 @@ class Rollout:
         )
 
         self.log_dir_name = (
-                "runs/"
+                root_path
+                + "runs/"
                 + file_subpath
             )
         self.writer = SummaryWriter(log_dir=f"{self.log_dir_name}/")
         self.log_txt_dir_name = (
-                "log/"
+                root_path
+                + "log/"
                 + file_subpath
             )
         log_path = self.log_txt_dir_name + ".log"
@@ -311,8 +313,8 @@ class Rollout:
             print(f"device_cost_{i}: {device_costs[i]}")
             writer.add_scalar("device_comp_ql_"+str(i), device_comp_qls[i], e_id)
             print(f"device_comp_ql_{i}: {device_comp_qls[i]}")
-            writer.add_scalar("device_virtual_comp_ql_"+str(i), self.mec_env.device_envs[i].virtual_comp_ql, e_id)
-            print(f"device_virtual_comp_ql_{i}: {self.mec_env.device_envs[i].virtual_comp_ql}")
+            writer.add_scalar("device_virtual_time_ql_"+str(i), self.mec_env.device_envs[i].virtual_time_ql, e_id)
+            print(f"device_virtual_time_ql_{i}: {self.mec_env.device_envs[i].virtual_time_ql}")
             writer.add_scalar("device_comp_dlys_"+str(i), device_comp_dlys[i], e_id)
             print(f"device_comp_dlys_{i}: {device_comp_dlys[i]}")
             writer.add_scalar("device_csum_engys_"+str(i), device_csum_engys[i], e_id)

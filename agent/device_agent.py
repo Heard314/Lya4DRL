@@ -72,7 +72,7 @@ class MappoDeviceAgent():
         with torch.no_grad():
             mean, std, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
         
-        if enable_print: print(f"[DEBUG] the p_net output: mean({mean}), std({std})")
+        # if enable_print: print(f"[DEBUG] the p_net output: mean({mean}), std({std})")
 
         # 数值稳定：避免 std 太小
         std = torch.clamp(std, min=1e-6)
