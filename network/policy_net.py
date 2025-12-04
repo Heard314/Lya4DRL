@@ -117,7 +117,7 @@ class MappoPolicyNetLSTM(nn.Module):
 
         # ---------- debug flag ----------
         # Set this to False if you want to disable NaN/Inf checks
-        self.debug_nan = True
+        self.debug_nan = False
         # print(f"The debug_nan is {self.debug_nan}")
 
     def _check_tensor(self, name, t):
@@ -133,7 +133,7 @@ class MappoPolicyNetLSTM(nn.Module):
             print(f"  shape: {tuple(t.shape)}")
             print(f"  has_nan: {bool(has_nan)}, has_inf: {bool(has_inf)}")
             # print a small sample for inspection
-            flat = t.detach().reshape(-1)
+            flat = t.detach().reshape(-1).cpu()
             print("  sample values:", flat[:10])
             raise ValueError(f"NaN/Inf detected in {name}")
 

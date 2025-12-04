@@ -6,6 +6,7 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 from torch.distributions import Normal
 from network.value_net import MappoValueNet, MaddpgValueNet
 from network.policy_net import MappoPolicyNet, MaddpgPolicyNet, MappoPolicyNetLSTM
+import config.global_params as gp
 
 class MappoEdgeAgent():
     def __init__(self, gen_params, alg_params):
@@ -33,8 +34,10 @@ class MappoEdgeAgent():
         self.decay_fac = alg_params.decay_fac
         self.weights_dir = alg_params.weights_dir
         
+        self.device = gp.settings.device
+        print("[DEBUG] The device for training is: ", self.device)
         # value network
-        self.v_net = MappoValueNet(alg_params)
+        self.v_net = MappoValueNet(alg_params).to(self.device)
         self.v_optimizer = torch.optim.Adam(self.v_net.parameters(),
                                             lr = self.v_lr)
         
@@ -45,7 +48,7 @@ class MappoEdgeAgent():
         self.p_optimizers = []
         for i in range(self.device_num):
             # p_net = MappoPolicyNet(alg_params)
-            p_net = MappoPolicyNetLSTM(alg_params)
+            p_net = MappoPolicyNetLSTM(alg_params).to(self.device)
             self.p_nets.append(p_net)
                 
             p_optimizer = torch.optim.Adam(p_net.parameters(),
@@ -55,32 +58,11 @@ class MappoEdgeAgent():
         # load networks' weights 
         if alg_params.load_weights:
             v_path = self.weights_dir + "v_net_params.pkl"
-            self.v_net.load_state_dict(torch.load(v_path))
+            self.v_net.load_state_dict(torch.load(v_path, map_location=self.device))
             
             for i in range(self.device_num):
                 p_path = self.weights_dir + "p_net_params_" + str(i) + ".pkl"
-                self.p_nets[i].load_state_dict(torch.load(p_path))
-    
-    # def train_nets(self, replay_buffer):
-    #     '''training data'''
-    #     # v_inputs: [train_freq x train_time_slots, state_dim]
-    #     # v_tags: [train_freq x train_time_slots, 1] 价值网络的目标值
-    #     # p_inputs: [train_freq x train_time_slots, device_num, obs_dim]
-    #     # acts: [train_freq x train_time_slots, device_num, action_dim]
-    #     # act_logprobs: [train_freq x train_time_slots, device_num, 1]
-    #     # advs: [train_freq x train_time_slots, 1]
-    #     # active_masks: [train_freq x train_time_slots, device_num, 1] 当前智能体是否需要处理任务
-    #     v_inputs, v_tags, p_inputs, \
-    #     acts, act_logprobs, advs, active_masks = replay_buffer.get_training_data(self.v_net)
-                                    
-    #     self.train_value_net(v_inputs, v_tags)
-        
-    #     for i in range(self.device_num):
-    #         # 训练策略网络依然只用局部信息
-    #         self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs, active_masks=active_masks[:, i])
-        
-    #     if self.use_lr_decay:
-    #         self.decay_lr()
+                self.p_nets[i].load_state_dict(torch.load(p_path, map_location=self.device))
 
     def train_nets(self, replay_buffer):
         '''training data'''
@@ -93,7 +75,19 @@ class MappoEdgeAgent():
         # active_masks: [train_freq x train_time_slots, device_num, 1] 当前智能体是否需要处理任务
         v_inputs, v_tags, p_inputs, lstm_hidden_hs, lstm_hidden_cs, \
         acts, act_logprobs, advs, active_masks = replay_buffer.get_training_data(self.v_net)
-                                    
+
+        v_inputs       = v_inputs.to(self.device)
+        v_tags         = v_tags.to(self.device)
+        p_inputs       = p_inputs.to(self.device)
+        acts           = acts.to(self.device)
+        act_logprobs   = act_logprobs.to(self.device)
+        advs           = advs.to(self.device)
+        active_masks   = active_masks.to(self.device)
+        if lstm_hidden_hs is not None:
+            lstm_hidden_hs = lstm_hidden_hs.to(self.device)
+        if lstm_hidden_cs is not None:
+            lstm_hidden_cs = lstm_hidden_cs.to(self.device)
+
         self.train_value_net(v_inputs, v_tags)
         
         for i in range(self.device_num):
@@ -104,6 +98,10 @@ class MappoEdgeAgent():
             self.decay_lr()
     
     def train_value_net(self, v_inputs, v_tags):
+        
+        # print("cuda available:", torch.cuda.is_available())
+        # print("v_net device:", next(self.v_net.parameters()).device)
+        # print("sample batch device:", v_inputs.device)
         total_size = self.train_freq * self.train_time_slots
         for e in range(self.v_epochs):
             for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
@@ -180,6 +178,50 @@ class MappoEdgeAgent():
                     torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
                                                    self.p_grad_clip)
                 self.p_optimizers[agent_id].step()
+
+    def decay_lr(self):
+       if self.v_lr > self.min_v_lr:  
+           self.v_lr *= self.decay_fac
+           for params in self.v_optimizer.param_groups:
+               params['lr'] = self.v_lr
+       
+       if self.p_lr > self.min_p_lr:  
+           self.p_lr *= self.decay_fac
+           for i in range(self.device_num):
+               for params in self.p_optimizers[i].param_groups:
+                   params['lr'] = self.p_lr
+        
+    def save_nets(self, e_id):
+        if not os.path.exists(self.weights_dir):
+            os.makedirs(self.weights_dir)
+            
+        torch.save(self.v_net.state_dict(), 
+                   self.weights_dir + "v_net_params_" + str(e_id) + ".pkl")
+        
+        for i in range(self.device_num):
+            torch.save(self.p_nets[i].state_dict(),
+                       self.weights_dir + "p_net_params_" + str(i) + "_" + str(e_id) + ".pkl")        
+
+    # def train_nets(self, replay_buffer):
+    #     '''training data'''
+    #     # v_inputs: [train_freq x train_time_slots, state_dim]
+    #     # v_tags: [train_freq x train_time_slots, 1] 价值网络的目标值
+    #     # p_inputs: [train_freq x train_time_slots, device_num, obs_dim]
+    #     # acts: [train_freq x train_time_slots, device_num, action_dim]
+    #     # act_logprobs: [train_freq x train_time_slots, device_num, 1]
+    #     # advs: [train_freq x train_time_slots, 1]
+    #     # active_masks: [train_freq x train_time_slots, device_num, 1] 当前智能体是否需要处理任务
+    #     v_inputs, v_tags, p_inputs, \
+    #     acts, act_logprobs, advs, active_masks = replay_buffer.get_training_data(self.v_net)
+                                    
+    #     self.train_value_net(v_inputs, v_tags)
+        
+    #     for i in range(self.device_num):
+    #         # 训练策略网络依然只用局部信息
+    #         self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs, active_masks=active_masks[:, i])
+        
+    #     if self.use_lr_decay:
+    #         self.decay_lr()
 
     # 按比例分配样本
     # def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs,
@@ -411,31 +453,6 @@ class MappoEdgeAgent():
     #                 torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
     #                                                self.p_grad_clip)
     #             self.p_optimizers[agent_id].step()
-
-
-                
-    def decay_lr(self):
-       if self.v_lr > self.min_v_lr:  
-           self.v_lr *= self.decay_fac
-           for params in self.v_optimizer.param_groups:
-               params['lr'] = self.v_lr
-       
-       if self.p_lr > self.min_p_lr:  
-           self.p_lr *= self.decay_fac
-           for i in range(self.device_num):
-               for params in self.p_optimizers[i].param_groups:
-                   params['lr'] = self.p_lr
-        
-    def save_nets(self, e_id):
-        if not os.path.exists(self.weights_dir):
-            os.makedirs(self.weights_dir)
-            
-        torch.save(self.v_net.state_dict(), 
-                   self.weights_dir + "v_net_params_" + str(e_id) + ".pkl")
-        
-        for i in range(self.device_num):
-            torch.save(self.p_nets[i].state_dict(),
-                       self.weights_dir + "p_net_params_" + str(i) + "_" + str(e_id) + ".pkl")        
             
 class MaddpgEdgeAgent():
     def __init__(self, gen_params, alg_params):

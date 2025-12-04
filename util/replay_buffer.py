@@ -48,98 +48,222 @@ class MappoReplayBuffer():
         self.ps[1] = (self.ps[1] + 1) % (self.train_time_slots + 1)
         
     def get_training_data(self, value_net):
-        '''GAE'''
-        v_inputs = torch.zeros([self.train_freq, self.train_time_slots + 1, self.state_dim])
+        """Build training data and compute GAE.
+        value_net is already on some device (CPU or GPU).
+        """
+        # ----- 1) build value inputs on CPU -----
+        v_inputs = torch.zeros(
+            [self.train_freq, self.train_time_slots + 1, self.state_dim],
+            dtype=torch.float32
+        )
         for i in range(self.train_freq):
             for j in range(self.train_time_slots + 1):
                 edge_obs = copy.copy(self.edge_obs[i][j])
                 device_obss = copy.copy(self.device_obss[i][j])
-                inputs = GetValueInputs(edge_obs, device_obss)
+                inputs = GetValueInputs(edge_obs, device_obss)  # expect torch or np
+                # ensure torch tensor
+                if not torch.is_tensor(inputs):
+                    inputs = torch.as_tensor(inputs, dtype=torch.float32)
                 v_inputs[i, j] = inputs
-        
+
+        # ----- 2) use value_net on its own device -----
+        dev_v = next(value_net.parameters()).device
         with torch.no_grad():
-            vs = value_net(v_inputs.reshape([-1, self.state_dim]))
-        # 使用价值网络计算状态价值
-        vs = vs.reshape([self.train_freq, self.train_time_slots + 1, 1])
-        
-        # [train_freq, train_time_slots, 1]
-        rewards = torch.tensor(self.joint_reward, dtype = torch.float) \
-                    [:, 0: self.train_time_slots].unsqueeze(-1)
-        # 计算优势函数
-        # [train_episodes, train_time_slots, 1]
+            # move inputs to value_net device for forward
+            v_inputs_flat = v_inputs.reshape([-1, self.state_dim]).to(dev_v)
+            vs = value_net(v_inputs_flat)  # [train_freq*(T+1), 1] on dev_v
+            # move back to CPU for further processing
+            vs = vs.cpu().reshape([self.train_freq, self.train_time_slots + 1, 1])
+
+        # ----- 3) compute GAE etc. on CPU -----
+        # rewards: [train_freq, train_time_slots, 1]
+        rewards = torch.tensor(
+            self.joint_reward, dtype=torch.float32
+        )[:, 0:self.train_time_slots].unsqueeze(-1)
+
+        # deltas: [train_freq, train_time_slots, 1]
         deltas = rewards + self.gamma * vs[:, 1: self.train_time_slots + 1] - \
-                    vs[:, 0: self.train_time_slots]
-        # 计算GAE优势函数
-        gae = 0
-        advs = torch.zeros([self.train_freq, self.train_time_slots, 1])
+                 vs[:, 0: self.train_time_slots]
+
+        gae = 0.0
+        advs = torch.zeros([self.train_freq, self.train_time_slots, 1],
+                           dtype=torch.float32)
         for t in reversed(range(self.train_time_slots)):
             gae = deltas[:, t] + self.lamda * self.gamma * gae
             advs[:, t] = gae
-        
-        # 计算价值网络目标值
-        # [train_episodes, train_time_slots, 1]
+
+        # value targets
         v_tags = advs + vs[:, 0: self.train_time_slots]
-        # normalization
+
+        # normalize advantages
         advs = (advs - advs.mean()) / (advs.std() + 1e-5)
-        
-        '''training data - value network'''
-        # [train_freq x train_time_slots, state_dim]
+
+        # ----- 4) flatten value training data -----
+        # [train_freq * train_time_slots, state_dim]
         v_inputs = v_inputs[:, 0: self.train_time_slots].reshape([-1, self.state_dim])
-        # [train_freq x train_time_slots, 1]
+        # [train_freq * train_time_slots, 1]
         v_tags = v_tags.reshape([-1, 1])
-        
-        '''training data - policy networks'''
-        p_inputs = torch.zeros([self.train_freq, self.train_time_slots, 
-                                self.device_num, self.obs_dim])
-        acts = torch.zeros([self.train_freq, self.train_time_slots, 
-                            self.device_num, self.action_dim])
-        act_logprobs = torch.zeros([self.train_freq, self.train_time_slots, 
-                                    self.device_num, 1])
-        device_active = torch.zeros([self.train_freq, self.train_time_slots, 
-                                    self.device_num, 1])
-        lstm_hidden_hs = torch.zeros([self.train_freq, self.train_time_slots, 
-                                    self.device_num, self.lstm_hidden_dim])
-        lstm_hidden_cs = torch.zeros([self.train_freq, self.train_time_slots, 
-                                    self.device_num, self.lstm_hidden_dim])
+
+        # ----- 5) build policy training data (still on CPU) -----
+        p_inputs = torch.zeros(
+            [self.train_freq, self.train_time_slots, self.device_num, self.obs_dim],
+            dtype=torch.float32
+        )
+        acts = torch.zeros(
+            [self.train_freq, self.train_time_slots, self.device_num, self.action_dim],
+            dtype=torch.float32
+        )
+        act_logprobs = torch.zeros(
+            [self.train_freq, self.train_time_slots, self.device_num, 1],
+            dtype=torch.float32
+        )
+        device_active = torch.zeros(
+            [self.train_freq, self.train_time_slots, self.device_num, 1],
+            dtype=torch.float32
+        )
+        lstm_hidden_hs = torch.zeros(
+            [self.train_freq, self.train_time_slots, self.device_num, self.lstm_hidden_dim],
+            dtype=torch.float32
+        )
+        lstm_hidden_cs = torch.zeros(
+            [self.train_freq, self.train_time_slots, self.device_num, self.lstm_hidden_dim],
+            dtype=torch.float32
+        )
+
         for i in range(self.train_freq):
             for j in range(self.train_time_slots):
                 for k in range(self.device_num):
                     obs = copy.copy(self.device_obss[i][j][k])
                     inputs = GetPolicyInputs(obs)
+                    if not torch.is_tensor(inputs):
+                        inputs = torch.as_tensor(inputs, dtype=torch.float32)
                     p_inputs[i, j, k] = inputs
-                    acts[i, j, k] = torch.tensor(self.device_acts[i][j][k],
-                                                    dtype = torch.float)
-                    act_logprobs[i, j, k] = torch.tensor(self.device_act_logprobs[i][j][k],
-                                                            dtype = torch.float)
-                    device_active[i, j, k] = torch.tensor(self.device_active[i][j][k],
-                                                            dtype = torch.float)
-                    raw_h = self.lstm_hidden_hs[i][j][k]    # 可能是 list 或 tensor
+
+                    acts[i, j, k] = torch.tensor(
+                        self.device_acts[i][j][k], dtype=torch.float32
+                    )
+                    act_logprobs[i, j, k] = torch.tensor(
+                        self.device_act_logprobs[i][j][k], dtype=torch.float32
+                    )
+                    device_active[i, j, k] = torch.tensor(
+                        self.device_active[i][j][k], dtype=torch.float32
+                    )
+
+                    raw_h = self.lstm_hidden_hs[i][j][k]
                     raw_c = self.lstm_hidden_cs[i][j][k]
 
-                    # 1. 安全转成 tensor（不管是 list 还是 tensor）
-                    h = torch.as_tensor(raw_h, dtype=torch.float32)
-                    c = torch.as_tensor(raw_c, dtype=torch.float32)
+                    h = torch.as_tensor(raw_h, dtype=torch.float32).view(-1)[:self.lstm_hidden_dim]
+                    c = torch.as_tensor(raw_c, dtype=torch.float32).view(-1)[:self.lstm_hidden_dim]
 
-                    # 2. 拉平成一维，并强制长度为 lstm_hidden_dim
-                    h = h.view(-1)[:self.lstm_hidden_dim]
-                    c = c.view(-1)[:self.lstm_hidden_dim]
-
-                    # 3. 塞进预分配好的大 tensor
                     lstm_hidden_hs[i, j, k] = h
                     lstm_hidden_cs[i, j, k] = c
 
-        # [train_freq x train_time_slots, device_num, obs_dim]
+        # reshape to [train_freq * train_time_slots, ...]
         p_inputs = p_inputs.reshape([-1, self.device_num, self.obs_dim])
-        # [train_freq x train_time_slots, device_num, action_dim]
         acts = acts.reshape([-1, self.device_num, self.action_dim])
-        # [train_freq x train_time_slots, device_num, 1]
         act_logprobs = act_logprobs.reshape([-1, self.device_num, 1])
         device_active = device_active.reshape([-1, self.device_num, 1])
         lstm_hidden_hs = lstm_hidden_hs.reshape([-1, self.device_num, self.lstm_hidden_dim])
         lstm_hidden_cs = lstm_hidden_cs.reshape([-1, self.device_num, self.lstm_hidden_dim])
         advs = advs.reshape([-1, 1])
+
+        return v_inputs, v_tags, p_inputs, lstm_hidden_hs, lstm_hidden_cs, \
+               acts, act_logprobs, advs, device_active
+
+
+    # def get_training_data(self, value_net):
+    #     '''GAE'''
+    #     v_inputs = torch.zeros([self.train_freq, self.train_time_slots + 1, self.state_dim])
+    #     for i in range(self.train_freq):
+    #         for j in range(self.train_time_slots + 1):
+    #             edge_obs = copy.copy(self.edge_obs[i][j])
+    #             device_obss = copy.copy(self.device_obss[i][j])
+    #             inputs = GetValueInputs(edge_obs, device_obss)
+    #             v_inputs[i, j] = inputs
         
-        return v_inputs, v_tags, p_inputs, lstm_hidden_hs, lstm_hidden_cs, acts, act_logprobs, advs, device_active
+    #     with torch.no_grad():
+    #         vs = value_net(v_inputs.reshape([-1, self.state_dim]))
+    #     # 使用价值网络计算状态价值
+    #     vs = vs.reshape([self.train_freq, self.train_time_slots + 1, 1])
+        
+    #     # [train_freq, train_time_slots, 1]
+    #     rewards = torch.tensor(self.joint_reward, dtype = torch.float) \
+    #                 [:, 0: self.train_time_slots].unsqueeze(-1)
+    #     # 计算优势函数
+    #     # [train_episodes, train_time_slots, 1]
+    #     deltas = rewards + self.gamma * vs[:, 1: self.train_time_slots + 1] - \
+    #                 vs[:, 0: self.train_time_slots]
+    #     # 计算GAE优势函数
+    #     gae = 0
+    #     advs = torch.zeros([self.train_freq, self.train_time_slots, 1])
+    #     for t in reversed(range(self.train_time_slots)):
+    #         gae = deltas[:, t] + self.lamda * self.gamma * gae
+    #         advs[:, t] = gae
+        
+    #     # 计算价值网络目标值
+    #     # [train_episodes, train_time_slots, 1]
+    #     v_tags = advs + vs[:, 0: self.train_time_slots]
+    #     # normalization
+    #     advs = (advs - advs.mean()) / (advs.std() + 1e-5)
+        
+    #     '''training data - value network'''
+    #     # [train_freq x train_time_slots, state_dim]
+    #     v_inputs = v_inputs[:, 0: self.train_time_slots].reshape([-1, self.state_dim])
+    #     # [train_freq x train_time_slots, 1]
+    #     v_tags = v_tags.reshape([-1, 1])
+        
+    #     '''training data - policy networks'''
+    #     p_inputs = torch.zeros([self.train_freq, self.train_time_slots, 
+    #                             self.device_num, self.obs_dim])
+    #     acts = torch.zeros([self.train_freq, self.train_time_slots, 
+    #                         self.device_num, self.action_dim])
+    #     act_logprobs = torch.zeros([self.train_freq, self.train_time_slots, 
+    #                                 self.device_num, 1])
+    #     device_active = torch.zeros([self.train_freq, self.train_time_slots, 
+    #                                 self.device_num, 1])
+    #     lstm_hidden_hs = torch.zeros([self.train_freq, self.train_time_slots, 
+    #                                 self.device_num, self.lstm_hidden_dim])
+    #     lstm_hidden_cs = torch.zeros([self.train_freq, self.train_time_slots, 
+    #                                 self.device_num, self.lstm_hidden_dim])
+    #     for i in range(self.train_freq):
+    #         for j in range(self.train_time_slots):
+    #             for k in range(self.device_num):
+    #                 obs = copy.copy(self.device_obss[i][j][k])
+    #                 inputs = GetPolicyInputs(obs)
+    #                 p_inputs[i, j, k] = inputs
+    #                 acts[i, j, k] = torch.tensor(self.device_acts[i][j][k],
+    #                                                 dtype = torch.float)
+    #                 act_logprobs[i, j, k] = torch.tensor(self.device_act_logprobs[i][j][k],
+    #                                                         dtype = torch.float)
+    #                 device_active[i, j, k] = torch.tensor(self.device_active[i][j][k],
+    #                                                         dtype = torch.float)
+    #                 raw_h = self.lstm_hidden_hs[i][j][k]    # 可能是 list 或 tensor
+    #                 raw_c = self.lstm_hidden_cs[i][j][k]
+
+    #                 # 1. 安全转成 tensor（不管是 list 还是 tensor）
+    #                 h = torch.as_tensor(raw_h, dtype=torch.float32)
+    #                 c = torch.as_tensor(raw_c, dtype=torch.float32)
+
+    #                 # 2. 拉平成一维，并强制长度为 lstm_hidden_dim
+    #                 h = h.view(-1)[:self.lstm_hidden_dim]
+    #                 c = c.view(-1)[:self.lstm_hidden_dim]
+
+    #                 # 3. 塞进预分配好的大 tensor
+    #                 lstm_hidden_hs[i, j, k] = h
+    #                 lstm_hidden_cs[i, j, k] = c
+
+    #     # [train_freq x train_time_slots, device_num, obs_dim]
+    #     p_inputs = p_inputs.reshape([-1, self.device_num, self.obs_dim])
+    #     # [train_freq x train_time_slots, device_num, action_dim]
+    #     acts = acts.reshape([-1, self.device_num, self.action_dim])
+    #     # [train_freq x train_time_slots, device_num, 1]
+    #     act_logprobs = act_logprobs.reshape([-1, self.device_num, 1])
+    #     device_active = device_active.reshape([-1, self.device_num, 1])
+    #     lstm_hidden_hs = lstm_hidden_hs.reshape([-1, self.device_num, self.lstm_hidden_dim])
+    #     lstm_hidden_cs = lstm_hidden_cs.reshape([-1, self.device_num, self.lstm_hidden_dim])
+    #     advs = advs.reshape([-1, 1])
+        
+    #     return v_inputs, v_tags, p_inputs, lstm_hidden_hs, lstm_hidden_cs, acts, act_logprobs, advs, device_active
    
 class MaddpgReplayBuffer():
     def __init__(self, gen_params, alg_params):

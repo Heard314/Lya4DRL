@@ -276,13 +276,13 @@ def get_mappo_params():
     parser.add_argument("--train_episodes", type = int, default = 8000,
                         help = "the number of training episodes")
     
-    parser.add_argument("--train_time_slots", type = int, default = 200,
+    parser.add_argument("--train_time_slots", type = int, default = 300,
                         help = "the number of training time-slots")
     
-    parser.add_argument("--train_freq", type = int, default = 32,     
+    parser.add_argument("--train_freq", type = int, default = 4,
                         help = "training frequency")
     
-    parser.add_argument("--train_batch_size", type = int, default = 800,
+    parser.add_argument("--train_batch_size", type = int, default = 1200,
                         help = "training batch-size")
     
     parser.add_argument("--v_epochs", type = int, default = 4,
