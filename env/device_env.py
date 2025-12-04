@@ -17,8 +17,6 @@ class Task():
         '''local subtask'''
         # computing delay
         self.l_comp_dly = None
-        # energy consumption
-        self.l_csum_engy = None
         '''offloading subtask'''
         # offloading data-size
         self.offl_dz = None
@@ -26,27 +24,29 @@ class Task():
         self.trans_time = None
         # computing delay 
         self.e_comp_dly = None
-        # consumed energy
-        self.e_csum_engy = None
-        # service expense
-        self.comp_expn = None
+        # energy consumption
+        self.local_comp_engy = None
+        # device consumed energy
+        self.tran_engy = None
+        # edge compute consumed energy
+        self.edge_comp_engy = None
         '''normalization'''
         self.norm_csum_engy = None
-        self.norm_comp_expn = None
+        self.norm_esum_engy = None
 
     def __str__(self):
         return "data_size: " + str(self.data_size) + \
                "\ncomp_dens: " + str(self.comp_dens) + \
                "\ndly_cons: " + str(self.dly_cons) + \
                "\nl_comp_dly: " + str(self.l_comp_dly) + \
-               "\nl_csum_engy: " + str(self.l_csum_engy) + \
+               "\nlocal_comp_engy: " + str(self.local_comp_engy) + \
                "\noffl_data_size: " + str(self.offl_dz) + \
                "\ntrans_time: " + str(self.trans_time) + \
                "\ne_comp_dly: " + str(self.e_comp_dly) + \
-               "\ne_csum_engy: " + str(self.e_csum_engy) + \
-               "\ncomp_expn: " + str(self.comp_expn) + \
+               "\ntran_engy: " + str(self.tran_engy) + \
+               "\ncomp_expn: " + str(self.edge_comp_engy) + \
                "\nnorm_csum_engy: " + str(self.norm_csum_engy) + \
-               "\nnorm_comp_expn: " + str(self.norm_comp_expn)
+               "\nnorm_comp_expn: " + str(self.norm_esum_engy)
 
 class DeviceEnv():
     
@@ -59,7 +59,10 @@ class DeviceEnv():
             if min_dis <= distance <= max_dis:
                 return x, y
 
-    def __init__(self, env_id, gen_params, edge_env):
+    def __init__(self, env_id, gen_params, edge_env, writer = None):
+
+        # Summary Writer
+        self.writer = writer
 
         self.edge_env = edge_env
         # env id
@@ -89,8 +92,8 @@ class DeviceEnv():
         self.data_size_inl = gen_params.data_size_inls[self.device_type]
         # unit: Gcycles/Mb
         self.comp_dens_inl = gen_params.comp_dens_inls[self.device_type]
-        # unit: $/Gcycles
-        self.service_price = gen_params.service_price
+        # # unit: $/Gcycles
+        # self.service_price = gen_params.service_price
         
         self.max_task_num = gen_params.max_task_num
 
@@ -216,9 +219,9 @@ class DeviceEnv():
             # task.dly_cons = max(self.unit_task_timeout_thre * data_size, self.delta)
             task.dly_cons = self.task_timeout_thre
             task.norm_csum_engy = comp * self.engy_fac
-            task.norm_comp_expn = comp * self.service_price
+            task.norm_esum_engy = comp * self.engy_fac 
             # print("[DEBUG] The norm_csum_engy is: ", task.norm_csum_engy)
-            # print("[DEBUG] The norm_comp_expn is: ", task.norm_comp_expn)
+            # print("[DEBUG] The norm_esum_engy is: ", task.norm_esum_engy)
             self.sched_tasks.append(task)
         
         # obs
@@ -317,7 +320,8 @@ class DeviceEnv():
     #! 目前每个时隙至多只传输一个任务的数据
     # act: [offl_rto, trans_rto, local_comp_rto], all in [0, 1]
     # t_id: the start t_id is 1
-    def compute(self, act, t_id):
+    def compute(self, act, e_id, t_id, visualize=False):
+        writer = self.writer
         enable_print = gp.settings.enable_print
         '''offloading'''
         # offloading data-size
@@ -336,6 +340,22 @@ class DeviceEnv():
             # local compute ratio
             device_comp_rto = act[2]
             device_comp_freq = self.device_comp_freq * device_comp_rto
+            if visualize:
+                writer.add_scalars(
+                    f"detail/offl_rto_{self.env_id}",
+                    {f"ep_{e_id}": offl_rto},
+                    t_id
+                )
+                writer.add_scalars(
+                    f"detail/trpw_rto_{self.env_id}",
+                    {f"ep_{e_id}": trpw_rto},
+                    t_id
+                )
+                writer.add_scalars(
+                    f"detail/comp_rto_{self.env_id}",
+                    {f"ep_{e_id}": device_comp_rto},
+                    t_id
+                )
         #! 处理的任务的顺序为FIFO
         # ascending order 
         # offl_dzs = sorted(offl_dzs.items(), key = lambda x: x[1])
@@ -368,19 +388,20 @@ class DeviceEnv():
             # if offl_dz = 0, there is no need to queue
             if task.offl_dz == 0:
                 task.trans_time = 0
-                task.e_csum_engy = 0
-                task.comp_expn = 0
+                task.tran_engy = 0
+                task.edge_comp_engy = 0
             else:
                 task.trans_time = tran_queue_delay + task.offl_dz / trans_rate
                 self.total_tran_time += task.offl_dz / trans_rate
-                task.e_csum_engy = trans_power * pow(10, -3) * \
+                task.tran_engy = trans_power * pow(10, -3) * \
                                    task.offl_dz / trans_rate
-                task.comp_expn = task.offl_dz * task.comp_dens * \
-                                 self.service_price
+                # task.edge_comp_engy = task.offl_dz * task.comp_dens * \
+                #                  self.engy_fac
             local_comps.append((task.data_size - task.offl_dz) * \
                                     task.comp_dens)
             # self.avail_task_num += 1
             # self.avg_local_comp = (self.avg_local_comp * (self.avail_task_num - 1) + (task.data_size - task.offl_dz) * task.comp_dens) / self.avail_task_num
+            
             if(enable_print): print(f"[DEBUG] the local_comp in device {self.env_id} is {(task.data_size - task.offl_dz) * task.comp_dens}")
             if(enable_print): print(f"[DEBUG] the offl_comp in device {self.env_id} is {task.offl_dz * task.comp_dens}")
 
@@ -401,15 +422,17 @@ class DeviceEnv():
             # if local_comp = 0, there is no need to queue
             if local_comp == 0:
                 task.l_comp_dly = 0
-                task.l_csum_engy = 0
+                task.local_comp_engy = 0
             else:
                 task.l_comp_dly = max(self.total_comp_time - (t_id-1)*self.delta, 0) + local_comp / device_comp_freq
                 self.total_comp_time += local_comp / device_comp_freq
-                task.l_csum_engy = self.engy_fac * pow(device_comp_freq,2) * local_comp
+                task.local_comp_engy = self.engy_fac * pow(device_comp_freq,2) * local_comp
+                # if(enable_print): print(f"[DEBUG] The device freq pow2 is {pow(device_comp_freq,2)}")
                 # 适用于单时隙一直有一个任务到达的情况
-                self.new_ql_change = local_comp / device_comp_freq - self.delta
-                self.time_ql = max(0, self.time_ql + self.new_ql_change)
-                
+                old_time_ql_ = self.time_ql
+                self.time_ql = max(0, old_time_ql_ + local_comp / device_comp_freq - self.delta)
+                self.new_ql_change = self.time_ql - old_time_ql_
+
             self.avail_task_num += 1
             self.avg_local_time = (self.avg_local_time * (self.avail_task_num - 1) + local_comp / device_comp_freq) / self.avail_task_num
             if(enable_print): print(f"[DEBUG] the local comp_dly in device {self.env_id} is {task.l_comp_dly}")
@@ -438,6 +461,7 @@ class DeviceEnv():
             self.new_vir_ql_change = self.time_ql/self.avg_local_time - self.device_dly_adj_val
             self.virtual_time_ql = max(0, self.virtual_time_ql + self.new_vir_ql_change)
 
+
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s avg_local_time is: ", self.avg_local_time)
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s new_ql_change is: ", self.new_ql_change)
@@ -445,6 +469,33 @@ class DeviceEnv():
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s old_virtual_time_ql is: ", self.old_virtual_time_ql)
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s new_vir_ql_change is: ", self.new_vir_ql_change)
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s virtual_time_ql is: ", self.virtual_time_ql)
+
+        if visualize:
+            writer.add_scalars(
+                f"detail/device_avg_local_time_{self.env_id}",
+                {f"ep_{e_id}": self.avg_local_time},
+                t_id
+            )
+            writer.add_scalars(
+                f"detail/device_time_ql_{self.env_id}",
+                {f"ep_{e_id}_act": self.time_ql},
+                t_id
+            )
+            writer.add_scalars(
+                f"detail/device_time_ql_{self.env_id}",
+                {f"ep_{e_id}_act_chg": self.new_ql_change},
+                t_id
+            )
+            writer.add_scalars(
+                f"detail/device_time_ql_{self.env_id}",
+                {f"ep_{e_id}_vir": self.virtual_time_ql},
+                t_id
+            )
+            writer.add_scalars(
+                f"detail/device_time_ql_{self.env_id}",
+                {f"ep_{e_id}_vir_chg": self.new_vir_ql_change},
+                t_id
+            )
 
         # update channel gain
         self.channel_gain = 0.1 * self.distance_from_edge ** (-3.5)
@@ -470,8 +521,8 @@ class DeviceEnv():
             # task.dly_cons = comp / self.std_comp_freq * self.dynamic_delay_adjust_coef
             # task.dly_cons = max(self.unit_task_timeout_thre * data_size, self.delta)
             task.dly_cons = self.task_timeout_thre
-            task.norm_csum_engy = comp * self.engy_fac
-            task.norm_comp_expn = comp * self.service_price
+            task.norm_csum_engy = comp * self.engy_fac * 6.25
+            task.norm_esum_engy = comp * self.engy_fac * 6400
             
             self.sched_tasks.append(task)
         

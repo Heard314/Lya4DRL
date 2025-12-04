@@ -1,6 +1,9 @@
 import config.global_params as gp
 class EdgeEnv():
-    def __init__(self, general_params):
+    def __init__(self, general_params, writer = None):
+        
+        # Summary Writer
+        self.writer = writer
         # unit: s
         self.delta = general_params.delta
         
@@ -110,7 +113,8 @@ class EdgeEnv():
 
         return obs
     
-    def compute(self, device_sched_tasks, t_id):
+    def compute(self, device_sched_tasks, e_id, t_id, visualize=False):
+        writer = self.writer
         enable_print = gp.settings.enable_print
         device_type_sched_tasks = [[] for _ in range(self.edge_queue_num)]
         for device_id, sched_tasks in enumerate(device_sched_tasks):
@@ -156,12 +160,17 @@ class EdgeEnv():
                     # if(enable_print): print(f"[DEBUG] The edge comp of task of type {device_type} in device {task.device_id} is 0")
                     # if(enable_print): print(f"[DEBUG] The edge calculated amount of type {device_type} in this episode is {alloc_edge_freq[device_type] * self.delta}")
                     task.e_comp_dly = 0
+                    task.edge_comp_engy = 0
                     if(enable_print): print(f"[DEBUG] the edge comp_dly in device {task.device_id} is {task.e_comp_dly}")
                 else:
                     # new_edge_comp += task.offl_dz * task.comp_dens
                     if(enable_print): print(f"[DEBUG] The edge comp of task in device {task.device_id} is {task.offl_dz * task.comp_dens}")
                     if(enable_print): print(f"[DEBUG] The edge calculated amount in device {task.device_id} is {min(task.offl_dz * task.comp_dens, alloc_edge_freq[device_type] * max(0, self.delta - max(comp_dlys[device_type], task.trans_time)))}")
                     
+                    #config
+                    # 能耗系数为1 J/GFlops
+                    task.edge_comp_engy = task.offl_dz * task.comp_dens * pow(alloc_edge_freq[device_type],2)
+                    # if(enable_print): print(f"[DEBUG] The edge freq pow2 is {pow(alloc_edge_freq[device_type],2)}")
                     task.e_comp_dly = max(max(self.total_comp_time[device_type] - (t_id-1)*self.delta, 0), task.trans_time) + task.offl_dz * \
                                     task.comp_dens / alloc_edge_freq[device_type]
                     
@@ -185,8 +194,10 @@ class EdgeEnv():
             # self.old_virtual_edge_queue_comp_ql = self.virtual_edge_queue_comp_ql
             # self.virtual_edge_queue_comp_ql[device_type] = max(0, self.virtual_edge_queue_comp_ql[device_type] + self.virtual_edge_comp_ql_growth[device_type] - self.completed_comp[device_type])
             self.old_virtual_edge_queue_time_ql[device_type] = self.virtual_edge_queue_time_ql[device_type]
-            self.new_vir_edge_ql_change[device_type] = self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type] - self.edge_dly_adj_val[device_type]
-            self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + self.new_vir_edge_ql_change[device_type], 0)
+            
+            old_virtual_edge_queue_time_ql_ = self.virtual_edge_queue_time_ql[device_type]
+            self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type] - self.edge_dly_adj_val[device_type], 0)
+            self.new_vir_edge_ql_change[device_type] = self.virtual_edge_queue_time_ql[device_type] - old_virtual_edge_queue_time_ql_
 
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s old_edge_queue_time_ql is: ", self.old_edge_queue_time_ql[device_type])
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s old_virtual_edge_queue_time_ql is: ", self.old_virtual_edge_queue_time_ql[device_type])
@@ -194,6 +205,33 @@ class EdgeEnv():
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s new_vir_edge_ql_change is: ", self.new_vir_edge_ql_change[device_type])
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s edge_queue_time_ql is: ", self.edge_queue_time_ql[device_type])
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s virtual_edge_queue_time_ql is: ", self.virtual_edge_queue_time_ql[device_type])
+            
+            if visualize:
+                    writer.add_scalars(
+                        f"detail/edge_avg_local_time_{device_type}",
+                        {f"ep_{e_id}": self.avg_edge_time[device_type]},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail/edge_time_ql_{device_type}",
+                        {f"ep_{e_id}_act": self.edge_queue_time_ql[device_type]},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail/edge_time_ql_{device_type}",
+                        {f"ep_{e_id}_act_chg": self.new_edge_ql_change[device_type]},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail/edge_time_ql_{device_type}",
+                        {f"ep_{e_id}_vir": self.virtual_edge_queue_time_ql[device_type]},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail/edge_time_ql_{device_type}",
+                        {f"ep_{e_id}_vir_chg": self.new_vir_edge_ql_change[device_type]},
+                        t_id
+                    )
 
         self.update_freq()
         # for i in range(self.edge_queue_num):

@@ -125,7 +125,7 @@ class Rollout:
         self.time_slots = self.train_time_slots + 1 if not self.evaluate else self.eval_time_slots
 
         # MEC env
-        self.mec_env = MECEnv(gen_params,self.time_slots)
+        self.mec_env = MECEnv(gen_params, self.time_slots, self.writer)
         self.device_type_num = gen_params.device_type_num
 
 
@@ -135,9 +135,11 @@ class Rollout:
         self.device_costs = None
         self.edge_comp_qls = None
         self.device_comp_qls = None
-        self.device_comp_dlys = None
+        self.comp_dlys = None
+        self.edge_comp_dlys = None
+        self.comp_dlys = None
         self.device_csum_engys = None
-        self.device_comp_expns = None
+        self.device_esum_engys = None
         self.device_overtime_nums = None
         self.device_task_avail_nums = None
         
@@ -151,13 +153,15 @@ class Rollout:
         self.device_costs = np.zeros([self.device_num], dtype = np.float32)
         self.edge_comp_qls = np.zeros([self.device_type_num], dtype = np.float32)
         self.device_comp_qls = np.zeros([self.device_num], dtype = np.float32)
-        self.device_comp_dlys = np.zeros([self.device_num], dtype = np.float32)
+        self.comp_dlys = np.zeros([self.device_num], dtype = np.float32)
+        self.comp_dlys = np.zeros([self.device_num], dtype = np.float32)
+        self.edge_comp_dlys = np.zeros([self.device_num], dtype = np.float32) #the edge computing delay for each task.
         self.device_csum_engys = np.zeros([self.device_num], dtype = np.float32)
-        self.device_comp_expns = np.zeros([self.device_num], dtype = np.float32)
+        self.device_esum_engys = np.zeros([self.device_num], dtype = np.float32)
         self.device_overtime_nums = np.zeros([self.device_num], dtype = np.float32)
         self.device_task_avail_nums = np.zeros([self.device_num], dtype = np.float32)
         
-    def run(self, e_id):
+    def run(self, e_id, visualize=False):
 
         writer = self.writer
         # reset
@@ -217,17 +221,22 @@ class Rollout:
             #     device_acts_ = device_acts
             
             # step
+            # device_rewards为能耗奖励
+            # act_queue_rewards为实际队列奖励
+            # vir_queue_rewards为虚拟队列奖励
+            # total_rewards为综合奖励
+            # device_engys和edge_engys分别为任务在设备端和边缘端的能耗
             joint_reward, device_rewards, \
             joint_cost, device_costs, \
-            device_comp_dlys, device_csum_engys, \
-            device_comp_expns, device_overtime_nums, \
-            next_edge_obs, next_device_obss, device_task_is_available = self.mec_env.step(device_acts_, e_id, t_id)
+            comp_dlys, device_csum_engys, \
+            device_esum_engys, device_overtime_nums, \
+            next_edge_obs, next_device_obss, device_task_is_available = self.mec_env.step(device_acts_, e_id = e_id, t_id = t_id, visualize = visualize)
             
             self.average(t_id, joint_reward, device_rewards,
                                joint_cost, device_costs,
                                edge_comp_qls, device_comp_qls,
-                               device_comp_dlys, device_csum_engys,
-                               device_comp_expns, device_overtime_nums,
+                               comp_dlys, device_csum_engys,
+                               device_esum_engys, device_overtime_nums,
                                device_task_is_available)
             
             if hasattr(self, "reward_scaling"):
@@ -293,12 +302,16 @@ class Rollout:
         device_costs = copy.copy(self.device_costs)
         edge_comp_qls =  copy.copy(self.edge_comp_qls)
         device_comp_qls = copy.copy(self.device_comp_qls)
-        device_comp_dlys = copy.copy(self.device_comp_dlys)
+        comp_dlys = copy.copy(self.comp_dlys)
+        # device_comp_dlys = copy.copy(self.device_comp_dlys)
+        # edge_comp_dlys = copy.copy(self.edge_comp_dlys)
         device_csum_engys = copy.copy(self.device_csum_engys)
-        device_comp_expns = copy.copy(self.device_comp_expns)
+        device_esum_engys = copy.copy(self.device_esum_engys)
         device_overtime_nums = copy.copy(self.device_overtime_nums)
-        
+
         # tensorboard日志保存
+        # if visualize:
+        #     self.visualize_for_one_episode()
         writer.add_scalar("joint_reward", joint_reward, e_id)
         print(f"joint_reward: {joint_reward}")
         writer.add_scalar("joint_cost", joint_cost, e_id)
@@ -307,6 +320,7 @@ class Rollout:
             writer.add_scalar("edge_comp_ql_"+str(i), edge_comp_qls[i], e_id)
             print(f"edge_comp_ql_{i}: {edge_comp_qls[i]}")
         for i in range(self.device_num):
+            
             writer.add_scalar("device_reward_"+str(i), device_rewards[i], e_id)
             print(f"device_reward_{i}: {device_rewards[i]}")
             writer.add_scalar("device_cost_"+str(i), device_costs[i], e_id)
@@ -315,14 +329,61 @@ class Rollout:
             print(f"device_comp_ql_{i}: {device_comp_qls[i]}")
             writer.add_scalar("device_virtual_time_ql_"+str(i), self.mec_env.device_envs[i].virtual_time_ql, e_id)
             print(f"device_virtual_time_ql_{i}: {self.mec_env.device_envs[i].virtual_time_ql}")
-            writer.add_scalar("device_comp_dlys_"+str(i), device_comp_dlys[i], e_id)
-            print(f"device_comp_dlys_{i}: {device_comp_dlys[i]}")
+            writer.add_scalar("comp_dlys_"+str(i), comp_dlys[i], e_id)
+            print(f"comp_dlys_{i}: {comp_dlys[i]}")
             writer.add_scalar("device_csum_engys_"+str(i), device_csum_engys[i], e_id)
             print(f"device_csum_engys_{i}: {device_csum_engys[i]}")
-            writer.add_scalar("device_comp_expns_"+str(i), device_comp_expns[i], e_id)
-            print(f"device_comp_expns_{i}: {device_comp_expns[i]}")
+            writer.add_scalar("device_comp_expns_"+str(i), device_esum_engys[i], e_id)
+            print(f"device_comp_expns_{i}: {device_esum_engys[i]}")
             writer.add_scalar("device_overtime_nums_"+str(i), device_overtime_nums[i], e_id)
             print(f"device_overtime_nums_{i}: {device_overtime_nums[i]}")
+
+            # writer.add_scalars(
+            #     "comp_dlys_" + str(i),
+            #     {
+            #         "total":  comp_dlys[i],
+            #         "device": device_comp_dlys[i],
+            #         "edge":   edge_comp_dlys[i],
+            #     },
+            #     e_id
+            # )
+
+            # writer.add_scalars(
+            #     "device_time_ql_" + str(i),
+            #     {
+            #         "act":  self.mec_env.device_envs[i].time_ql,
+            #         "vir": self.mec_env.device_envs[i].virtual_time_ql,
+            #         "act_chg":   edge_comp_dlys[i],
+            #         "vir_chg":   edge_comp_dlys[i],
+            #         "act_reward": device_rewards[i],
+            #         "vir_reward": device_rewards[i],
+            #     },
+            #     e_id
+            # )
+
+            # writer.add_scalars(
+            #     "edge_time_ql_" + str(i),
+            #     {
+            #         "act":  comp_dlys[i],
+            #         "vir": device_comp_dlys[i],
+            #         "act_chg":   edge_comp_dlys[i],
+            #         "vir_chg":   edge_comp_dlys[i],
+            #         "act_reward": device_rewards[i],
+            #         "vir_reward": device_rewards[i],
+            #     },
+            #     e_id
+            # )
+
+            # writer.add_scalars(
+            #     "reward_" + str(i),
+            #     {
+            #         "navie":
+            #         "act_queue": device_rewards[i],
+            #         "vir_queue": device_rewards[i],
+            #         "total": device_rewards[i]
+            #     },
+            #     e_id
+            # )
         
         if e_id % 50 == 0:
             self.writer.flush()
@@ -330,14 +391,14 @@ class Rollout:
         return joint_reward, device_rewards, \
                joint_cost, device_costs, \
                edge_comp_qls, device_comp_qls, \
-               device_comp_dlys, device_csum_engys, \
-               device_comp_expns, device_overtime_nums
+               comp_dlys, device_csum_engys, \
+               device_esum_engys, device_overtime_nums
     
     def average(self, t_id, joint_reward, device_rewards, 
                             joint_cost, device_costs, 
                             edge_comp_qls, device_comp_qls,
-                            device_comp_dlys, device_csum_engys, 
-                            device_comp_expns, device_overtime_nums,
+                            comp_dlys, device_csum_engys, 
+                            device_esum_engys, device_overtime_nums,
                             device_task_is_available):
         self.joint_reward += 1 / t_id * (joint_reward - self.joint_reward)
         self.device_rewards += 1 / t_id * (device_rewards - self.device_rewards)
@@ -347,10 +408,10 @@ class Rollout:
         self.device_comp_qls += 1 / t_id * (device_comp_qls - self.device_comp_qls)
         # self.device_comp_dlys += 1 / t_id * (device_comp_dlys - self.device_comp_dlys)
         # self.device_csum_engys += 1 / t_id * (device_csum_engys - self.device_csum_engys)
-        # self.device_comp_expns += 1 / t_id * (device_comp_expns - self.device_comp_expns)
-        self.device_comp_dlys += (device_comp_dlys)
+        # self.device_esum_engys += 1 / t_id * (device_esum_engys - self.device_esum_engys)
+        self.comp_dlys += (comp_dlys)
         self.device_csum_engys += (device_csum_engys)
-        self.device_comp_expns += (device_comp_expns)
+        self.device_esum_engys += (device_esum_engys)
         self.device_overtime_nums += device_overtime_nums
         for i in range(self.device_num):
             if device_task_is_available[i]:
@@ -360,7 +421,6 @@ class Rollout:
     def average_available(self):
         for i in range(self.device_num):
             self.device_task_avail_nums[i] = max(1.0, self.device_task_avail_nums[i])
-            self.device_comp_dlys[i] /= self.device_task_avail_nums[i]
+            self.comp_dlys[i] /= self.device_task_avail_nums[i]
             self.device_csum_engys[i] /= self.device_task_avail_nums[i]
-            self.device_comp_expns[i] /= self.device_task_avail_nums[i]
-    
+            self.device_esum_engys[i] /= self.device_task_avail_nums[i]

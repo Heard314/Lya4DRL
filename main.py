@@ -21,7 +21,7 @@ if __name__ == '__main__':
         joint_cost, device_costs, \
         edge_comp_ql, device_comp_qls, \
         device_comp_dlys, device_csum_engys, \
-        device_comp_expns, device_overtime_nums = ctr.evaluate()
+        device_esum_engys, device_overtime_nums = ctr.evaluate()
         
         print("joint_reward:\n", joint_reward)
         print("device_rewards:\n", device_rewards)
@@ -31,5 +31,5 @@ if __name__ == '__main__':
         print("device_comp_qls:\n", device_comp_qls)
         print("device_comp_dlys:\n", device_comp_dlys)
         print("device_csum_engys:\n", device_csum_engys)
-        print("device_comp_expns:\n", device_comp_expns)
+        print("device_esum_engys:\n", device_esum_engys)
         print("device_overtime_nums:\n", device_overtime_nums)

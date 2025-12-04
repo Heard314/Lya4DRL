@@ -171,17 +171,17 @@ def get_general_params():
     parser.add_argument("--edge_comp_freq", type = float, default = 200,
                         help = "the computation frequency of MEC server (Gcycles/s)")
     
-    parser.add_argument("--service_price", type = float, default = 0.1, 
-                        help = "the service price of MEC server ($/Gcycles)")
+    # parser.add_argument("--service_price", type = float, default = 0.1, 
+    #                     help = "the service price of MEC server ($/Gcycles)")
     
-    parser.add_argument("--energy_weights", type = list, 
-                        # default = [0.8, 0.8, 0.8, 0.8, 0.8],
-                        default = [1.0, 1.0, 1.0, 1.0, 1.0],
+    parser.add_argument("--device_energy_weights", type = list, 
+                        default = [0.8, 0.8, 0.8, 0.8, 0.8],
+                        # default = [1.0, 1.0, 1.0, 1.0, 1.0],
                         help = "the weights of tasks' energy consumption")
     
-    # parser.add_argument("--expense_weights", type = list, 
-    #                     default = [0.2, 0.2, 0.2, 0.2, 0.2], 
-    #                     help = "the weights of tasks' edge computation expense")
+    parser.add_argument("--edge_energy_weights", type = list, 
+                        default = [0.2, 0.2, 0.2, 0.2, 0.2], 
+                        help = "the weights of tasks' edge computation expense")
     
     parser.add_argument("--max_data_size", type = float, 
                         default = 3.5,
