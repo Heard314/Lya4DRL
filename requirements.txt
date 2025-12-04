@@ -27,8 +27,6 @@ sympy==1.14.0
 tensorboard==2.20.0
 tensorboard-data-server==0.7.2
 textrank4zh==0.3
-# torch @ file:///D:/GoogleDownload/torch-2.8.0%2Bcu128-cp39-cp39-win_amd64.whl#sha256=fca71fd04bf524a54370386b85e2e89840c2bbc86dc2a8df2aadedd3bba5645f
-# torchvision @ file:///D:/GoogleDownload/torchvision-0.23.0%2Bcu128-cp39-cp39-win_amd64.whl#sha256=4cbc97e320d229929ec706f98edc926b68dc2fa9fb7785133c6bda2c5d163694
 typing_extensions==4.15.0
 Werkzeug==3.1.3
 zipp==3.23.0
