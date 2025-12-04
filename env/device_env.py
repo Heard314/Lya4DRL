@@ -218,8 +218,8 @@ class DeviceEnv():
             # now the delay threshold is 
             # task.dly_cons = max(self.unit_task_timeout_thre * data_size, self.delta)
             task.dly_cons = self.task_timeout_thre
-            task.norm_csum_engy = comp * self.engy_fac
-            task.norm_esum_engy = comp * self.engy_fac 
+            task.norm_csum_engy = comp * self.engy_fac * 6.25
+            task.norm_esum_engy = comp * self.engy_fac * 1600
             # print("[DEBUG] The norm_csum_engy is: ", task.norm_csum_engy)
             # print("[DEBUG] The norm_esum_engy is: ", task.norm_esum_engy)
             self.sched_tasks.append(task)
@@ -522,7 +522,7 @@ class DeviceEnv():
             # task.dly_cons = max(self.unit_task_timeout_thre * data_size, self.delta)
             task.dly_cons = self.task_timeout_thre
             task.norm_csum_engy = comp * self.engy_fac * 6.25
-            task.norm_esum_engy = comp * self.engy_fac * 6400
+            task.norm_esum_engy = comp * self.engy_fac * 1600
             
             self.sched_tasks.append(task)
         

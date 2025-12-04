@@ -5,3 +5,5 @@ weight/
 __pycache__/
 log/
 *.pyc
+.vscode/
+.idea/

@@ -43,7 +43,8 @@ class MECEnv():
 
         writer = self.writer
         if e_id % 50 == 1:
-            gp.settings.enable_print = True
+            # gp.settings.enable_print = True
+            gp.settings.enable_print = False
         else:
             gp.settings.enable_print = False
         enable_print = gp.settings.enable_print
@@ -100,9 +101,9 @@ class MECEnv():
                 if(enable_print): print(f"[DEBUG] the comp_dly in device {i} is {comp_dly}")
                 device_comp_dlys[i] += 1 / (j + 1) * (comp_dly - device_comp_dlys[i])
                 
-                csum_engy = task.local_comp_engy + task.tran_engy
-                if(enable_print): print(f"[DEBUG] the local csum_engy in device {i} is {task.local_comp_engy}")
-                if(enable_print): print(f"[DEBUG] the edge csum_engy in device {i} is {task.tran_engy}")
+                local_engy = task.local_comp_engy + task.tran_engy
+                if(enable_print): print(f"[DEBUG] the local local_engy in device {i} is {task.local_comp_engy}")
+                if(enable_print): print(f"[DEBUG] the tran local_engy in device {i} is {task.tran_engy}")
                 if visualize:
                     writer.add_scalars(
                         f"detail/engy_{i}",
@@ -116,17 +117,17 @@ class MECEnv():
                     )
 
 
-                device_csum_engys[i] += 1 / (j + 1) * (csum_engy - device_csum_engys[i])
+                device_csum_engys[i] += 1 / (j + 1) * (local_engy - device_csum_engys[i])
                 edge_comp_engy = task.edge_comp_engy
                 device_esum_engys[i] += 1 / (j + 1) * (edge_comp_engy - device_esum_engys[i])
                 
-                device_costs[i] += self.device_energy_weights[device_type] * csum_engy \
+                device_costs[i] += self.device_energy_weights[device_type] * local_engy \
                                    + self.edge_energy_weights[device_type] * edge_comp_engy
                 
                 # if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
                 #     print("[DEBUG] The device index is: ", i)
                     # print("[DEBUG] The task", j ,"'s dly_cons is: ", task.dly_cons, " The comp_dly is: ", comp_dly)
-                    # print("[DEBUG] The task", j ,"'s norm_csum_engy is: ", task.norm_csum_engy, " The csum_engy is: ", csum_engy)
+                    # print("[DEBUG] The task", j ,"'s norm_csum_engy is: ", task.norm_csum_engy, " The local_engy is: ", local_engy)
                     # print("[DEBUG] The task", j ,"'s norm_esum_engy is: ", task.norm_esum_engy, " The edge_comp_engy is: ", edge_comp_engy)
                     # print("[DEBUG] The device", i, "'s virtual comp ql is: ", self.device_envs[i].virtual_comp_ql)
                     # print("[DEBUG] The device", i, "'s completed comp is: ", self.device_envs[i].completed_comp)
@@ -149,7 +150,7 @@ class MECEnv():
                     norm_esum_engy = task.norm_esum_engy
                     # 奖励函数 能耗比重 *实际总能耗 / 标准化能耗 + 成本比重 *实际总成本 / 标准化成本
                     device_rewards[i] += -1000 * (self.device_energy_weights[device_type] * 
-                                                  csum_engy / norm_csum_engy
+                                                  local_engy / norm_csum_engy
                                                   + self.edge_energy_weights[device_type] * 
                                                   edge_comp_engy / norm_esum_engy
                                                   )
@@ -159,11 +160,11 @@ class MECEnv():
                 if(self.enable_actual_queue_reward):
                     device_queue_actual_rewards[i] = self.local_reward_weight * \
                             self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
-                    device_queue_actual_rewards[i] = min(max(-2000, device_queue_actual_rewards[i]), 2000)
+                    device_queue_actual_rewards[i] = min(max(-300, device_queue_actual_rewards[i]), 300)
                 if(self.enable_virtual_queue_reward):
                     device_queue_virtual_rewards[i] = self.local_reward_weight * \
                             self.device_envs[i].virtual_time_ql * (self.device_envs[i].new_vir_ql_change)
-                    device_queue_virtual_rewards[i] = min(max(-6000, device_queue_virtual_rewards[i]), 6000)
+                    device_queue_virtual_rewards[i] = min(max(-1200, device_queue_virtual_rewards[i]), 1200)
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_actual_rewards is: ", device_queue_actual_rewards[i])
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_virtual_rewards is: ", device_queue_virtual_rewards[i])
                 if visualize:
@@ -183,8 +184,8 @@ class MECEnv():
                         t_id
                     )
 
-        actual_queue_type_scale_fac = self.device_num / self.device_type_num * 2000
-        virtual_queue_type_scale_fac = self.device_num / self.device_type_num * 6000
+        actual_queue_type_scale_fac = self.device_num / self.device_type_num * 300
+        virtual_queue_type_scale_fac = self.device_num / self.device_type_num * 1200
         for i in range(edge_queue_num):
             edge_queue_actual_rewards[i] = 0.0
             edge_queue_virtual_rewards[i] = 0.0
