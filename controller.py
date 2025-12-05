@@ -49,8 +49,8 @@ class Controller:
             print("------------------train episode: " + str(e_id) + "------------------")
             
             visualize = False
-            # if e_id == 1 or e_id == 2:
-            if e_id % 400 == 0:
+            if e_id == 1 or e_id == 2:
+            # if e_id % 400 == 0:
                 visualize = True
 
             joint_reward, device_rewards, \

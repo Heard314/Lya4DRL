@@ -100,7 +100,9 @@ class MECEnv():
                     )
                 if(enable_print): print(f"[DEBUG] the comp_dly in device {i} is {comp_dly}")
                 device_comp_dlys[i] += 1 / (j + 1) * (comp_dly - device_comp_dlys[i])
-                
+                print(f"[GDEBUG] the comp_dly in device {i} is {comp_dly}")
+                print(f"[GDEBUG] the local comp_dly in device {i} is {task.l_comp_dly}")
+                print(f"[GDEBUG] the edge comp_dly in device {i} is {task.e_comp_dly}")
                 local_engy = task.local_comp_engy + task.tran_engy
                 if(enable_print): print(f"[DEBUG] the local local_engy in device {i} is {task.local_comp_engy}")
                 if(enable_print): print(f"[DEBUG] the tran local_engy in device {i} is {task.tran_engy}")
@@ -160,11 +162,11 @@ class MECEnv():
                 if(self.enable_actual_queue_reward):
                     device_queue_actual_rewards[i] = self.local_reward_weight * \
                             self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
-                    device_queue_actual_rewards[i] = min(max(-300, device_queue_actual_rewards[i]), 300)
+                    device_queue_actual_rewards[i] = min(max(-300, device_queue_actual_rewards[i]), 200)
                 if(self.enable_virtual_queue_reward):
                     device_queue_virtual_rewards[i] = self.local_reward_weight * \
                             self.device_envs[i].virtual_time_ql * (self.device_envs[i].new_vir_ql_change)
-                    device_queue_virtual_rewards[i] = min(max(-1200, device_queue_virtual_rewards[i]), 1200)
+                    device_queue_virtual_rewards[i] = min(max(-1200, device_queue_virtual_rewards[i]), 800)
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_actual_rewards is: ", device_queue_actual_rewards[i])
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_virtual_rewards is: ", device_queue_virtual_rewards[i])
                 if visualize:
@@ -184,19 +186,21 @@ class MECEnv():
                         t_id
                     )
 
-        actual_queue_type_scale_fac = self.device_num / self.device_type_num * 300
-        virtual_queue_type_scale_fac = self.device_num / self.device_type_num * 1200
+        actual_queue_type_scale_posfac = self.device_num / self.device_type_num * 200
+        virtual_queue_type_scale_posfac = self.device_num / self.device_type_num * 800
+        actual_queue_type_scale_negfac = -self.device_num / self.device_type_num * 300
+        virtual_queue_type_scale_negfac = -self.device_num / self.device_type_num * 1200
         for i in range(edge_queue_num):
             edge_queue_actual_rewards[i] = 0.0
             edge_queue_virtual_rewards[i] = 0.0
             if(self.enable_actual_queue_reward):
                 edge_queue_actual_rewards[i] = self.edge_reward_weight * \
                             self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
-                edge_queue_actual_rewards[i] = min(max(-actual_queue_type_scale_fac, edge_queue_actual_rewards[i]), actual_queue_type_scale_fac)
+                edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
             if(self.enable_virtual_queue_reward):
                 edge_queue_virtual_rewards[i] = self.edge_reward_weight * \
                     self.edge_env.virtual_edge_queue_time_ql[i] * (self.edge_env.new_vir_edge_ql_change[i])
-                edge_queue_virtual_rewards[i] = min(max(-virtual_queue_type_scale_fac, edge_queue_virtual_rewards[i]), virtual_queue_type_scale_fac)
+                edge_queue_virtual_rewards[i] = min(max(virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), virtual_queue_type_scale_posfac)
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])
             if visualize:
@@ -226,6 +230,16 @@ class MECEnv():
                     f"detail/dev_timeout_num_{i}",
                     {f"ep_{e_id}": device_overtime_nums[i]},
                     t_id
+                )
+                writer.add_scalars(
+                    f"overall/timeout_alldev_ep_{e_id}",
+                    {"device": device_overtime_nums[i]},
+                    i
+                )
+                writer.add_scalars(
+                    f"overall/comp_dly_alldev_ep_{e_id}",
+                    {"device": device_comp_dlys[i]},
+                    i
                 )
 
         joint_reward = sum(device_rewards)
