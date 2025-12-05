@@ -432,6 +432,7 @@ class DeviceEnv():
                 old_time_ql_ = self.time_ql
                 self.time_ql = max(0, old_time_ql_ + local_comp / device_comp_freq - self.delta)
                 self.new_ql_change = self.time_ql - old_time_ql_
+                self.act_backlog = local_comp / device_comp_freq
 
             self.avail_task_num += 1
             self.avg_local_time = (self.avg_local_time * (self.avail_task_num - 1) + local_comp / device_comp_freq) / self.avail_task_num
@@ -458,9 +459,10 @@ class DeviceEnv():
         #     # self.virtual_comp_ql = max(0, self.virtual_comp_ql + self.comp_ql/self.avg_local_comp - self.task_timeout_thre)
         #     
         if self.avg_local_time > EPS:
-            self.new_vir_ql_change = self.time_ql/self.avg_local_time - self.device_dly_adj_val
-            self.virtual_time_ql = max(0, self.virtual_time_ql + self.new_vir_ql_change)
-
+            old_vir_time_ql_ = self.virtual_time_ql
+            self.virtual_time_ql = max(0, self.virtual_time_ql + 0.1*(self.time_ql/self.avg_local_time - self.device_dly_adj_val))
+            self.new_vir_ql_change = self.virtual_time_ql - old_vir_time_ql_
+            self.vir_backlog = self.time_ql/self.avg_local_time
 
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s avg_local_time is: ", self.avg_local_time)
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)
@@ -488,12 +490,22 @@ class DeviceEnv():
             )
             writer.add_scalars(
                 f"detail/device_time_ql_{self.env_id}",
+                {f"ep_{e_id}_act_backlog": self.act_backlog},
+                t_id
+            )
+            writer.add_scalars(
+                f"detail/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_vir": self.virtual_time_ql},
                 t_id
             )
             writer.add_scalars(
                 f"detail/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_vir_chg": self.new_vir_ql_change},
+                t_id
+            )
+            writer.add_scalars(
+                f"detail/device_time_ql_{self.env_id}",
+                {f"ep_{e_id}_vir_backlog": self.vir_backlog},
                 t_id
             )
 
