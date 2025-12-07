@@ -27,16 +27,16 @@ class Controller:
         print(f"The project dir is {root_path}")
 
         # seed 
-        if not gen_params.evaluate and alg_params.load_weights:
-            self.weights_dir = root_path + alg_params.weights_dir
+        if not gen_params.evaluate and gen_params.load_weights:
+            self.weights_dir = root_path + gen_params.weights_dir
             gp.settings.weight_dir = self.weights_dir
-            train_info_path  = self.weights_dir + f"train_info_{alg_params.resume_episode}.pkl"
+            train_info_path  = self.weights_dir + f"train_info_{gen_params.resume_episode}.pkl"
             with open(train_info_path, "rb") as f:
                 train_info = pickle.load(f)
-            self.seed = train_info["seed"]
+            self.seed = train_info["train_seed"]
             run_dir = train_info["run_dir"]
-            resume_episode = alg_params.resume_episode
-            assert alg_params.resume_episode == train_info["resume_episode"], \
+            resume_episode = gen_params.resume_episode
+            assert gen_params.resume_episode == train_info["resume_episode"], \
                 "The resume episode in alg_params does not match that in train_info!"
         else:
             # fix random seed  
@@ -55,8 +55,8 @@ class Controller:
                     + gen_params.run_desc
             )
             run_dir = run_path + "/"
-            gp.settings.weight_dir = root_path + alg_params.weights_dir + run_dir
-            resume_episode = 1
+            gp.settings.weight_dir = root_path + gen_params.weights_dir + run_dir
+            resume_episode = 0
         
         gp.settings.run_dir = run_dir
         print(f"The runtime file dir is {run_dir}")
@@ -66,7 +66,7 @@ class Controller:
 
         # rollout
         self.rollout = Rollout(gen_params, alg_params, self.seed)
-        self.rollout.resume_episode = resume_episode
+        self.rollout.resume_episode = resume_episode + 1
         # training
         if not gen_params.evaluate:
             self.train_episodes = alg_params.train_episodes

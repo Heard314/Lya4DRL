@@ -41,6 +41,15 @@ def get_general_params():
     parser.add_argument("--eval_time_slots", type = int, default = 200,
                         help = "the number of time-slots for evaluation")
     
+    parser.add_argument("--load_weights", action="store_true",
+                        help = "whether to load network parameters")
+    
+    parser.add_argument("--weights_dir", type = str, default = "weight/mappo/", 
+                        help = "the directory for saving network parameters")
+    
+    parser.add_argument("--resume_episode", type = int, default = 0, 
+                        help = "the episode to resume training from")
+
     # environment
     parser.add_argument("--delta", type = float, default = 0.1, 
                         help = "the duration of each time-slot (s)")
@@ -338,21 +347,12 @@ def get_mappo_params():
     
     parser.add_argument("--save_freq", type = int, default = 48, 
                         help = "the saving frequency of networks")
-    
-    parser.add_argument("--load_weights", type = bool, default = False, 
-                        help = "whether to load network parameters")
-    
-    parser.add_argument("--weights_dir", type = str, default = "weight/mappo/", 
-                        help = "the directory for saving network parameters")
-    
-    parser.add_argument("--resume_episode", type = int, default = 1, 
-                        help = "the episode to resume training from")
+
+    parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
+                        help = "the directory for saving plot images")
 
     parser.add_argument("--results_dir", type = str, default = "result/mappo/",
                         help = "the directory for saving training results")
-    
-    parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
-                        help = "the directory for saving plot images")
 
     params, unknown = parser.parse_known_args()
     

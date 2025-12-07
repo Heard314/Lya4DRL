@@ -21,7 +21,7 @@ class Rollout:
         self.resume_episode = 1 # the episode number to be held
 
         #resume
-        self.load_weights = alg_params.load_weights
+        self.load_weights = gen_params.load_weights
         # project storage path
         root_path = gp.settings.project_dir
         run_dir = gp.settings.run_dir
@@ -95,7 +95,7 @@ class Rollout:
             # initialize agents' policy networks
             if self.eval_mode[0] == "m":
                 for i in range(self.device_num):
-                    path = alg_params.weights_dir + "p_net_params_" + str(i) + ".pkl"
+                    path = gen_params.weights_dir + "p_net_params_" + str(i) + ".pkl"
                     self.device_agents[i].load_net(path)
 
         self.tb_log_dir = (
@@ -114,7 +114,7 @@ class Rollout:
         print(f"The log file path is {log_path}")
         
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        log_txt_file = open(log_path, "w", encoding = "utf-8")
+        log_txt_file = open(log_path, "a", encoding = "utf-8")
         sys.stdout = log_txt_file
         sys.stderr = log_txt_file
         atexit.register(log_txt_file.close)

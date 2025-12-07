@@ -9,5 +9,5 @@ class Settings:
     run_dir: str = ""
     plot_dir: str = ""
     weight_dir: str = ""
-    resume_episode: int = 1
+    resume_episode: int = 0
 settings = Settings()

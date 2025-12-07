@@ -60,12 +60,13 @@ class MappoEdgeAgent():
             
         # load networks' weights 
 
-        if alg_params.load_weights:
-            v_path = self.weights_dir + f"v_net_params_{alg_params.resume_episode}.pkl"
+        if gen_params.load_weights:
+            v_path = self.weights_dir + f"v_net_params_{gen_params.resume_episode}.pkl"
+            print("Loading value network from: ", v_path)
             self.v_net.load_state_dict(torch.load(v_path, map_location=self.device))
-            
+            print(f"Loading policy networks from: {self.weights_dir + "p_net_params.pkl"}")
             for i in range(self.device_num):
-                p_path = self.weights_dir + "p_net_params_" + str(i) + f"_{alg_params.resume_episode}.pkl"
+                p_path = self.weights_dir + "p_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
                 self.p_nets[i].load_state_dict(torch.load(p_path, map_location=self.device))
 
     def train_nets(self, replay_buffer):
@@ -521,7 +522,7 @@ class MaddpgEdgeAgent():
             self.p_optimizers.append(p_optimizer)
             
         # load networks' weights
-        if alg_params.load_weights:
+        if gen_params.load_weights:
             v_path = self.weights_dir + "v_net_params.pkl"
             self.v_net.load_state_dict(torch.load(v_path))
             target_v_path = self.weights_dir + "target_v_net_params.pkl"
