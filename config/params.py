@@ -275,7 +275,7 @@ def get_mappo_params():
     
     parser.add_argument("--train_episodes", type = int, default = 8000,
                         help = "the number of training episodes")
-    
+
     parser.add_argument("--train_time_slots", type = int, default = 300,
                         help = "the number of training time-slots")
     
@@ -336,7 +336,7 @@ def get_mappo_params():
     parser.add_argument("--enty_coef", type = float, default = 0.01,   
                         help = "the coefficient about policy's entropy")
     
-    parser.add_argument("--save_freq", type = int, default = 500, 
+    parser.add_argument("--save_freq", type = int, default = 48, 
                         help = "the saving frequency of networks")
     
     parser.add_argument("--load_weights", type = bool, default = False, 
@@ -345,9 +345,15 @@ def get_mappo_params():
     parser.add_argument("--weights_dir", type = str, default = "weight/mappo/", 
                         help = "the directory for saving network parameters")
     
+    parser.add_argument("--resume_episode", type = int, default = 1, 
+                        help = "the episode to resume training from")
+
     parser.add_argument("--results_dir", type = str, default = "result/mappo/",
                         help = "the directory for saving training results")
     
+    parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
+                        help = "the directory for saving plot images")
+
     params, unknown = parser.parse_known_args()
     
     return params

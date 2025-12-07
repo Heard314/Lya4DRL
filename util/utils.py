@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -98,3 +99,55 @@ def GetValueInputs(edge_obs, device_obss):
     inputs = torch.tensor(inputs, dtype = torch.float).reshape([1, -1])
     
     return inputs
+
+import matplotlib
+matplotlib.use("Agg")  # use non-GUI backend
+import matplotlib.pyplot as plt
+
+def save_device_hist_plots(device_overtime_nums,
+                           device_comp_dlys,
+                           e_id,
+                           out_dir="runs/plot/"):
+    """
+    Draw bar-like histograms for all devices and save to disk.
+
+    Args:
+        device_overtime_nums: list or 1D array, overtime metric per device
+        device_comp_dlys:     list or 1D array, delay metric per device
+        e_id:                 current episode id (used in filename)
+        out_dir:              directory to save figures
+    """
+    os.makedirs(out_dir, exist_ok=True)
+
+    # Convert to numpy array for convenience
+    overtime = np.asarray(device_overtime_nums, dtype=float)
+    delays   = np.asarray(device_comp_dlys, dtype=float)
+
+    num_devices = len(overtime)
+    x_idx = np.arange(num_devices)  # 0,1,2,... as device index
+
+    # --------- Plot 1: overtime per device ---------
+    fig1, ax1 = plt.subplots(figsize=(12, 4))
+    ax1.bar(x_idx, overtime)
+    ax1.set_xlabel("Device index")
+    ax1.set_ylabel("Timeout task count")
+    ax1.set_title(f"Timeout task count of all devices (episode {e_id})")
+    ax1.set_xticks(x_idx)  # show all device indices
+
+    save_path1 = os.path.join(out_dir, f"timeout_all_device_ep_{e_id}.png")
+    fig1.tight_layout()
+    fig1.savefig(save_path1)
+    plt.close(fig1)
+
+    # --------- Plot 2: computation delay per device ---------
+    fig2, ax2 = plt.subplots(figsize=(12, 4))
+    ax2.bar(x_idx, delays)
+    ax2.set_xlabel("Device index")
+    ax2.set_ylabel("Computation delay(s)")
+    ax2.set_title(f"Computation delay of all devices (episode {e_id})")
+    ax2.set_xticks(x_idx)
+
+    save_path2 = os.path.join(out_dir, f"comp_dly_all_device_ep_{e_id}.png")
+    fig2.tight_layout()
+    fig2.savefig(save_path2)
+    plt.close(fig2)

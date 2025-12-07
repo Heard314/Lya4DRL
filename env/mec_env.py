@@ -231,16 +231,16 @@ class MECEnv():
                     {f"ep_{e_id}": device_overtime_nums[i]},
                     t_id
                 )
-                writer.add_scalars(
-                    f"overall/timeout_alldev_ep_{e_id}",
-                    {"device": device_overtime_nums[i]},
-                    i
-                )
-                writer.add_scalars(
-                    f"overall/comp_dly_alldev_ep_{e_id}",
-                    {"device": device_comp_dlys[i]},
-                    i
-                )
+                # writer.add_scalars(
+                #     f"overall/timeout_alldev_ep_{e_id}",
+                #     {"device": device_overtime_nums[i]},
+                #     i
+                # )
+                # writer.add_scalars(
+                #     f"overall/comp_dly_alldev_ep_{e_id}",
+                #     {"device": device_comp_dlys[i]},
+                #     i
+                # )
 
         joint_reward = sum(device_rewards)
         joint_cost = sum(device_costs)

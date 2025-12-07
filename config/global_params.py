@@ -4,7 +4,10 @@ import torch
 @dataclass
 class Settings:
     enable_print: bool = False
-    project_root: str = "D:/project/MADRL4MEC_Dynamic_Delay_Adjust/"
+    project_dir: str = "D:/project/MADRL4MEC_Dynamic_Delay_Adjust/"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    run_dir: str = ""
+    plot_dir: str = ""
+    weight_dir: str = ""
+    resume_episode: int = 1
 settings = Settings()

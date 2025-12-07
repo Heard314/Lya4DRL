@@ -1,1 +1,1 @@
-python main.py --train_mode mappo --run_desc "debug" --enable_actual_queue_reward --enable_virtual_queue_reward
+python main.py --train_mode mappo --run_desc "debug" --enable_actual_queue_reward --enable_virtual_queue_reward 

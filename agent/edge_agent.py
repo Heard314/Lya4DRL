@@ -1,4 +1,5 @@
 import os
+import pickle
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -32,10 +33,12 @@ class MappoEdgeAgent():
         self.min_v_lr = alg_params.min_v_lr
         self.min_p_lr = alg_params.min_p_lr
         self.decay_fac = alg_params.decay_fac
-        self.weights_dir = alg_params.weights_dir
+        root_path = gp.settings.project_dir
+        run_dir = gp.settings.run_dir
+        self.weights_dir = gp.settings.weight_dir
         
         self.device = gp.settings.device
-        print("[DEBUG] The device for training is: ", self.device)
+        print("The device for training is: ", self.device)
         # value network
         self.v_net = MappoValueNet(alg_params).to(self.device)
         self.v_optimizer = torch.optim.Adam(self.v_net.parameters(),
@@ -56,12 +59,13 @@ class MappoEdgeAgent():
             self.p_optimizers.append(p_optimizer)
             
         # load networks' weights 
+
         if alg_params.load_weights:
-            v_path = self.weights_dir + "v_net_params.pkl"
+            v_path = self.weights_dir + f"v_net_params_{alg_params.resume_episode}.pkl"
             self.v_net.load_state_dict(torch.load(v_path, map_location=self.device))
             
             for i in range(self.device_num):
-                p_path = self.weights_dir + "p_net_params_" + str(i) + ".pkl"
+                p_path = self.weights_dir + "p_net_params_" + str(i) + f"_{alg_params.resume_episode}.pkl"
                 self.p_nets[i].load_state_dict(torch.load(p_path, map_location=self.device))
 
     def train_nets(self, replay_buffer):
@@ -191,7 +195,7 @@ class MappoEdgeAgent():
                for params in self.p_optimizers[i].param_groups:
                    params['lr'] = self.p_lr
         
-    def save_nets(self, e_id):
+    def save_nets(self, e_id, seed):
         if not os.path.exists(self.weights_dir):
             os.makedirs(self.weights_dir)
             
@@ -201,6 +205,15 @@ class MappoEdgeAgent():
         for i in range(self.device_num):
             torch.save(self.p_nets[i].state_dict(),
                        self.weights_dir + "p_net_params_" + str(i) + "_" + str(e_id) + ".pkl")        
+
+        train_info = {
+            "resume_episode": e_id,
+            "train_seed": seed,
+            "run_dir": gp.settings.run_dir
+        }
+        with open(self.weights_dir + f"train_info_{e_id}.pkl", "wb") as f:
+            # save training meta info (overwritten every time)
+            pickle.dump(train_info, f)
 
     # def train_nets(self, replay_buffer):
     #     '''training data'''
@@ -456,68 +469,70 @@ class MappoEdgeAgent():
             
 class MaddpgEdgeAgent():
     def __init__(self, gen_params, alg_params):
-       self.device_num = gen_params.device_num
-       self.action_dim = alg_params.action_dim
-       
-       # training
-       self.warm_time_slots = alg_params.warm_time_slots
-       self.train_batch_size = alg_params.train_batch_size
-       self.v_epochs = alg_params.v_epochs
-       self.p_epochs = alg_params.p_epochs
-       self.buffer_size = alg_params.buffer_size
-       self.gamma = alg_params.gamma
-       self.v_lr = alg_params.v_lr
-       self.p_lr = alg_params.p_lr
-       # gradient clip
-       self.use_grad_clip = alg_params.use_grad_clip
-       self.v_grad_clip = alg_params.v_grad_clip
-       self.p_grad_clip = alg_params.p_grad_clip
-       self.weights_dir = alg_params.weights_dir
-       # learning-rate decay
-       self.use_lr_decay = alg_params.use_lr_decay
-       self.min_v_lr = alg_params.min_v_lr
-       self.min_p_lr = alg_params.min_p_lr
-       self.decay_intl = alg_params.decay_intl
-       self.decay_fac = alg_params.decay_fac
-       
-       # value network
-       self.v_net = MaddpgValueNet(alg_params)
-       # target value network 
-       self.target_v_net = MaddpgValueNet(alg_params) 
-       self.target_v_net.load_state_dict(self.v_net.state_dict())
-       # optimizer
-       self.v_optimizer = torch.optim.Adam(self.v_net.parameters(),
-                                           lr = self.v_lr)
-       
-       self.p_nets = []
-       self.target_p_nets = []
-       self.p_optimizers = []
-       for i in range(self.device_num):
-           # policy network
-           p_net = MaddpgPolicyNet(alg_params)
-           self.p_nets.append(p_net)
-           # target policy network
-           target_p_net = MaddpgPolicyNet(alg_params)
-           target_p_net.load_state_dict(p_net.state_dict())
-           self.target_p_nets.append(target_p_net)
-           # optimizer
-           p_optimizer = torch.optim.Adam(p_net.parameters(),
-                                          lr = self.p_lr)
-           self.p_optimizers.append(p_optimizer)
-           
-       # load networks' weights
-       if alg_params.load_weights:
-           v_path = self.weights_dir + "v_net_params.pkl"
-           self.v_net.load_state_dict(torch.load(v_path))
-           target_v_path = self.weights_dir + "target_v_net_params.pkl"
-           self.target_v_net.load_state_dict(torch.load(target_v_path))
-           
-           for i in range(self.device_num):
-               p_path = self.weights_dir + "p_net_params_" + str(i) + ".pkl"
-               self.p_nets[i].load_state_dict(torch.load(p_path))
-               target_p_path = self.weights_dir + "target_p_net_params_" + str(i) + ".pkl"
-               self.target_p_nets[i].load_state_dict(torch.load(target_p_path))
-    
+        self.device_num = gen_params.device_num
+        self.action_dim = alg_params.action_dim
+        
+        # training
+        self.warm_time_slots = alg_params.warm_time_slots
+        self.train_batch_size = alg_params.train_batch_size
+        self.v_epochs = alg_params.v_epochs
+        self.p_epochs = alg_params.p_epochs
+        self.buffer_size = alg_params.buffer_size
+        self.gamma = alg_params.gamma
+        self.v_lr = alg_params.v_lr
+        self.p_lr = alg_params.p_lr
+        # gradient clip
+        self.use_grad_clip = alg_params.use_grad_clip
+        self.v_grad_clip = alg_params.v_grad_clip
+        self.p_grad_clip = alg_params.p_grad_clip
+        root_path = gp.settings.project_dir
+        run_dir = gp.settings.run_dir
+        self.weights_dir = gp.settings.weight_dir
+        # learning-rate decay
+        self.use_lr_decay = alg_params.use_lr_decay
+        self.min_v_lr = alg_params.min_v_lr
+        self.min_p_lr = alg_params.min_p_lr
+        self.decay_intl = alg_params.decay_intl
+        self.decay_fac = alg_params.decay_fac
+        
+        # value network
+        self.v_net = MaddpgValueNet(alg_params)
+        # target value network 
+        self.target_v_net = MaddpgValueNet(alg_params) 
+        self.target_v_net.load_state_dict(self.v_net.state_dict())
+        # optimizer
+        self.v_optimizer = torch.optim.Adam(self.v_net.parameters(),
+                                            lr = self.v_lr)
+        
+        self.p_nets = []
+        self.target_p_nets = []
+        self.p_optimizers = []
+        for i in range(self.device_num):
+            # policy network
+            p_net = MaddpgPolicyNet(alg_params)
+            self.p_nets.append(p_net)
+            # target policy network
+            target_p_net = MaddpgPolicyNet(alg_params)
+            target_p_net.load_state_dict(p_net.state_dict())
+            self.target_p_nets.append(target_p_net)
+            # optimizer
+            p_optimizer = torch.optim.Adam(p_net.parameters(),
+                                            lr = self.p_lr)
+            self.p_optimizers.append(p_optimizer)
+            
+        # load networks' weights
+        if alg_params.load_weights:
+            v_path = self.weights_dir + "v_net_params.pkl"
+            self.v_net.load_state_dict(torch.load(v_path))
+            target_v_path = self.weights_dir + "target_v_net_params.pkl"
+            self.target_v_net.load_state_dict(torch.load(target_v_path))
+            
+            for i in range(self.device_num):
+                p_path = self.weights_dir + "p_net_params_" + str(i) + ".pkl"
+                self.p_nets[i].load_state_dict(torch.load(p_path))
+                target_p_path = self.weights_dir + "target_p_net_params_" + str(i) + ".pkl"
+                self.target_p_nets[i].load_state_dict(torch.load(target_p_path))
+        
     def train_nets(self, total_time_slots, replay_buffer):
         if total_time_slots >= self.warm_time_slots:
             if total_time_slots < self.buffer_size:

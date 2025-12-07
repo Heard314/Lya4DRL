@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from config.params import get_mappo_params, get_maddpg_params
 from rollout import Rollout
+import config.global_params as gp
 
 class Controller:
     def __init__(self, gen_params):
@@ -21,13 +22,57 @@ class Controller:
         print("The training mode is in controller: ", gen_params.train_mode)
         print("The evaluation mode is in controller: ", gen_params.eval_mode)
         
-        # rollout
-        self.rollout = Rollout(gen_params, alg_params)
+        # project storage path
+        root_path = gp.settings.project_dir
+        print(f"The project dir is {root_path}")
+
+        # seed 
+        if not gen_params.evaluate and alg_params.load_weights:
+            self.weights_dir = root_path + alg_params.weights_dir
+            gp.settings.weight_dir = self.weights_dir
+            train_info_path  = self.weights_dir + f"train_info_{alg_params.resume_episode}.pkl"
+            with open(train_info_path, "rb") as f:
+                train_info = pickle.load(f)
+            self.seed = train_info["seed"]
+            run_dir = train_info["run_dir"]
+            resume_episode = alg_params.resume_episode
+            assert alg_params.resume_episode == train_info["resume_episode"], \
+                "The resume episode in alg_params does not match that in train_info!"
+        else:
+            # fix random seed  
+            self.seed = gen_params.evaluate and gen_params.eval_seed or alg_params.train_seed
+            # runtime storage path
+            import datetime
+            run_path =  (
+                    (gen_params.evaluate and "evaluate" or "train")
+                    + "/"
+                    + (gen_params.evaluate and gen_params.eval_mode or gen_params.train_mode)
+                    + "_s_"
+                    + str(self.seed)
+                    + "_t_"
+                    + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+                    + "_d_"
+                    + gen_params.run_desc
+            )
+            run_dir = run_path + "/"
+            gp.settings.weight_dir = root_path + alg_params.weights_dir + run_dir
+            resume_episode = 1
         
+        gp.settings.run_dir = run_dir
+        print(f"The runtime file dir is {run_dir}")
+        print(f"The weight file dir is {gp.settings.weight_dir}")
+        plot_dir = root_path + alg_params.plot_dir + run_dir
+        gp.settings.plot_dir = plot_dir
+
+        # rollout
+        self.rollout = Rollout(gen_params, alg_params, self.seed)
+        self.rollout.resume_episode = resume_episode
         # training
         if not gen_params.evaluate:
             self.train_episodes = alg_params.train_episodes
-            self.results_dir = alg_params.results_dir
+            root_path = gp.settings.project_dir
+            run_dir = gp.settings.run_dir
+            self.results_dir = root_path + alg_params.results_dir + run_dir
             if not os.path.exists(self.results_dir):
                 os.makedirs(self.results_dir)
             self.joint_reward_col = []
@@ -45,12 +90,15 @@ class Controller:
             self.eval_episodes = gen_params.eval_episodes
     
     def train(self):
-        for e_id in range(1, self.train_episodes + 1):
+        
+        start_epi = self.rollout.resume_episode
+        for e_id in range(start_epi, self.train_episodes + 1):
             print("------------------train episode: " + str(e_id) + "------------------")
             
             visualize = False
-            if e_id == 1 or e_id == 2:
-            # if e_id % 400 == 0:
+            if e_id == 1 or e_id == 2: #FOR DEBUG
+                visualize = True
+            if e_id % 400 == 0:
                 visualize = True
 
             joint_reward, device_rewards, \

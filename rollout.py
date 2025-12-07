@@ -1,4 +1,5 @@
 import copy
+import pickle
 import numpy as np
 import torch
 from env.mec_env import MECEnv
@@ -11,13 +12,20 @@ from torch.utils.tensorboard import SummaryWriter
 import sys, atexit, os
 import config.global_params as gp
 class Rollout:
-    def __init__(self, gen_params, alg_params):
+    def __init__(self, gen_params, alg_params, seed):
         self.device_num = gen_params.device_num
         self.task_arrival_prob = gen_params.task_arrival_prob
         self.evaluate = gen_params.evaluate
         self.train_mode = gen_params.train_mode
         self.eval_mode = gen_params.eval_mode
-        
+        self.resume_episode = 1 # the episode number to be held
+
+        #resume
+        self.load_weights = alg_params.load_weights
+        # project storage path
+        root_path = gp.settings.project_dir
+        run_dir = gp.settings.run_dir
+
         # edge agent and replay buffer
         if not self.evaluate and self.train_mode == "mappo":
             print("The training mode is in rollout: mappo")
@@ -35,7 +43,7 @@ class Rollout:
                                               gen_params.max_data_size,
                                               gen_params.max_comp_dens,
                                               gen_params.std_comp_freq)
-        
+
         # device agents
         self.device_agents = []
         for i in range(self.device_num):
@@ -57,11 +65,10 @@ class Rollout:
 
         # training
         if not self.evaluate:
-            # fix random seed
-            self.seed = alg_params.train_seed
-            torch.manual_seed(alg_params.train_seed)
-            np.random.seed(alg_params.train_seed)
-            
+            # seed 
+            self.seed = seed
+            torch.manual_seed(self.seed)
+            np.random.seed(self.seed)
             self.train_mode = gen_params.train_mode
             self.train_time_slots = alg_params.train_time_slots
             self.train_freq = alg_params.train_freq
@@ -79,7 +86,7 @@ class Rollout:
         # evaluation
         else:
             # fix random seed
-            self.seed = gen_params.eval_seed
+            self.seed = seed
             torch.manual_seed(gen_params.eval_seed)
             np.random.seed(gen_params.eval_seed)
             
@@ -90,32 +97,22 @@ class Rollout:
                 for i in range(self.device_num):
                     path = alg_params.weights_dir + "p_net_params_" + str(i) + ".pkl"
                     self.device_agents[i].load_net(path)
-        root_path = gp.settings.project_root
-        import datetime
-        file_subpath =  (
-                (self.evaluate and "evaluate" or "train")
-                + "/"
-                + (self.evaluate and self.eval_mode or self.train_mode)
-                + "_s_"
-                + str(self.seed)
-                + "_t_"
-                + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
-                + "_d_"
-                + gen_params.run_desc
-        )
 
-        self.log_dir_name = (
+        self.tb_log_dir = (
                 root_path
                 + "runs/"
-                + file_subpath
+                + run_dir
             )
-        self.writer = SummaryWriter(log_dir=f"{self.log_dir_name}/")
+        self.writer = SummaryWriter(log_dir=f"{self.tb_log_dir}/")
+        print(f"The tensorboard file path is {self.tb_log_dir}")
         self.log_txt_dir_name = (
                 root_path
                 + "log/"
-                + file_subpath
+                + run_dir[:-1]
             )
         log_path = self.log_txt_dir_name + ".log"
+        print(f"The log file path is {log_path}")
+        
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         log_txt_file = open(log_path, "w", encoding = "utf-8")
         sys.stdout = log_txt_file
@@ -292,7 +289,7 @@ class Rollout:
                     self.device_agents[i].update_net(self.edge_agent.p_nets[i].state_dict())
                     
             if e_id % self.save_freq == 0:
-                self.edge_agent.save_nets(e_id)
+                self.edge_agent.save_nets(e_id, self.seed)
         
         self.average_available()
 
@@ -309,9 +306,17 @@ class Rollout:
         device_esum_engys = copy.copy(self.device_esum_engys)
         device_overtime_nums = copy.copy(self.device_overtime_nums)
 
+        # Periodically visualize the operation status of all devices in this round using plot
+        from util.utils import save_device_hist_plots
+        if visualize:
+            save_device_hist_plots(
+                device_overtime_nums=device_overtime_nums,
+                device_comp_dlys=comp_dlys,
+                e_id=e_id,
+                out_dir=gp.settings.plot_dir
+            )
+
         # tensorboard日志保存
-        # if visualize:
-        #     self.visualize_for_one_episode()
         writer.add_scalar("joint_reward", joint_reward, e_id)
         print(f"joint_reward: {joint_reward}")
         writer.add_scalar("joint_cost", joint_cost, e_id)
