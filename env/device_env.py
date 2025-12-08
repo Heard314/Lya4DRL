@@ -67,6 +67,15 @@ class DeviceEnv():
         self.edge_env = edge_env
         # env id
         self.env_id = env_id
+
+        # create per-env random generators
+        base_seed = gp.settings.seed
+        self._rnd = random.Random(base_seed + env_id)
+        self._np_rnd = np.random.RandomState(base_seed + env_id)
+
+        self.device_type = gen_params.device_types[env_id]
+        self.device_type_num = gen_params.device_type_num
+
         self.device_type = gen_params.device_types[env_id]
         self.device_type_num = gen_params.device_type_num
         # unit: s
@@ -184,6 +193,9 @@ class DeviceEnv():
 
         self.total_comp_time = 0.0
         self.total_tran_time = 0.0
+
+        self.act_backlog = 0.0
+        self.vir_backlog = 0.0
 
         # reset transmission-queue length
         self.trans_ql = 0

@@ -10,4 +10,5 @@ class Settings:
     plot_dir: str = ""
     weight_dir: str = ""
     resume_episode: int = 0
+    seed: int = 0
 settings = Settings()

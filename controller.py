@@ -63,9 +63,11 @@ class Controller:
         print(f"The weight file dir is {gp.settings.weight_dir}")
         plot_dir = root_path + alg_params.plot_dir + run_dir
         gp.settings.plot_dir = plot_dir
+        print(f"The plot file dir is {plot_dir}")
+        gp.settings.seed = self.seed
 
         # rollout
-        self.rollout = Rollout(gen_params, alg_params, self.seed)
+        self.rollout = Rollout(gen_params, alg_params)
         self.rollout.resume_episode = resume_episode + 1
         # training
         if not gen_params.evaluate:
@@ -96,8 +98,8 @@ class Controller:
             print("------------------train episode: " + str(e_id) + "------------------")
             
             visualize = False
-            if e_id == 1 or e_id == 2: #FOR DEBUG
-                visualize = True
+            # if e_id == 1 or e_id == 2: #FOR DEBUG
+            #     visualize = True
             if e_id % 400 == 0:
                 visualize = True
 

@@ -4,6 +4,8 @@ from env.edge_env import EdgeEnv
 import torch
 import math
 import config.global_params as gp
+
+from concurrent.futures import ThreadPoolExecutor
 class MECEnv():
     def __init__(self, gen_params,time_slots, writer = None):
         # Summary Writer
@@ -57,6 +59,10 @@ class MECEnv():
         print(f"[DEBUG] edge_act_queue_growth_rate: {gen_params.edge_act_queue_growth_rate}")
         print(f"[DEBUG] edge_vir_queue_growth_rate: {gen_params.edge_vir_queue_growth_rate}")
 
+        # create thread pool for parallel device_env.compute
+        # each worker thread handles one DeviceEnv
+        self._device_executor = ThreadPoolExecutor(max_workers=self.device_num)
+
     def reset(self):
         edge_obs = self.edge_env.reset()
         
@@ -77,9 +83,27 @@ class MECEnv():
         enable_print = gp.settings.enable_print
         # 首先每个设备对待执行任务做出卸载决策，然后执行任务的本地计算部分，返回远程卸载部分（以下代码中的sched_tasks）
         device_sched_tasks = [None for i in range(self.device_num)]
+
+        # Serial execution of device computations
+        # for i in range(self.device_num):
+        #     sched_tasks = self.device_envs[i].compute(device_acts[i], e_id = e_id, t_id = t_id, visualize = visualize)
+        #     device_sched_tasks[i] = sched_tasks
+
+        # Parallel execution of device computations
+        # submit compute tasks to thread pool
+        futures = []
         for i in range(self.device_num):
-            sched_tasks = self.device_envs[i].compute(device_acts[i], e_id = e_id, t_id = t_id, visualize = visualize)
-            device_sched_tasks[i] = sched_tasks
+            env = self.device_envs[i]
+            act = device_acts[i]
+            future = self._device_executor.submit(
+                env.compute, act, e_id, t_id, visualize
+            )
+            futures.append((i, future))
+
+        # collect results
+        for i, future in futures:
+            device_sched_tasks[i] = future.result()
+
         # 边缘服务器执行任务的远程卸载部分
         self.edge_env.compute(device_sched_tasks, e_id = e_id, t_id = t_id, visualize = visualize)
         
@@ -210,8 +234,8 @@ class MECEnv():
                             self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
                     device_queue_actual_rewards[i] = min(max(device_act_queue_reward_min_bound + device_vir_queue_reward_min_bound, device_queue_actual_rewards[i]), device_act_queue_reward_max_bound + device_vir_queue_reward_max_bound)
 
-                print(f"[DEBUG] The device", i, "'s device_queue_actual_rewards is: ", device_queue_actual_rewards[i])
-                print(f"[DEBUG] The device", i, "'s device_queue_virtual_rewards is: ", device_queue_virtual_rewards[i])
+                # print(f"[DEBUG] The device", i, "'s device_queue_actual_rewards is: ", device_queue_actual_rewards[i])
+                # print(f"[DEBUG] The device", i, "'s device_queue_virtual_rewards is: ", device_queue_virtual_rewards[i])
 
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_actual_rewards is: ", device_queue_actual_rewards[i])
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_virtual_rewards is: ", device_queue_virtual_rewards[i])
@@ -257,8 +281,8 @@ class MECEnv():
                             self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
                 edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)
 
-            print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
-            print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])
+            # print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
+            # print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])
 
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])

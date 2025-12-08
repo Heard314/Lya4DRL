@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 import sys, atexit, os
 import config.global_params as gp
 class Rollout:
-    def __init__(self, gen_params, alg_params, seed):
+    def __init__(self, gen_params, alg_params):
         self.device_num = gen_params.device_num
         self.task_arrival_prob = gen_params.task_arrival_prob
         self.evaluate = gen_params.evaluate
@@ -66,7 +66,7 @@ class Rollout:
         # training
         if not self.evaluate:
             # seed 
-            self.seed = seed
+            self.seed = gp.settings.seed
             torch.manual_seed(self.seed)
             np.random.seed(self.seed)
             self.train_mode = gen_params.train_mode
@@ -86,7 +86,7 @@ class Rollout:
         # evaluation
         else:
             # fix random seed
-            self.seed = seed
+            self.seed = gp.settings.seed
             torch.manual_seed(gen_params.eval_seed)
             np.random.seed(gen_params.eval_seed)
             
