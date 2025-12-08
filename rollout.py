@@ -113,6 +113,29 @@ class Rollout:
         log_path = self.log_txt_dir_name + ".log"
         print(f"The log file path is {log_path}")
         
+        # print hyperparameters info
+        print(f"[DEBUG] device_queue_reward_weight: {gen_params.device_queue_reward_weight}")
+        print(f"[DEBUG] edge_queue_reward_weight: {gen_params.edge_queue_reward_weight}")
+        print(f"[DEBUG] device_act_queue_reward_max_bound: {gen_params.device_act_queue_reward_max_bound}")
+        print(f"[DEBUG] device_act_queue_reward_min_bound: {gen_params.device_act_queue_reward_min_bound}")
+        print(f"[DEBUG] device_vir_queue_reward_max_bound: {gen_params.device_vir_queue_reward_max_bound}")
+        print(f"[DEBUG] device_vir_queue_reward_min_bound: {gen_params.device_vir_queue_reward_min_bound}")
+
+        print(f"[DEBUG] timeout_reward_penalty: {gen_params.timeout_reward_penalty}")
+        print(f"[DEBUG] target_reward_penalty: {gen_params.target_reward_penalty}")
+
+        # device_env info print
+        print(f"[DEBUG] device_act_queue_growth_rate: {gen_params.device_act_queue_growth_rate}")
+        print(f"[DEBUG] device_vir_queue_growth_rate: {gen_params.device_vir_queue_growth_rate}")
+
+        # edge_env info print
+        print(f"[DEBUG] edge_act_queue_growth_rate: {gen_params.edge_act_queue_growth_rate}")
+        print(f"[DEBUG] edge_vir_queue_growth_rate: {gen_params.edge_vir_queue_growth_rate}")
+
+        # enable queue reward info
+        print(f"[DEBUG] enable_actual_queue_reward: {gen_params.enable_actual_queue_reward}")
+        print(f"[DEBUG] enable_virtual_queue_reward: {gen_params.enable_virtual_queue_reward}")
+
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         log_txt_file = open(log_path, "a", encoding = "utf-8")
         sys.stdout = log_txt_file
@@ -139,7 +162,12 @@ class Rollout:
         self.device_esum_engys = None
         self.device_overtime_nums = None
         self.device_task_avail_nums = None
-        
+    
+        # enable queue reward info
+        print(f"[DEBUG] enable_actual_queue_reward: {gen_params.enable_actual_queue_reward}")
+        print(f"[DEBUG] enable_virtual_queue_reward: {gen_params.enable_virtual_queue_reward}")
+
+
     def reset(self):
         if hasattr(self, "reward_scaling"):
             self.reward_scaling.reset()
@@ -179,7 +207,7 @@ class Rollout:
         # rollout
         time_slots = self.time_slots
         for t_id in range(1, time_slots + 1):
-            print("-------------time slot: " + str(t_id) + "-------------")
+            # print("-------------time slot: " + str(t_id) + "-------------")
             
             # choose action (use deterministic strategy during evaluation)
             device_acts = [None for i in range(self.device_num)]

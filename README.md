@@ -10,8 +10,10 @@ Spyder 5.4.2 (conda)
 conda create -n env_name python=3.9.16
 conda activate env_name
 pip install -r requirements.txt
+torch version 2.8.0
+torchvisoin version 0.23.0
 ```
-### The second method
+### The second method(don't ref)
 Open the 'environment.yml' file and modify the 'name' field to your desired environment name (e.g., env_name).
 ``` Bash
 conda env create -f environment.yml

@@ -184,8 +184,8 @@ def get_general_params():
     #                     help = "the service price of MEC server ($/Gcycles)")
     
     parser.add_argument("--device_energy_weights", type = list, 
-                        default = [0.8, 0.8, 0.8, 0.8, 0.8],
-                        # default = [1.0, 1.0, 1.0, 1.0, 1.0],
+                        # default = [0.8, 0.8, 0.8, 0.8, 0.8],
+                        default = [1.0, 1.0, 1.0, 1.0, 1.0],
                         help = "the weights of tasks' energy consumption")
     
     parser.add_argument("--edge_energy_weights", type = list, 
@@ -199,11 +199,6 @@ def get_general_params():
     parser.add_argument("--max_comp_dens", type = float,
                         default = 1.8,
                         help = "maximum computation density (Gcycles/Mb)")
-
-    # 暂时用local_reward_weight和edge_reward_weight替代其作用
-    # parser.add_argument("--lyaV", type = float,
-    #                     default = 0.2,
-    #                     help = "The lya algorithm weights for task rewards")
 
     parser.add_argument("--edge_weight_w", type = float,
                         default = 1,
@@ -229,21 +224,48 @@ def get_general_params():
     #                     default = 0.6,
     #                     help = "The length growth rate of the virtual computing queue on the edge server")
 
-    parser.add_argument("--local_reward_weight", type = float,
-                        default = -1000*0.3,
+    # Hyperparameter
+    # queue reward
+    parser.add_argument("--device_act_queue_reward_max_bound", type = float, default = 200, 
+                        help = "the max bound of actual device queue reward")
+
+    parser.add_argument("--device_act_queue_reward_min_bound", type = float, default = -300, 
+                        help = "the min bound of actual device queue reward")
+
+    parser.add_argument("--device_vir_queue_reward_max_bound", type = float, default = 800, 
+                        help = "the max bound of virtual device queue reward")
+
+    parser.add_argument("--device_vir_queue_reward_min_bound", type = float, default = -1200, 
+                        help = "the min bound of virtual device queue reward")
+
+    parser.add_argument("--device_queue_reward_weight", type = float,
+                        default = -300,
                         help = "The Lyapunov Drift-Plus-Penalty weight for local queues")
-
-    # parser.add_argument("--local_reward_bound", type = float,
-    #                     default = 7000,
-    #                     help = "The Lyapunov Drift-Plus-Penalty reward boundary for local queues")
-
-    parser.add_argument("--edge_reward_weight", type = float,
-                        default = -1000*0.7,
-                        help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
     
-    # parser.add_argument("--edge_reward_bound", type = float,
-    #                     default = 3000,
-    #                     help = "The Lyapunov Drift-Plus-Penalty reward boundary for edge queues")
+    parser.add_argument("--edge_queue_reward_weight", type = float,
+                        default = -700,
+                        help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
+
+    # navie reward
+
+    parser.add_argument("--timeout_reward_penalty", type = float, default = -4000, 
+                        help = "the max bound of actual device queue reward")
+
+    parser.add_argument("--target_reward_penalty", type = float, default = -1000, 
+                        help = "the min bound of actual device queue reward")
+
+    # device queue growth rate
+    parser.add_argument("--device_act_queue_growth_rate", type = float, default = 1, 
+                        help = "the growth rate of actual device queue reward")
+
+    parser.add_argument("--device_vir_queue_growth_rate", type = float, default = 0.1, 
+                    help = "the growth rate of virtual device queue reward")
+
+    # edge queue growth rate
+    parser.add_argument("--edge_act_queue_growth_rate", type = float, default = 1,
+                        help = "the growth rate of actual edge queue reward")
+    parser.add_argument("--edge_vir_queue_growth_rate", type = float, default = 0.1,
+                        help = "the growth rate of virtual edge queue reward")
 
     params = parser.parse_args()
     
@@ -255,7 +277,6 @@ deivce_obs_dim = 10 # 5(one-hot) + 2 + max_task_num * 3
 edge_queue_obs_dim = 2 # alloc_freq + comp_ql_length
 def get_mappo_params():
     parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
-
 
     #! 修改后，ObsScaling类的代码也需要改
     # networks

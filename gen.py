@@ -27,5 +27,7 @@
 # for i, (x, y) in enumerate(points, 1):
 #     print(y,end=",")
 # print("]",end="")
-print(16.5*1024*1024/3/640/640/8)
-print((3.0*224*224*8)/(1024.0*1024))
+# print(16.5*1024*1024/3/640/640/8)
+# print((3.0*224*224*8)/(1024.0*1024))
+import torch
+print( torch.log(torch.exp(torch.tensor(1.0)) -1.0 + 5) )

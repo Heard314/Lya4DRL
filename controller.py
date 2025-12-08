@@ -50,7 +50,7 @@ class Controller:
                     + "_s_"
                     + str(self.seed)
                     + "_t_"
-                    + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+                    + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
                     + "_d_"
                     + gen_params.run_desc
             )

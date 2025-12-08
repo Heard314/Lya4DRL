@@ -161,6 +161,9 @@ class DeviceEnv():
 
         self.total_comp_time = 0.0
         self.total_tran_time = 0.0
+
+        self.device_act_queue_growth_rate = gen_params.device_act_queue_growth_rate
+        self.device_vir_queue_growth_rate = gen_params.device_vir_queue_growth_rate
     
     def reset(self):
         # reset computation-queue length
@@ -414,6 +417,7 @@ class DeviceEnv():
         self.old_time_ql = self.time_ql
         # total_local_comp = self.comp_ql #计算队列剩余的计算量
         # new_local_comp = 0
+        device_act_queue_growth_rate = self.device_act_queue_growth_rate
         for task_id, local_comp in enumerate(local_comps):
             task = self.sched_tasks[task_id]
             # total_local_comp += local_comp
@@ -430,7 +434,7 @@ class DeviceEnv():
                 # if(enable_print): print(f"[DEBUG] The device freq pow2 is {pow(device_comp_freq,2)}")
                 # 适用于单时隙一直有一个任务到达的情况
                 old_time_ql_ = self.time_ql
-                self.time_ql = max(0, old_time_ql_ + local_comp / device_comp_freq - self.delta)
+                self.time_ql = max(0, old_time_ql_ + device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta))
                 self.new_ql_change = self.time_ql - old_time_ql_
                 self.act_backlog = local_comp / device_comp_freq
 
@@ -457,10 +461,12 @@ class DeviceEnv():
         EPS = 1e-6
         # if self.avg_local_comp > EPS:
         #     # self.virtual_comp_ql = max(0, self.virtual_comp_ql + self.comp_ql/self.avg_local_comp - self.task_timeout_thre)
-        #     
+        
+        device_vir_queue_growth_rate = self.device_vir_queue_growth_rate
+
         if self.avg_local_time > EPS:
             old_vir_time_ql_ = self.virtual_time_ql
-            self.virtual_time_ql = max(0, self.virtual_time_ql + 0.1*(self.time_ql/self.avg_local_time - self.device_dly_adj_val))
+            self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time - self.device_dly_adj_val))
             self.new_vir_ql_change = self.virtual_time_ql - old_vir_time_ql_
             self.vir_backlog = self.time_ql/self.avg_local_time
 
