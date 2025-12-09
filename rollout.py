@@ -23,7 +23,7 @@ class Rollout:
         #resume
         self.load_weights = gen_params.load_weights
         # project storage path
-        root_path = gp.settings.project_dir
+        root_path = gp.settings.exp_result_dir
         run_dir = gp.settings.run_dir
 
         # edge agent and replay buffer

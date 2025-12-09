@@ -33,7 +33,7 @@ class MappoEdgeAgent():
         self.min_v_lr = alg_params.min_v_lr
         self.min_p_lr = alg_params.min_p_lr
         self.decay_fac = alg_params.decay_fac
-        root_path = gp.settings.project_dir
+        root_path = gp.settings.exp_result_dir
         run_dir = gp.settings.run_dir
         self.weights_dir = gp.settings.weight_dir
         
@@ -486,7 +486,7 @@ class MaddpgEdgeAgent():
         self.use_grad_clip = alg_params.use_grad_clip
         self.v_grad_clip = alg_params.v_grad_clip
         self.p_grad_clip = alg_params.p_grad_clip
-        root_path = gp.settings.project_dir
+        root_path = gp.settings.exp_result_dir
         run_dir = gp.settings.run_dir
         self.weights_dir = gp.settings.weight_dir
         # learning-rate decay

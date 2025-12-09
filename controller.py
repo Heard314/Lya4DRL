@@ -23,7 +23,7 @@ class Controller:
         print("The evaluation mode is in controller: ", gen_params.eval_mode)
         
         # project storage path
-        root_path = gp.settings.project_dir
+        root_path = gp.settings.exp_result_dir
         print(f"The project dir is {root_path}")
 
         # seed 
@@ -72,7 +72,7 @@ class Controller:
         # training
         if not gen_params.evaluate:
             self.train_episodes = alg_params.train_episodes
-            root_path = gp.settings.project_dir
+            root_path = gp.settings.exp_result_dir
             run_dir = gp.settings.run_dir
             self.results_dir = root_path + alg_params.results_dir + run_dir
             if not os.path.exists(self.results_dir):
