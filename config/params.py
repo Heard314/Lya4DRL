@@ -366,7 +366,7 @@ def get_mappo_params():
     parser.add_argument("--enty_coef", type = float, default = 0.01,   
                         help = "the coefficient about policy's entropy")
     
-    parser.add_argument("--save_freq", type = int, default = 48, 
+    parser.add_argument("--save_freq", type = int, default = 400, 
                         help = "the saving frequency of networks")
 
     parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
