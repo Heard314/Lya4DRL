@@ -18,6 +18,9 @@ class MECEnv():
         self.device_num_per_type = gen_params.device_num_per_type
         # edge env
         self.edge_env = EdgeEnv(gen_params, writer)
+
+        self.device_freqs = gen_params.device_comp_freqs
+
         # device envs
         self.device_envs = []
         for i in range(self.device_num):
@@ -256,16 +259,21 @@ class MECEnv():
                         t_id
                     )
 
-        actual_queue_type_scale_posfac = self.device_num / self.device_type_num * device_act_queue_reward_max_bound
-        virtual_queue_type_scale_posfac = self.device_num / self.device_type_num * device_vir_queue_reward_max_bound
-        actual_queue_type_scale_negfac = self.device_num / self.device_type_num * device_act_queue_reward_min_bound
-        virtual_queue_type_scale_negfac = self.device_num / self.device_type_num * device_vir_queue_reward_min_bound
         for i in range(edge_queue_num):
             edge_queue_actual_rewards[i] = 0.0
             edge_queue_virtual_rewards[i] = 0.0
+            # actual_queue_type_scale_posfac = self.device_num_per_type[i] * device_act_queue_reward_max_bound
+            # virtual_queue_type_scale_posfac = self.device_num_per_type[i] * device_vir_queue_reward_max_bound
+            # actual_queue_type_scale_negfac = self.device_num_per_type[i] * device_act_queue_reward_min_bound
+            # virtual_queue_type_scale_negfac = self.device_num_per_type[i] * device_vir_queue_reward_min_bound
+            actual_queue_type_scale_posfac = device_act_queue_reward_max_bound
+            virtual_queue_type_scale_posfac = device_vir_queue_reward_max_bound
+            actual_queue_type_scale_negfac = device_act_queue_reward_min_bound
+            virtual_queue_type_scale_negfac = device_vir_queue_reward_min_bound
             if(self.enable_actual_queue_reward and self.enable_virtual_queue_reward):
                 edge_queue_actual_rewards[i] = self.edge_queue_reward_weight * \
-                            self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
+                    torch.max(1.0, torch.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
+                    self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
                 edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
                 edge_queue_virtual_rewards[i] = self.edge_queue_reward_weight * \
                     self.edge_env.virtual_edge_queue_time_ql[i] * (self.edge_env.new_vir_edge_ql_change[i])
@@ -278,7 +286,8 @@ class MECEnv():
             
             elif(self.enable_actual_queue_reward):
                 edge_queue_actual_rewards[i] = self.edge_queue_reward_weight * \
-                            self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
+                    torch.max(1.0, torch.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
+                    self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
                 edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)
 
             # print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
@@ -300,8 +309,11 @@ class MECEnv():
 
         for i in range(self.device_num):
             device_rewards[i] += device_queue_actual_rewards[i] + device_queue_virtual_rewards[i] + \
-                edge_queue_actual_rewards[self.device_envs[i].device_type] / self.device_num_per_type[self.device_envs[i].device_type] + \
-                edge_queue_virtual_rewards[self.device_envs[i].device_type] / self.device_num_per_type[self.device_envs[i].device_type]
+                edge_queue_actual_rewards[self.device_envs[i].device_type] + \
+                edge_queue_virtual_rewards[self.device_envs[i].device_type]
+                # edge_queue_actual_rewards[self.device_envs[i].device_type] / self.device_num_per_type[self.device_envs[i].device_type] + \
+                # edge_queue_virtual_rewards[self.device_envs[i].device_type] / self.device_num_per_type[self.device_envs[i].device_type]
+
             if(enable_print): print(f"[DEBUG] The device", i, "'s final reward is: ", device_rewards[i])
             if visualize:
                 writer.add_scalars(

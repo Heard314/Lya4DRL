@@ -193,6 +193,7 @@ class EdgeEnv():
             self.avg_edge_time[device_type] = (self.avg_edge_time[device_type] * (self.delta_num-1) + total_comp_need_time_this_epi) / self.delta_num
             edge_act_queue_growth_rate = self.edge_act_queue_growth_rate
             self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type]), 0)
+            
             self.new_edge_ql_change[device_type] = self.edge_queue_time_ql[device_type] - old_edge_queue_time_ql_
             self.act_backlog = self.edge_queue_time_ql[device_type] - old_edge_queue_time_ql_
             # self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type], 0)
@@ -206,6 +207,15 @@ class EdgeEnv():
             self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type] - self.edge_dly_adj_val[device_type]), 0)
             self.new_vir_edge_ql_change[device_type] = self.virtual_edge_queue_time_ql[device_type] - old_virtual_edge_queue_time_ql_
             self.vir_backlog = self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]
+            
+            # print(f"[DEBUG] The edge_queue", device_type, "'s old_virtual_edge_queue_time_ql is: ", self.old_virtual_edge_queue_time_ql[device_type])
+            # print(f"[DEBUG] The edge_queue", device_type, "'s new_vir_edge_ql_change is: ", self.new_vir_edge_ql_change[device_type])
+            # print(f"[DEBUG] The edge_queue", device_type, "'s virtual_edge_queue_time_ql is: ", self.virtual_edge_queue_time_ql[device_type])
+            
+            # print(f"[DEBUG] The edge_queue", device_type, "'s avg_edge_time is: ", self.avg_edge_time[device_type])
+            # print(f"[DEBUG] The edge_queue", device_type, "'s actual task dwell time is: ", self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type])
+            # print(f"[DEBUG] The edge_queue", device_type, "'s edge_dly_adj_val is: ", self.edge_dly_adj_val[device_type])
+
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s old_edge_queue_time_ql is: ", self.old_edge_queue_time_ql[device_type])
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s old_virtual_edge_queue_time_ql is: ", self.old_virtual_edge_queue_time_ql[device_type])
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s new_edge_ql_change is: ", self.new_edge_ql_change[device_type])
@@ -214,41 +224,41 @@ class EdgeEnv():
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s virtual_edge_queue_time_ql is: ", self.virtual_edge_queue_time_ql[device_type])
             
             if visualize:
-                    writer.add_scalars(
-                        f"detail/edge_avg_local_time_{device_type}",
-                        {f"ep_{e_id}": self.avg_edge_time[device_type]},
-                        t_id
-                    )
-                    writer.add_scalars(
-                        f"detail/edge_time_ql_{device_type}",
-                        {f"ep_{e_id}_act": self.edge_queue_time_ql[device_type]},
-                        t_id
-                    )
-                    writer.add_scalars(
-                        f"detail/edge_time_ql_{device_type}",
-                        {f"ep_{e_id}_act_chg": self.new_edge_ql_change[device_type]},
-                        t_id
-                    )
-                    writer.add_scalars(
-                        f"detail/edge_time_ql_{device_type}",
-                        {f"ep_{e_id}_act_backlog": self.act_backlog},
-                        t_id
-                    )
-                    writer.add_scalars(
-                        f"detail/edge_time_ql_{device_type}",
-                        {f"ep_{e_id}_vir": self.virtual_edge_queue_time_ql[device_type]},
-                        t_id
-                    )
-                    writer.add_scalars(
-                        f"detail/edge_time_ql_{device_type}",
-                        {f"ep_{e_id}_vir_chg": self.new_vir_edge_ql_change[device_type]},
-                        t_id
-                    )
-                    writer.add_scalars(
-                        f"detail/edge_time_ql_{device_type}",
-                        {f"ep_{e_id}_vir_backlog": self.vir_backlog},
-                        t_id
-                    )
+                writer.add_scalars(
+                    f"detail/edge_avg_local_time_{device_type}",
+                    {f"ep_{e_id}": self.avg_edge_time[device_type]},
+                    t_id
+                )
+                writer.add_scalars(
+                    f"detail/edge_time_ql_{device_type}",
+                    {f"ep_{e_id}_act": self.edge_queue_time_ql[device_type]},
+                    t_id
+                )
+                writer.add_scalars(
+                    f"detail/edge_time_ql_{device_type}",
+                    {f"ep_{e_id}_act_chg": self.new_edge_ql_change[device_type]},
+                    t_id
+                )
+                writer.add_scalars(
+                    f"detail/edge_time_ql_{device_type}",
+                    {f"ep_{e_id}_act_backlog": self.act_backlog},
+                    t_id
+                )
+                writer.add_scalars(
+                    f"detail/edge_time_ql_{device_type}",
+                    {f"ep_{e_id}_vir": self.virtual_edge_queue_time_ql[device_type]},
+                    t_id
+                )
+                writer.add_scalars(
+                    f"detail/edge_time_ql_{device_type}",
+                    {f"ep_{e_id}_vir_chg": self.new_vir_edge_ql_change[device_type]},
+                    t_id
+                )
+                writer.add_scalars(
+                    f"detail/edge_time_ql_{device_type}",
+                    {f"ep_{e_id}_vir_backlog": self.vir_backlog},
+                    t_id
+                )
         self.update_freq()
         # for i in range(self.edge_queue_num):
         #     if(enable_print): print(f"[DEBUG] After compute, edge time_ql of device_type: {i} is {self.edge_queue_time_ql[i]}")
