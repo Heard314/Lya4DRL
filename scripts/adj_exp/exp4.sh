@@ -1,4 +1,4 @@
-python main.py --train_mode mappo --run_desc "no_queue" \
+python ../../main.py --train_mode mappo --run_desc "no_queue_exp4" \
     --edge_queue_reward_weight -700 --device_queue_reward_weight -300 \
     --device_act_queue_reward_max_bound 600 --device_act_queue_reward_min_bound -800 \
     --device_vir_queue_reward_max_bound 1600 --device_vir_queue_reward_min_bound -2000 \

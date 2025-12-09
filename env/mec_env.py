@@ -85,24 +85,24 @@ class MECEnv():
         device_sched_tasks = [None for i in range(self.device_num)]
 
         # Serial execution of device computations
-        # for i in range(self.device_num):
-        #     sched_tasks = self.device_envs[i].compute(device_acts[i], e_id = e_id, t_id = t_id, visualize = visualize)
-        #     device_sched_tasks[i] = sched_tasks
+        for i in range(self.device_num):
+            sched_tasks = self.device_envs[i].compute(device_acts[i], e_id = e_id, t_id = t_id, visualize = visualize)
+            device_sched_tasks[i] = sched_tasks
 
         # Parallel execution of device computations
         # submit compute tasks to thread pool
-        futures = []
-        for i in range(self.device_num):
-            env = self.device_envs[i]
-            act = device_acts[i]
-            future = self._device_executor.submit(
-                env.compute, act, e_id, t_id, visualize
-            )
-            futures.append((i, future))
+        # futures = []
+        # for i in range(self.device_num):
+        #     env = self.device_envs[i]
+        #     act = device_acts[i]
+        #     future = self._device_executor.submit(
+        #         env.compute, act, e_id, t_id, visualize
+        #     )
+        #     futures.append((i, future))
 
-        # collect results
-        for i, future in futures:
-            device_sched_tasks[i] = future.result()
+        # # collect results
+        # for i, future in futures:
+        #     device_sched_tasks[i] = future.result()
 
         # 边缘服务器执行任务的远程卸载部分
         self.edge_env.compute(device_sched_tasks, e_id = e_id, t_id = t_id, visualize = visualize)
@@ -163,19 +163,19 @@ class MECEnv():
                         {f"ep_{e_id}_local": task.local_comp_engy + task.tran_engy},
                         t_id
                     )
-                    writer.add_scalars(
-                        f"detail/engy_{i}",
-                        {f"ep_{e_id}_edge": task.edge_comp_engy},
-                        t_id
-                    )
+                    # writer.add_scalars(
+                    #     f"detail/engy_{i}",
+                    #     {f"ep_{e_id}_edge": task.edge_comp_engy},
+                    #     t_id
+                    # )
 
 
                 device_csum_engys[i] += 1 / (j + 1) * (local_engy - device_csum_engys[i])
                 edge_comp_engy = task.edge_comp_engy
-                device_esum_engys[i] += 1 / (j + 1) * (edge_comp_engy - device_esum_engys[i])
+                # device_esum_engys[i] += 1 / (j + 1) * (edge_comp_engy - device_esum_engys[i])
                 
-                device_costs[i] += self.device_energy_weights[device_type] * local_engy \
-                                   + self.edge_energy_weights[device_type] * edge_comp_engy
+                device_costs[i] += self.device_energy_weights[device_type] * local_engy 
+                                #    + self.edge_energy_weights[device_type] * edge_comp_engy
                 
                 # if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
                 #     print("[DEBUG] The device index is: ", i)
@@ -188,7 +188,7 @@ class MECEnv():
                 if comp_dly > task.dly_cons:
                     #! 考虑到每个任务的超时程度会影响到任务的执行效果，在原有惩罚的基础上多乘一个log函数（表示超时程度）
                     # device_rewards[i] += -5000 * torch.log(torch.exp(torch.tensor(1.0)) -1.0 + comp_dly / task.dly_cons)
-                    device_rewards[i] += -self.timeout_reward_penalty
+                    device_rewards[i] += self.timeout_reward_penalty
                     device_overtime_nums[i] += 1
                     #! 当设备i超时严重时，其他设备的动态时间阈值调整系数应适当增大
                     # if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
@@ -202,7 +202,7 @@ class MECEnv():
                     norm_csum_engy = task.norm_csum_engy
                     norm_esum_engy = task.norm_esum_engy
                     # 奖励函数 能耗比重 *实际总能耗 / 标准化能耗 + 成本比重 *实际总成本 / 标准化成本
-                    device_rewards[i] += -self.target_reward_penalty * (self.device_energy_weights[device_type] * 
+                    device_rewards[i] += self.target_reward_penalty * (self.device_energy_weights[device_type] * 
                                                   local_engy / norm_csum_engy
                                                 #   + self.edge_energy_weights[device_type] * 
                                                 #   edge_comp_engy / norm_esum_engy
