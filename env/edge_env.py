@@ -113,7 +113,9 @@ class EdgeEnv():
         obs = []
         obs += alloc_edge_freq
         obs += edge_queue_time_ql
-
+        # for i in range(self.edge_queue_num):
+        #     print(f"[DEBUG] The time queue length of edge {i} is {edge_queue_time_ql[i]}")
+        # print(f"[DEBUG] The observation of edge is {obs}")
         return obs
     
     def compute(self, device_sched_tasks, e_id, t_id, visualize=False):

@@ -76,7 +76,6 @@ class MECEnv():
         return edge_obs, device_obss
     
     def step(self, device_acts, e_id, t_id, visualize=False):
-
         writer = self.writer
         if e_id % 50 == 1:
             # gp.settings.enable_print = True

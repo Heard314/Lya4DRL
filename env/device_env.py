@@ -274,6 +274,7 @@ class DeviceEnv():
     def get_obs(self):
         channel_gain = self.channel_gain
         local_queue = self.time_ql
+        # print(f"[DEBUG] The time queue length of device {self.env_id} is {self.time_ql}")
         device_type = [1 if i == self.device_type else 0 for i in range(self.device_type_num)] #onehot
         task_msgs = []
         for i in range(self.task_num):
@@ -284,6 +285,7 @@ class DeviceEnv():
         obs = []
         obs += device_type
         obs += [channel_gain, local_queue] + task_msgs
+        # print(f"[DEBUG] The observation of device {self.env_id} is {obs}")
         return obs
 
     # the end device moves when a time slot ends

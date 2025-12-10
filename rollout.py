@@ -270,7 +270,14 @@ class Rollout:
             device_type_num = self.device_type_num
             # update computing-queue lengths
             edge_comp_qls = [next_edge_obs[i] for i in range(device_type_num,2*device_type_num)]
-            device_comp_qls = [obs[7] for obs in next_device_obss]
+            device_comp_qls = [obs[6] for obs in next_device_obss]
+
+            # for i in range(self.device_num):
+            #     print(f"For noting, [DEBUG] The time queue length of device {i} is {device_comp_qls[i]}")
+
+            # for i in range(self.device_type_num):
+            #     print(f"For noting, [DEBUG] The time queue length of edge {i} is {edge_comp_qls[i]}")
+
             # obs scaling
             if hasattr(self, "obs_scaling"):
                 self.obs_scaling(next_edge_obs, next_device_obss)
