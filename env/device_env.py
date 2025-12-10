@@ -106,7 +106,7 @@ class DeviceEnv():
         
         self.max_task_num = gen_params.max_task_num
 
-        self.task_timeout_thre = gen_params.comp_dly_thre[self.device_type]
+        self.task_timeout_thre = gen_params.comp_dly_thre[self.device_type] * self.delta
 
         self.task_num = 0
 

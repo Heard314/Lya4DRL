@@ -142,7 +142,7 @@ def get_general_params():
                         help = "the min distance between end device and edge server. (m)")
     
     parser.add_argument("--device_comp_freqs", type = list, 
-                        default = [2.5, 2.5, 2.5, 2.5, 2.5], 
+                        default = [3.0, 3.0, 3.0, 3.0, 3.0], 
                         help = "the computation frequencies of devices (Gcycles/s)")
     
     parser.add_argument("--std_comp_freq", type = float, default = 2, 
@@ -177,7 +177,7 @@ def get_general_params():
                         default = [1, 3, 3, 5, 5], 
                         help = "the timeout threshold for different task types (delta 0.1s)")
 
-    parser.add_argument("--edge_comp_freq", type = float, default = 200,
+    parser.add_argument("--edge_comp_freq", type = float, default = 250,
                         help = "the computation frequency of MEC server (Gcycles/s)")
     
     # parser.add_argument("--service_price", type = float, default = 0.1, 
