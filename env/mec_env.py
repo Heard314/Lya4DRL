@@ -272,7 +272,7 @@ class MECEnv():
             virtual_queue_type_scale_negfac = device_vir_queue_reward_min_bound
             if(self.enable_actual_queue_reward and self.enable_virtual_queue_reward):
                 edge_queue_actual_rewards[i] = self.edge_queue_reward_weight * \
-                    torch.max(1.0, torch.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
+                    max(1.0, math.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
                     self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
                 edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
                 edge_queue_virtual_rewards[i] = self.edge_queue_reward_weight * \
@@ -286,7 +286,7 @@ class MECEnv():
             
             elif(self.enable_actual_queue_reward):
                 edge_queue_actual_rewards[i] = self.edge_queue_reward_weight * \
-                    torch.max(1.0, torch.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
+                    max(1.0, math.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
                     self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
                 edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)
 
