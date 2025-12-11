@@ -127,7 +127,6 @@ class EdgeEnv():
         for device_id, sched_tasks in enumerate(device_sched_tasks):
             device_type = self.device_types_ref[device_id]
             device_type_sched_tasks[device_type] += sched_tasks
-
         # self.completed_comp = [ 0 for _ in range(self.edge_queue_num)]
         # self.new_edge_comp = [ 0 for _ in range(self.edge_queue_num)]
 
@@ -136,6 +135,14 @@ class EdgeEnv():
             sorted(sub_list, key=lambda x: x.trans_time)
             for sub_list in device_type_sched_tasks
         ]
+
+        # for type_idx, sub_list in enumerate(device_type_sched_tasks):
+        #     print(f"Task type {type_idx}:")
+        #     for task in sub_list:
+        #         # assume each task has attributes 'device_id' and 'trans_time'
+        #         print(f"  device_id={task.device_id}, trans_time={task.trans_time}")
+        #     print("-" * 40)
+
         # comp_dly = self.comp_ql / self.edge_comp_freq
         # self.comp_ql = max(0, self.comp_ql - self.edge_comp_freq * self.delta)
 
@@ -167,6 +174,8 @@ class EdgeEnv():
                     # if(enable_print): print(f"[DEBUG] The edge comp of task of type {device_type} in device {task.device_id} is 0")
                     # if(enable_print): print(f"[DEBUG] The edge calculated amount of type {device_type} in this episode is {alloc_edge_freq[device_type] * self.delta}")
                     task.e_comp_dly = 0
+                    task.e_queue_dly = 0
+                    task.e_proc_dly = 0
                     task.edge_comp_engy = 0
                     if(enable_print): print(f"[DEBUG] the edge comp_dly in device {task.device_id} is {task.e_comp_dly}")
                 else:
@@ -180,7 +189,8 @@ class EdgeEnv():
                     # if(enable_print): print(f"[DEBUG] The edge freq pow2 is {pow(alloc_edge_freq[device_type],2)}")
                     task.e_comp_dly = max(max(self.total_comp_time[device_type] - (t_id-1)*self.delta, 0), task.trans_time) + task.offl_dz * \
                                     task.comp_dens / alloc_edge_freq[device_type]
-                    
+                    task.e_queue_dly = max(self.total_comp_time[device_type] - (t_id-1)*self.delta, 0)
+                    task.e_proc_dly = task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
                     total_comp_need_time_this_epi += task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
                     total_comp_used_time_this_epi[device_type] += min(task.offl_dz * task.comp_dens/alloc_edge_freq[device_type], max(0, self.delta-max(task.trans_time, comp_dlys[device_type])))
                     if(enable_print): print(f"[DEBUG] the edge comp_dly in device {task.device_id} is {task.e_comp_dly}")

@@ -327,19 +327,19 @@ def get_mappo_params():
     parser.add_argument("--lamda", type = float, default = 0.95,
                         help = "the parameter about GAE")
     
-    parser.add_argument("--v_lr", type = float, default = 4e-4,
+    parser.add_argument("--v_lr", type = float, default = 1e-4,
                         help = "the learning-rate of value network")
     
-    parser.add_argument("--p_lr", type = float, default = 4e-4,
+    parser.add_argument("--p_lr", type = float, default = 1e-4,
                         help = "the learning-rate of policy networks")
     
     parser.add_argument("--use_lr_decay", type = bool, default = False,
                         help = "whether to use learning-rate decay")
     
-    parser.add_argument("--min_v_lr", type = float, default = 1e-4,        
+    parser.add_argument("--min_v_lr", type = float, default = 1e-5,        
                         help = "the minimal learning-rate of value network")
     
-    parser.add_argument("--min_p_lr", type = float, default = 1e-4,        
+    parser.add_argument("--min_p_lr", type = float, default = 1e-5,        
                         help = "the minimal learning-rate of policy networks")
     
     parser.add_argument("--decay_fac", type = float, default = 0.999, 
@@ -363,7 +363,7 @@ def get_mappo_params():
     parser.add_argument("--p_clip", type = float, default = 0.1,
                         help = "the parameter about ppo clip")
     
-    parser.add_argument("--enty_coef", type = float, default = 0.01,   
+    parser.add_argument("--enty_coef", type = float, default = 0.05,   
                         help = "the coefficient about policy's entropy")
     
     parser.add_argument("--save_freq", type = int, default = 400, 

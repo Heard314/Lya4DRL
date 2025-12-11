@@ -112,7 +112,8 @@ class MappoPolicyNetLSTM(nn.Module):
         self.register_buffer("act_scale", (high - low) / 2.0)
         self.register_buffer("act_bias",  (high + low) / 2.0)
 
-        self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0
+        # self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0 # 正态分布std越小，越接近确定性策略
+        self.LOG_STD_MIN, self.LOG_STD_MAX = -2.0, 2.0
         self.EPS = 1e-6
 
         # ---------- debug flag ----------

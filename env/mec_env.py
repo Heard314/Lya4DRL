@@ -143,14 +143,41 @@ class MECEnv():
                     )
                     writer.add_scalars(
                         f"detail/l_comp_dly_{i}",
-                        {f"ep_{e_id}": task.l_comp_dly},
+                        {f"ep_{e_id}_total": task.l_comp_dly},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail/l_comp_dly_{i}",
+                        {f"ep_{e_id}_queue": task.l_queue_dly},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail/l_comp_dly_{i}",
+                        {f"ep_{e_id}_proc": task.l_proc_dly},
+                        t_id
+                    )
+
+                    writer.add_scalars(
+                        f"detail/e_comp_dly_{i}",
+                        {f"ep_{e_id}_total": task.e_comp_dly},
                         t_id
                     )
                     writer.add_scalars(
                         f"detail/e_comp_dly_{i}",
-                        {f"ep_{e_id}": task.e_comp_dly},
+                        {f"ep_{e_id}_tran": task.trans_time},
                         t_id
                     )
+                    writer.add_scalars(
+                        f"detail/e_comp_dly_{i}",
+                        {f"ep_{e_id}_queue": task.e_queue_dly},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail/e_comp_dly_{i}",
+                        {f"ep_{e_id}_proc": task.e_proc_dly},
+                        t_id
+                    )
+
                 if(enable_print): print(f"[DEBUG] the comp_dly in device {i} is {comp_dly}")
                 device_comp_dlys[i] += 1 / (j + 1) * (comp_dly - device_comp_dlys[i])
                 # print(f"[GDEBUG] the comp_dly in device {i} is {comp_dly}")

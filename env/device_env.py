@@ -34,6 +34,11 @@ class Task():
         self.norm_csum_engy = None
         self.norm_esum_engy = None
 
+        # Debug
+        self.l_queue_dly = None
+        self.e_queue_dly = None
+        self.l_proc_dly = None
+        self.e_proc_dly = None
     def __str__(self):
         return "data_size: " + str(self.data_size) + \
                "\ncomp_dens: " + str(self.comp_dens) + \
@@ -440,9 +445,13 @@ class DeviceEnv():
             # if local_comp = 0, there is no need to queue
             if local_comp == 0:
                 task.l_comp_dly = 0
+                task.l_proc_dly = 0
+                task.l_queue_dly = 0
                 task.local_comp_engy = 0
             else:
                 task.l_comp_dly = max(self.total_comp_time - (t_id-1)*self.delta, 0) + local_comp / device_comp_freq
+                task.l_queue_dly = max(self.total_comp_time - (t_id-1)*self.delta, 0)
+                task.l_proc_dly = local_comp / device_comp_freq
                 self.total_comp_time += local_comp / device_comp_freq
                 task.local_comp_engy = self.engy_fac * pow(device_comp_freq,2) * local_comp
                 # if(enable_print): print(f"[DEBUG] The device freq pow2 is {pow(device_comp_freq,2)}")
@@ -563,7 +572,7 @@ class DeviceEnv():
             # task.dly_cons = comp / self.std_comp_freq * self.dynamic_delay_adjust_coef
             # task.dly_cons = max(self.unit_task_timeout_thre * data_size, self.delta)
             task.dly_cons = self.task_timeout_thre
-            task.norm_csum_engy = comp * self.engy_fac * 6.25
+            task.norm_csum_engy = comp * self.engy_fac * 9
             task.norm_esum_engy = comp * self.engy_fac * 1600
             
             self.sched_tasks.append(task)
