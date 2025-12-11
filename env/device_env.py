@@ -494,6 +494,16 @@ class DeviceEnv():
 
         if visualize:
             writer.add_scalars(
+                f"detail/device_total_comp_time_{self.env_id}",
+                {f"ep_{e_id}": self.total_comp_time},
+                t_id
+            )
+            writer.add_scalars(
+                f"detail/device_total_comp_time_{self.env_id}",
+                {f"ep_{e_id}": self.total_tran_time},
+                t_id
+            )
+            writer.add_scalars(
                 f"detail/device_avg_local_time_{self.env_id}",
                 {f"ep_{e_id}": self.avg_local_time},
                 t_id

@@ -69,6 +69,7 @@ class EdgeEnv():
         #                                     self.alloc_edge_freq[i]/(self.alloc_edge_freq[i]+device_comp_freqs[i]*device_num) * \
         #                                     dz_mean * dens_mean * task_arrival_prob[i]
         self.total_comp_time = [0 for _ in range(self.edge_queue_num)]
+        self.total_comp_amount = [0 for _ in range(self.edge_queue_num)]
 
         self.edge_act_queue_growth_rate = general_params.edge_act_queue_growth_rate
         self.edge_vir_queue_growth_rate = general_params.edge_vir_queue_growth_rate
@@ -92,6 +93,7 @@ class EdgeEnv():
         self.alloc_edge_freq = [self.edge_comp_freq / self.edge_queue_num for _ in range(self.edge_queue_num)]
         # print(f"[DEBUG] alloc_edge_freq: {self.alloc_edge_freq}")
         self.total_comp_time = [0 for _ in range(self.edge_queue_num)]
+        self.total_comp_amount = [0 for _ in range(self.edge_queue_num)]
         # reset computation time queue length
         self.edge_queue_time_ql = [ 0 for _ in range(self.edge_queue_num)]
         self.old_edge_queue_time_ql = [ 0 for _ in range(self.edge_queue_num)]
@@ -190,6 +192,7 @@ class EdgeEnv():
                     #                                             max(comp_dlys[device_type], task.trans_time)))
                     comp_dlys[device_type] = max(comp_dlys[device_type], task.trans_time) + task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
                     self.total_comp_time[device_type] += task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
+                    self.total_comp_amount[device_type] += task.offl_dz * task.comp_dens
                     
             old_edge_queue_time_ql_ = self.avg_edge_time[device_type]
             self.avg_edge_time[device_type] = (self.avg_edge_time[device_type] * (self.delta_num-1) + total_comp_need_time_this_epi) / self.delta_num
@@ -261,6 +264,25 @@ class EdgeEnv():
                     {f"ep_{e_id}_vir_backlog": self.vir_backlog},
                     t_id
                 )
+
+                writer.add_scalars(
+                    f"detail/total_comp_{device_type}",
+                    {f"ep_{e_id}_time": self.total_comp_time[device_type]},
+                    t_id
+                )
+
+                writer.add_scalars(
+                    f"detail/total_comp_{device_type}",
+                    {f"ep_{e_id}_amount": self.total_comp_amount[device_type]},
+                    t_id
+                )
+
+                writer.add_scalars(
+                    f"detail/alloc_edge_freq_{device_type}",
+                    {f"ep_{e_id}_freq": alloc_edge_freq[device_type]},
+                    t_id
+                )
+
         self.update_freq()
         # for i in range(self.edge_queue_num):
         #     if(enable_print): print(f"[DEBUG] After compute, edge time_ql of device_type: {i} is {self.edge_queue_time_ql[i]}")
