@@ -174,7 +174,7 @@ def get_general_params():
 
     parser.add_argument("--comp_dly_thre", type = list, 
                         # default = [1, 5, 5, 10, 10], 
-                        default = [1, 3, 3, 5, 5], 
+                        default = [3, 5, 5, 10, 10],
                         help = "the timeout threshold for different task types (delta 0.1s)")
 
     parser.add_argument("--edge_comp_freq", type = float, default = 250,
@@ -249,10 +249,10 @@ def get_general_params():
     # navie reward
 
     parser.add_argument("--timeout_reward_penalty", type = float, default = -4000, 
-                        help = "the max bound of actual device queue reward")
+                        help = "the reward if the task is timeout")
 
-    parser.add_argument("--target_reward_penalty", type = float, default = -1000, 
-                        help = "the min bound of actual device queue reward")
+    parser.add_argument("--target_reward_penalty", type = float, default = -2000, 
+                        help = "the reward if the task is completed within the threshold")
 
     # device queue growth rate
     parser.add_argument("--device_act_queue_growth_rate", type = float, default = 1, 
@@ -303,7 +303,7 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 8000,
+    parser.add_argument("--train_episodes", type = int, default = 400,
                         help = "the number of training episodes")
 
     parser.add_argument("--train_time_slots", type = int, default = 300,

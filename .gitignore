@@ -8,3 +8,4 @@ log/
 .vscode/
 .idea/
 *.code-workspace
+test_demo.py
