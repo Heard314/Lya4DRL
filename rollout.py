@@ -39,10 +39,12 @@ class Rollout:
         # obs scaling
         if not self.evaluate or (self.evaluate and self.eval_mode[0] == "m"):
             if alg_params.use_obs_scaling:
-                self.obs_scaling = ObsScaling(gen_params.max_task_num,
-                                              gen_params.max_data_size,
-                                              gen_params.max_comp_dens,
-                                              gen_params.std_comp_freq)
+                self.obs_scaling = ObsScaling(  gen_params,
+                                                alg_params,
+                                                gen_params.max_task_num,
+                                                gen_params.max_data_size,
+                                                gen_params.max_comp_dens,
+                                                gen_params.std_comp_freq)
 
         # device agents
         self.device_agents = []

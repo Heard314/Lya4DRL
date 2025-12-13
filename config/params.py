@@ -8,7 +8,7 @@ from torch import device
 general params
 """
 device_num = 10
-edge_queue_num = 5
+edge_queue_num = 3
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
     
@@ -59,7 +59,8 @@ def get_general_params():
 
     parser.add_argument("--device_types", type = list, 
                         # default = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4],
-                        default = [0]*4 + [1]*2 + [2]*2 + [3]*1 + [4]*1,
+                        # default = [0]*4 + [1]*2 + [2]*2 + [3]*1 + [4]*1,
+                        default = [0]*2 + [1]*4 + [2]*4,
                         help = "the types of devices")
 
     parser.add_argument("--device_in_types", type = list, 
@@ -70,27 +71,37 @@ def get_general_params():
                         #     [40, 41, 42, 43, 44],
                         #     [45, 46, 47, 48, 49]
                         # ],
+                        # default = [
+                        #     [0, 1, 2, 3],
+                        #     [4, 5],
+                        #     [6, 7],
+                        #     [8],
+                        #     [9]
+                        # ],
                         default = [
-                            [0, 1, 2, 3],
-                            [4, 5],
-                            [6, 7],
-                            [8],
-                            [9]
+                            [0,1],
+                            [2,3,4,5],
+                            [6,7,8,9],
                         ],
                         help = "all devices nums for each types")
 
     parser.add_argument("--device_num_per_type", type = list, 
                         # default = [20,10,10,5,5],
-                        default = [4,2,2,1,1],
+                        # default = [4,2,2,1,1],
+                        default = [2,4,4],
                         help = "the number of devices for each type")
 
-    parser.add_argument("--device_type_num", type = int, default = 5,
+    parser.add_argument("--device_type_num", type = int, 
+                        # default = 5,
+                        default = edge_queue_num,
                         help = "the number of device types")
     
     # parser.add_argument("--task_arrival_prob", type = int, default = [1.0, 0.6, 0.2, 0.12, 0.1],
     #                     help = "the probability of task arrival at each time slot")
 
-    parser.add_argument("--task_arrival_prob", type = int, default = [1.0, 1.0, 1.0, 1.0, 1.0],
+    parser.add_argument("--task_arrival_prob", type = int, 
+                        # default = [1.0, 1.0, 1.0, 1.0, 1.0],
+                        default = [1.0]*edge_queue_num,
                         help = "the probability of task arrival at each time slot")
     
     parser.add_argument("--max_task_num", type = int, default = 1,
@@ -103,7 +114,7 @@ def get_general_params():
     
     parser.add_argument("--device_trans_powers", type = list, 
                         # default = [251, 206, 126, 227, 186], 
-                        default = [300, 300, 300, 300, 300],
+                        default = [300]*edge_queue_num,
                         help = "the transmission powers of devices (mW)")
     
     # parser.add_argument("--device_path_loss", type = list, 
@@ -147,37 +158,37 @@ def get_general_params():
                         help = "the min accelerate direction of end device (degree/(s^2))")
     
     parser.add_argument("--max_distance_from_edge", type = float, 
-                    default = 500,
-                    help = "the max distance between end device and edge server. (m)")
+                        default = 500,
+                        help = "the max distance between end device and edge server. (m)")
 
-    parser.add_argument("--min_distance_from_edge", type = float, 
+    parser.add_argument("--min_distance_from_edge", type = float,
                         default = 100,
                         help = "the min distance between end device and edge server. (m)")
     
-    parser.add_argument("--device_comp_freqs", type = list, 
-                        default = [3.0, 3.0, 3.0, 3.0, 3.0], 
+    parser.add_argument("--device_comp_freqs", type = list,
+                        default = [2.5]*edge_queue_num,
                         help = "the computation frequencies of devices (Gcycles/s)")
     
     parser.add_argument("--std_comp_freq", type = float, default = 2, 
                         help = "standard computation frequency (Gcycles/s)")
     
     parser.add_argument("--device_engy_facs", type = list, 
-                        default = [1, 1, 1, 1, 1],
+                        default = [1]*edge_queue_num,
                         help = "the energy factors of devices (J/Gcycles)")
     
     parser.add_argument(
         "--data_size_inls",
         type=list,
-        default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
-                [1.4, 1.5], [0.6, 1.2]],
+        # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
+        #         [1.4, 1.5], [0.6, 1.2]],
+        default=[[1.4, 1.5], [0.8, 1.0], [1.8, 2.0]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
     parser.add_argument(
         "--comp_dens_inls",
         type=list,
-        default=[[0.3, 0.4], [0.2, 0.8], [0.25, 0.3],
-                [0.3, 0.4], [0.4, 0.5]],
+        default=[[0.3, 0.4], [0.6, 0.8], [0.2, 0.3]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     # #! 数值待修改
@@ -187,7 +198,8 @@ def get_general_params():
 
     parser.add_argument("--comp_dly_thre", type = list, 
                         # default = [1, 5, 5, 10, 10], 
-                        default = [3, 5, 5, 10, 10],
+                        # default = [3, 5, 5, 10, 10],
+                        default = [5, 10, 10],
                         help = "the timeout threshold for different task types (delta 0.1s)")
 
     parser.add_argument("--edge_comp_freq", type = float, default = 50,
@@ -198,11 +210,12 @@ def get_general_params():
     
     parser.add_argument("--device_energy_weights", type = list, 
                         # default = [0.8, 0.8, 0.8, 0.8, 0.8],
-                        default = [1.0, 1.0, 1.0, 1.0, 1.0],
+                        # default = [1.0, 1.0, 1.0, 1.0, 1.0],
+                        default = [1.0]*edge_queue_num,
                         help = "the weights of tasks' energy consumption")
     
     parser.add_argument("--edge_energy_weights", type = list, 
-                        default = [0.2, 0.2, 0.2, 0.2, 0.2], 
+                        default = [0.2]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
     
     parser.add_argument("--max_data_size", type = float, 
@@ -222,11 +235,11 @@ def get_general_params():
                         help = "the b parameter for edge weight linear function")
 
     parser.add_argument("--device_dly_adj_fac", type = list, 
-                        default = [1.0, 1.0, 1.0, 1.0, 1.0], 
+                        default = [1.0]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     parser.add_argument("--edge_dly_adj_fac", type = list, 
-                        default = [1.0, 1.0, 1.0, 1.0, 1.0], 
+                        default = [1.0]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     # parser.add_argument("--vir_local_ql_growth_rate", type = float,
@@ -286,7 +299,7 @@ def get_general_params():
 """
 mappo params
 """
-deivce_obs_dim = 10 # 5(one-hot) + 2 + max_task_num * 3
+deivce_obs_dim = 8 # 5(one-hot) + 2 + max_task_num * 3
 edge_queue_obs_dim = 2 # alloc_freq + comp_ql_length
 def get_mappo_params():
     parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
@@ -306,7 +319,7 @@ def get_mappo_params():
     parser.add_argument("--v_hid_dims", type = list, default = [200, 200],
                         help = "the dimension of value network's hidden layers")
     
-    parser.add_argument("--p_hid_dims", type = list, default = [200, 200],   
+    parser.add_argument("--p_hid_dims", type = list, default = [200, 200],
                         help = "the dimension of policy network's hidden layers")
 
     parser.add_argument("--use_orthogonal_init", type = bool, default = True,
@@ -375,10 +388,10 @@ def get_mappo_params():
     
     parser.add_argument("--p_clip", type = float, default = 0.1,
                         help = "the parameter about ppo clip")
-    
+
     parser.add_argument("--enty_coef", type = float, default = 0.05,   
                         help = "the coefficient about policy's entropy")
-    
+
     parser.add_argument("--save_freq", type = int, default = 400, 
                         help = "the saving frequency of networks")
 
