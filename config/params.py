@@ -7,7 +7,7 @@ from torch import device
 """
 general params
 """
-device_num = 50
+device_num = 10
 edge_queue_num = 5
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
@@ -57,19 +57,32 @@ def get_general_params():
     parser.add_argument("--device_num", type = int, default = device_num,
                         help = "the number of devices")
 
-    parser.add_argument("--device_types", type = list, default = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4],
+    parser.add_argument("--device_types", type = list, 
+                        # default = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4],
+                        default = [0]*4 + [1]*2 + [2]*2 + [3]*1 + [4]*1,
                         help = "the types of devices")
 
-    parser.add_argument("--device_in_types", type = list, default = [
-                            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
-                            [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
-                            [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
-                            [40, 41, 42, 43, 44],
-                            [45, 46, 47, 48, 49]
+    parser.add_argument("--device_in_types", type = list, 
+                        # default = [
+                        #     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+                        #     [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
+                        #     [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
+                        #     [40, 41, 42, 43, 44],
+                        #     [45, 46, 47, 48, 49]
+                        # ],
+                        default = [
+                            [0, 1, 2, 3],
+                            [4, 5],
+                            [6, 7],
+                            [8],
+                            [9]
                         ],
                         help = "all devices nums for each types")
 
-    parser.add_argument("--device_num_per_type", type = list, default = [20,10,10,5,5])
+    parser.add_argument("--device_num_per_type", type = list, 
+                        # default = [20,10,10,5,5],
+                        default = [4,2,2,1,1],
+                        help = "the number of devices for each type")
 
     parser.add_argument("--device_type_num", type = int, default = 5,
                         help = "the number of device types")
@@ -177,7 +190,7 @@ def get_general_params():
                         default = [3, 5, 5, 10, 10],
                         help = "the timeout threshold for different task types (delta 0.1s)")
 
-    parser.add_argument("--edge_comp_freq", type = float, default = 250,
+    parser.add_argument("--edge_comp_freq", type = float, default = 50,
                         help = "the computation frequency of MEC server (Gcycles/s)")
     
     # parser.add_argument("--service_price", type = float, default = 0.1, 
@@ -290,7 +303,7 @@ def get_mappo_params():
     parser.add_argument("--action_dim", type = int, default = 3,
                         help = "the dimension of agents' actions")
     
-    parser.add_argument("--v_hid_dims", type = list, default = [200, 200],   
+    parser.add_argument("--v_hid_dims", type = list, default = [200, 200],
                         help = "the dimension of value network's hidden layers")
     
     parser.add_argument("--p_hid_dims", type = list, default = [200, 200],   
@@ -303,7 +316,7 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 400,
+    parser.add_argument("--train_episodes", type = int, default = 8000,
                         help = "the number of training episodes")
 
     parser.add_argument("--train_time_slots", type = int, default = 300,
