@@ -181,7 +181,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.4, 1.5], [0.8, 1.0], [1.8, 2.0]],
+        default=[[1.4, 1.6], [0.8, 1.0], [2.0, 2.4]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -274,10 +274,10 @@ def get_general_params():
 
     # navie reward
 
-    parser.add_argument("--timeout_reward_penalty", type = float, default = -4000, 
+    parser.add_argument("--timeout_reward_penalty", type = float, default = -4000,
                         help = "the reward if the task is timeout")
 
-    parser.add_argument("--target_reward_penalty", type = float, default = -2000, 
+    parser.add_argument("--target_reward_penalty", type = float, default = -2000,
                         help = "the reward if the task is completed within the threshold")
 
     # device queue growth rate
@@ -329,16 +329,16 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 8000,
+    parser.add_argument("--train_episodes", type = int, default = 10000,
                         help = "the number of training episodes")
 
-    parser.add_argument("--train_time_slots", type = int, default = 300,
+    parser.add_argument("--train_time_slots", type = int, default = 450,
                         help = "the number of training time-slots")
     
     parser.add_argument("--train_freq", type = int, default = 4,
                         help = "training frequency")
     
-    parser.add_argument("--train_batch_size", type = int, default = 1200,
+    parser.add_argument("--train_batch_size", type = int, default = 1800,
                         help = "training batch-size")
     
     parser.add_argument("--v_epochs", type = int, default = 4,

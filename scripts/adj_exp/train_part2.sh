@@ -13,3 +13,4 @@ echo "===== Running exp8.sh ====="
 ./exp8.sh
 
 echo "===== All experiments finished! ====="
+/usr/bin/shutdown
