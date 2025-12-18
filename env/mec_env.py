@@ -215,10 +215,12 @@ class MECEnv():
                     # print("[DEBUG] The device", i, "'s completed comp is: ", self.device_envs[i].completed_comp)
                 # 计算超时惩罚，其中task.dly_cons是按照设备计算能力为2Gcycles/s计算的，实际的设备计算能力在2.1~2.4Gcycles/s之间
                 if comp_dly > task.dly_cons:
+                    device_overtime_nums[i] += 1
+
+                if comp_dly > task.dly_cons and not (self.enable_virtual_queue_reward or self.enable_actual_queue_reward):
                     #! 考虑到每个任务的超时程度会影响到任务的执行效果，在原有惩罚的基础上多乘一个log函数（表示超时程度）
                     # device_rewards[i] += -5000 * torch.log(torch.exp(torch.tensor(1.0)) -1.0 + comp_dly / task.dly_cons)
                     device_rewards[i] += self.timeout_reward_penalty
-                    device_overtime_nums[i] += 1
                     #! 当设备i超时严重时，其他设备的动态时间阈值调整系数应适当增大
                     # if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
                     #     print("[DEBUG] The ratio of comp_dly to task.dly_cons in device", i, "is: ", comp_dly / task.dly_cons)

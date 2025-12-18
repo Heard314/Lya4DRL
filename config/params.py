@@ -293,6 +293,10 @@ def get_general_params():
     parser.add_argument("--edge_vir_queue_growth_rate", type = float, default = 0.1,
                         help = "the growth rate of virtual edge queue reward")
 
+    # training
+    parser.add_argument("--train_seed", type = int, default = 4399,
+                        help = "training random-seed")
+
     params = parser.parse_args()
     
     return params
