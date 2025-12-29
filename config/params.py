@@ -31,6 +31,9 @@ def get_general_params():
     parser.add_argument("--eval_seed", type = int, default = 2345,
                         help = "evaluation random-seed")
     
+    parser.add_argument("--train_seed", type = int, default = 4399,
+                    help = "training random-seed")
+
     # choices: mappo or maddpg or local_comp or edge_comp or random_comp
     parser.add_argument("--eval_mode", type = str, default = "mappo",
                         help = "evaluation mode")

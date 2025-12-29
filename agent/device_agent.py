@@ -21,12 +21,12 @@ class MappoDeviceAgent():
         self.lstm_hidden_dim = alg_params.p_hid_dims[1]
 
         #OU exploration params
-        self.use_ou_noise = alg_params.use_ou_noise
-        self.ou_theta = alg_params.ou_theta  # 越大回归越快，相关性越弱
-        self.ou_sigma = alg_params.ou_sigma   # 越大噪声越强
-        self.ou_dt    = alg_params.ou_dt
+        self.use_ou_noise = gen_params.use_ou_noise
+        self.ou_theta = gen_params.ou_theta  # 越大回归越快，相关性越弱
+        self.ou_sigma = gen_params.ou_sigma   # 越大噪声越强
+        self.ou_dt    = gen_params.ou_dt
         # 额外缩放
-        self.ou_scale = alg_params.ou_scale
+        self.ou_scale = gen_params.ou_scale
 
         # OU state: 存在 eps 空间，shape = [B, action_dim]
         self._ou_state = None
