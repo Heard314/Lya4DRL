@@ -293,9 +293,21 @@ def get_general_params():
     parser.add_argument("--edge_vir_queue_growth_rate", type = float, default = 0.1,
                         help = "the growth rate of virtual edge queue reward")
 
-    # training
-    parser.add_argument("--train_seed", type = int, default = 4399,
-                        help = "training random-seed")
+    # ou_noise settings
+    parser.add_argument("--use_ou_noise", action="store_true",
+                        help = "whether to use ou noise for action exploration")
+
+    parser.add_argument("--ou_theta", type = float, default = 0.15,
+                        help = "the theta parameter of ou noise")
+
+    parser.add_argument("--ou_sigma", type = float, default = 0.20,
+                        help = "the sigma parameter of ou noise")
+    
+    parser.add_argument("--ou_dt", type = float, default = 1.0,
+                        help = "the dt parameter of ou noise")
+
+    parser.add_argument("--ou_scale", type = float, default = 1.0,
+                        help = "the scale parameter of ou noise")
 
     params = parser.parse_args()
     
@@ -404,6 +416,7 @@ def get_mappo_params():
 
     parser.add_argument("--results_dir", type = str, default = "result/mappo/",
                         help = "the directory for saving training results")
+    
 
     params, unknown = parser.parse_known_args()
     
