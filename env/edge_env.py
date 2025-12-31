@@ -293,6 +293,7 @@ class EdgeEnv():
                     t_id
                 )
 
-        self.update_freq()
+        # 不启用服务器动态变化算法了
+        # self.update_freq()
         # for i in range(self.edge_queue_num):
         #     if(enable_print): print(f"[DEBUG] After compute, edge time_ql of device_type: {i} is {self.edge_queue_time_ql[i]}")
