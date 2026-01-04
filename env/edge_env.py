@@ -12,6 +12,9 @@ class EdgeEnv():
         # unit: Gcycles/s
         self.edge_comp_freq = general_params.edge_comp_freq
         
+        self.device_num = general_params.device_num
+        self.device_num_per_type = general_params.device_num_per_type
+
         # prev: 根据各个任务类型的计算量与到达频率分配服务器的计算频率
         # edge_freq_weights = []
         # data_size_inls = general_params.data_size_inls
@@ -30,7 +33,7 @@ class EdgeEnv():
         # total_weight = sum(edge_freq_weights)
         # self.alloc_edge_freq = [w/total_weight*self.edge_comp_freq for w in edge_freq_weights]
         # 服务器计算频率初始时，每个计算队列分配均等的计算频率
-        self.alloc_edge_freq = [self.edge_comp_freq / self.edge_queue_num for _ in range(self.edge_queue_num)]
+        self.alloc_edge_freq = [self.edge_comp_freq * self.device_num_per_type[i] / self.device_num for i in range(self.edge_queue_num)]
         # print(f"[DEBUG] alloc_edge_freq: {self.alloc_edge_freq}")
         # unit: Gcycles
         # self.edge_queue_comp_ql = [ 0 for _ in range(self.edge_queue_num)]
@@ -112,9 +115,11 @@ class EdgeEnv():
         alloc_edge_freq = self.alloc_edge_freq
         # edge_queue_comp_ql = self.edge_queue_comp_ql
         edge_queue_time_ql = self.edge_queue_time_ql
+        vir_edge_queue_time_ql = self.virtual_edge_queue_time_ql
         obs = []
         obs += alloc_edge_freq
         obs += edge_queue_time_ql
+        obs += vir_edge_queue_time_ql
         # for i in range(self.edge_queue_num):
         #     print(f"[DEBUG] The time queue length of edge {i} is {edge_queue_time_ql[i]}")
         # print(f"[DEBUG] The observation of edge is {obs}")

@@ -184,7 +184,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.4, 1.6], [0.8, 1.0], [2.0, 2.4]],
+        default=[[1.4, 1.6], [0.6, 0.8], [2.0, 2.4]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -318,8 +318,8 @@ def get_general_params():
 """
 mappo params
 """
-deivce_obs_dim = 8 # 5(one-hot) + 2 + max_task_num * 3
-edge_queue_obs_dim = 2 # alloc_freq + comp_ql_length
+deivce_obs_dim = 11 # 3(one-hot) + 5 + max_task_num * 3
+edge_queue_obs_dim = 3 # alloc_freq + comp_ql_length + vir_comp_ql_length
 def get_mappo_params():
     parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
 

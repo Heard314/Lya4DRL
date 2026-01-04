@@ -279,6 +279,9 @@ class DeviceEnv():
     def get_obs(self):
         channel_gain = self.channel_gain
         local_queue = self.time_ql
+        local_vir_queue = self.virtual_time_ql
+        edge_queue = self.edge_env.edge_queue_time_ql[self.device_type]
+        edge_vir_queue = self.edge_env.virtual_edge_queue_time_ql[self.device_type]
         # print(f"[DEBUG] The time queue length of device {self.env_id} is {self.time_ql}")
         device_type = [1 if i == self.device_type else 0 for i in range(self.device_type_num)] #onehot
         task_msgs = []
@@ -289,7 +292,7 @@ class DeviceEnv():
             task_msgs += [data_size, comp_dens, dly_cons]
         obs = []
         obs += device_type
-        obs += [channel_gain, local_queue] + task_msgs
+        obs += [channel_gain, local_queue, local_vir_queue, edge_queue, edge_vir_queue] + task_msgs
         # print(f"[DEBUG] The observation of device {self.env_id} is {obs}")
         return obs
 

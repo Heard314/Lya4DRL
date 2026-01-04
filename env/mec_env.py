@@ -16,6 +16,7 @@ class MECEnv():
         self.time_slots = time_slots
         self.device_type_num = gen_params.device_type_num
         self.device_num_per_type = gen_params.device_num_per_type
+        self.device_in_types = gen_params.device_in_types
         # edge env
         self.edge_env = EdgeEnv(gen_params, writer)
 
@@ -324,16 +325,27 @@ class MECEnv():
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])
             if visualize:
-                writer.add_scalars(
-                    f"detail/edge_reward_{i}",
-                    {f"ep_{e_id}_act": edge_queue_actual_rewards[i]},
-                    t_id
-                )
-                writer.add_scalars(
-                    f"detail/edge_reward_{i}",
-                    {f"ep_{e_id}_vir": edge_queue_virtual_rewards[i]},
-                    t_id
-                )
+                for j in self.device_in_types[i]:
+                    writer.add_scalars(
+                        f"detail/dev_reward_{j}",
+                        {f"ep_{e_id}_edge_act": edge_queue_actual_rewards[i]},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail/dev_reward_{j}",
+                        {f"ep_{e_id}_edge_vir": edge_queue_virtual_rewards[i]},
+                        t_id
+                    )
+                # writer.add_scalars(
+                #     f"detail/edge_reward_{i}",
+                #     {f"ep_{e_id}_act": edge_queue_actual_rewards[i]},
+                #     t_id
+                # )
+                # writer.add_scalars(
+                #     f"detail/edge_reward_{i}",
+                #     {f"ep_{e_id}_vir": edge_queue_virtual_rewards[i]},
+                #     t_id
+                # )
 
         for i in range(self.device_num):
             device_rewards[i] += device_queue_actual_rewards[i] + device_queue_virtual_rewards[i] + \
