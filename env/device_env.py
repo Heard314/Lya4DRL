@@ -154,6 +154,8 @@ class DeviceEnv():
         self.device_dly_adj_fac = gen_params.device_dly_adj_fac[self.device_type]
         self.device_dly_adj_val = self.device_dly_adj_fac * gen_params.comp_dly_thre[self.device_type] * self.delta
         self.avg_local_time = 0
+        self.old_comp_times = []
+        self.statSlotNum = gen_params.statSlotNum
         self.new_ql_change = 0
         self.new_vir_ql_change = 0
 
@@ -208,7 +210,7 @@ class DeviceEnv():
         # reset channel gain
         # self.channel_gain = self.path_loss * np.random.exponential(1)        
         self.channel_gain = 0.0
-
+        self.old_comp_times = []
         # reset scheduling tasks
         self.sched_tasks.clear()
 
@@ -465,7 +467,10 @@ class DeviceEnv():
                 self.act_backlog = local_comp / device_comp_freq
 
             self.avail_task_num += 1
-            self.avg_local_time = (self.avg_local_time * (self.avail_task_num - 1) + local_comp / device_comp_freq) / self.avail_task_num
+            # avg_local_time：只使用最近时隙的计算时间的平均值
+            self.old_comp_times.append(local_comp / device_comp_freq)
+            tail = self.old_comp_times[-self.statSlotNum:]
+            self.avg_local_time = sum(tail) / len(tail) if tail else 0
             if(enable_print): print(f"[DEBUG] the local comp_dly in device {self.env_id} is {task.l_comp_dly}")
             # if isPrint:
             #     print("[DEBUG] The action of ", self.env_id, " is:", act)

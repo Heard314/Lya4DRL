@@ -54,6 +54,8 @@ class EdgeEnv():
         self.edge_dly_adj_fac = general_params.edge_dly_adj_fac
         self.edge_dly_adj_val = [self.edge_dly_adj_fac[i] * general_params.comp_dly_thre[i] * self.delta for i in range(self.edge_queue_num)]
         self.avg_edge_time = [ 0 for _ in range(self.edge_queue_num)]
+        self.old_comp_times =[ [] for _ in range(self.edge_queue_num)]
+        self.statSlotNum = general_params.statSlotNum
         self.delta_num = 0 # 本回合已经度过的时隙数目
 
         # self.completed_comp = [ 0 for _ in range(self.edge_queue_num)]
@@ -103,6 +105,7 @@ class EdgeEnv():
         self.virtual_edge_queue_time_ql = [ 0 for _ in range(self.edge_queue_num)]
         self.old_virtual_edge_queue_time_ql = [ 0 for _ in range(self.edge_queue_num)]
         self.avg_edge_time = [ 0 for _ in range(self.edge_queue_num)]
+        self.old_comp_times =[ [] for _ in range(self.edge_queue_num)]
         self.new_edge_ql_change = [ 0 for _ in range(self.edge_queue_num)]
         self.new_vir_edge_ql_change = [ 0 for _ in range(self.edge_queue_num)]
         self.delta_num = 0
@@ -125,6 +128,7 @@ class EdgeEnv():
         # print(f"[DEBUG] The observation of edge is {obs}")
         return obs
     
+
     def compute(self, device_sched_tasks, e_id, t_id, visualize=False):
         writer = self.writer
         enable_print = gp.settings.enable_print
@@ -208,9 +212,13 @@ class EdgeEnv():
                     comp_dlys[device_type] = max(comp_dlys[device_type], task.trans_time) + task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
                     self.total_comp_time[device_type] += task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
                     self.total_comp_amount[device_type] += task.offl_dz * task.comp_dens
-                    
-            old_edge_queue_time_ql_ = self.avg_edge_time[device_type]
-            self.avg_edge_time[device_type] = (self.avg_edge_time[device_type] * (self.delta_num-1) + total_comp_need_time_this_epi) / self.delta_num
+            
+            # avg_edge_time：只使用最近时隙的计算时间的平均值
+            old_edge_queue_time_ql_ = self.edge_queue_time_ql[device_type]
+            self.old_comp_times[device_type].append(total_comp_need_time_this_epi)
+            tail = self.old_comp_times[device_type][-self.statSlotNum:]
+            self.avg_edge_time[device_type] = sum(tail) / len(tail) if tail else 0
+            
             edge_act_queue_growth_rate = self.edge_act_queue_growth_rate
             self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type]), 0)
             
@@ -245,7 +253,7 @@ class EdgeEnv():
             
             if visualize:
                 writer.add_scalars(
-                    f"detail/edge_avg_local_time_{device_type}",
+                    f"detail/avg_edge_time_{device_type}",
                     {f"ep_{e_id}": self.avg_edge_time[device_type]},
                     t_id
                 )

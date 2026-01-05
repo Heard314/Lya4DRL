@@ -48,7 +48,8 @@ class MappoReplayBuffer():
         self.ps[1] = (self.ps[1] + 1) % (self.train_time_slots + 1)
         
     def get_training_data(self, value_net):
-        """Build training data and compute GAE.
+        """
+        Build training data and compute GAE.
         value_net is already on some device (CPU or GPU).
         """
         # ----- 1) build value inputs on CPU -----

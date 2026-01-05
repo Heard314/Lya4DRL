@@ -207,7 +207,6 @@ class LocalComputingDeviceAgent(StaticDeviceAgent):
         
     def choose_action(self):
         act = [0 for i in range(self.max_task_num + 1)]
-        
         return act
 
 class EdgeComputingDeviceAgent(StaticDeviceAgent):

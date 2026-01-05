@@ -276,7 +276,6 @@ def get_general_params():
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     # navie reward
-
     parser.add_argument("--timeout_reward_penalty", type = float, default = -4000,
                         help = "the reward if the task is timeout")
 
@@ -289,6 +288,10 @@ def get_general_params():
 
     parser.add_argument("--device_vir_queue_growth_rate", type = float, default = 0.1, 
                     help = "the growth rate of virtual device queue reward")
+
+    # For average computation time
+    parser.add_argument("--statSlotNum", type = int, default = 100,
+                        help = "the number of slots to calculate average computation time")
 
     # edge queue growth rate
     parser.add_argument("--edge_act_queue_growth_rate", type = float, default = 1,
