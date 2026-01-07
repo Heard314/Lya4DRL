@@ -95,7 +95,6 @@ def get_general_params():
                         help = "the number of devices for each type")
 
     parser.add_argument("--device_type_num", type = int, 
-                        # default = 5,
                         default = edge_queue_num,
                         help = "the number of device types")
     
@@ -112,7 +111,7 @@ def get_general_params():
 
     # 修改为10-15Mbps
     parser.add_argument("--total_bandwidth", type = float, 
-                        default = 40 * pow(10, 6),
+                        default = 10 * pow(10, 6),
                         help = "total bandwidth (Hz)")
     
     parser.add_argument("--device_trans_powers", type = list, 
@@ -137,7 +136,7 @@ def get_general_params():
                         help = "the min speed of end device (m)")
     
     parser.add_argument("--accelerate_speed_max", type = float, 
-                    default = 2.0,
+                    default = 4.0,
                     help = "the max accelerate direction of end device (m/(s^2))")
     
     parser.add_argument("--accelerate_speed_min", type = float, 
@@ -153,11 +152,11 @@ def get_general_params():
                         help = "the min direction of end device (degree/s)")
     
     parser.add_argument("--accelerate_direction_max", type = float, 
-                    default = 30.0,
+                    default = 60.0,
                     help = "the max accelerate direction of end device (degree/(s^2))")
     
     parser.add_argument("--accelerate_direction_min", type = float, 
-                        default = -30.0,
+                        default = -60.0,
                         help = "the min accelerate direction of end device (degree/(s^2))")
     
     parser.add_argument("--max_distance_from_edge", type = float, 
@@ -184,14 +183,14 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.4, 1.6], [0.6, 0.8], [2.0, 2.4]],
+        default=[[1.4, 1.6], [0.6, 0.8], [2.5, 3.0]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
     parser.add_argument(
         "--comp_dens_inls",
         type=list,
-        default=[[0.3, 0.4], [0.6, 0.8], [0.2, 0.3]],
+        default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     # #! 数值待修改
@@ -321,19 +320,27 @@ def get_general_params():
 """
 mappo params
 """
-deivce_obs_dim = 11 # 3(one-hot) + 5 + max_task_num * 3
-edge_queue_obs_dim = 3 # alloc_freq + comp_ql_length + vir_comp_ql_length
+device_obs_dim = 6 # 3 + max_task_num * 3
+edge_queue_obs_dim = 2 # comp_ql_length + vir_comp_ql_length
+value_input_dims = [n * device_obs_dim + edge_queue_obs_dim for n in [2, 4, 4]]
+policy_input_dim = device_obs_dim + edge_queue_obs_dim
 def get_mappo_params():
     parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
 
     #! 修改后，ObsScaling类的代码也需要改
-    # networks
-    parser.add_argument("--obs_dim", type = int, default = deivce_obs_dim,
-                        help = "the dimension of agents' observations")
+    # env obs dim and networks input dim
+    parser.add_argument("--device_obs_dim", type = int, default = device_obs_dim,
+                        help = "the dimension of devices' observations")
     
-    parser.add_argument("--state_dim", type = int, default = edge_queue_obs_dim*edge_queue_num + deivce_obs_dim*device_num,
-                        help = "the dimension of global states")
+    parser.add_argument("--edge_queue_obs_dim", type = int, default = edge_queue_obs_dim,
+                        help = "the dimension of edge queues' observations")
+
+    parser.add_argument("--value_input_dims", type = list, default = value_input_dims,
+                        help = "the dimension of value network input")
     
+    parser.add_argument("--policy_input_dim", type = int, default = policy_input_dim,
+                        help = "the dimension of policy network input")
+
     # 包含：任务远程卸载率、传输能耗利用率、本地计算频率利用率
     parser.add_argument("--action_dim", type = int, default = 3,
                         help = "the dimension of agents' actions")

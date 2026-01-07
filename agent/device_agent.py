@@ -140,27 +140,6 @@ class MappoDeviceAgent():
     def load_net(self, path):
         self.update_net(torch.load(path))
 
-    # without LSTM
-    # def choose_action(self, obs, active: bool = True):
-    #     if not active:
-    #         return [0.0] * self.action_dim, 0.0
-
-    #     p_inputs = GetPolicyInputs(obs)
-    #     with torch.no_grad():
-    #         mean, std = self.p_net(p_inputs)
-    #     if self.evaluate:
-    #         act = mean.squeeze(dim = 0).tolist()
-    #         act_logprob = None
-    #     else:
-    #         dist = Normal(mean, std)
-    #         act = dist.sample()
-    #         act = torch.clamp(act, 0, 10)
-    #         act_logprob = dist.log_prob(act).sum(-1)
-    #         act = act.squeeze(dim = 0).tolist()
-    #         act_logprob = float(act_logprob)
-            
-    #     return act, act_logprob
-
 class MaddpgDeviceAgent():
     def __init__(self, agent_id, gen_params, alg_params):
         # agent id

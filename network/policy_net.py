@@ -4,26 +4,10 @@ import torch.nn.functional as F
 from util.utils import OrthogonalInit
 import math
 class MappoPolicyNet(nn.Module):
-    # def __init__(self, alg_params):
-    #     super(MappoPolicyNet, self).__init__()
-        
-    #     self.fc1 = nn.Linear(alg_params.obs_dim, alg_params.p_hid_dims[0])
-    #     self.fc2 = nn.Linear(alg_params.p_hid_dims[0], alg_params.p_hid_dims[1])
-    #     self.fc3 = nn.Linear(alg_params.p_hid_dims[1], alg_params.action_dim)
-    #     self.tanh = nn.Tanh()
-            
-    #     self.log_std = nn.Parameter(torch.tensor([0] * alg_params.action_dim,
-    #                                 dtype = torch.float))
-        
-    #     # orthogonal initialization
-    #     if alg_params.use_orthogonal_init:
-    #         OrthogonalInit(self.fc1)
-    #         OrthogonalInit(self.fc2)
-    #         OrthogonalInit(self.fc3, gain = 0.01)
     def __init__(self, alg_params):
         super(MappoPolicyNet, self).__init__()
         
-        self.fc1 = nn.Linear(alg_params.obs_dim, alg_params.p_hid_dims[0])
+        self.fc1 = nn.Linear(alg_params.policy_input_dim, alg_params.p_hid_dims[0])
         self.fc2 = nn.Linear(alg_params.p_hid_dims[0], alg_params.p_hid_dims[1])
         self.mu_head = nn.Linear(alg_params.p_hid_dims[1], alg_params.action_dim)
         self.log_std = nn.Parameter(torch.tensor([0] * alg_params.action_dim,
@@ -81,7 +65,7 @@ class MappoPolicyNetLSTM(nn.Module):
     def __init__(self, alg_params):
         super(MappoPolicyNetLSTM, self).__init__()
 
-        obs_dim = alg_params.obs_dim
+        obs_dim = alg_params.policy_input_dim
         hid1, hid2 = alg_params.p_hid_dims
         act_dim = alg_params.action_dim
         # ---------- feature extraction ----------
@@ -167,7 +151,6 @@ class MappoPolicyNetLSTM(nn.Module):
 
         if self.debug_nan:
             self._check_tensor("x(after fc1+tanh)", x)
-
         out, (h_n, c_n) = self.lstm(x, h_in)   # [B,T,hid2], ([1,B,hid2],[1,B,hid2])
 
         if self.debug_nan:

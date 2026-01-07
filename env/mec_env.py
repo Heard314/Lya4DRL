@@ -33,9 +33,6 @@ class MECEnv():
         print(f"[DEBUG] device_queue_reward_weight: {self.device_queue_reward_weight}")
         print(f"[DEBUG] edge_queue_reward_weight: {self.edge_queue_reward_weight}")
 
-        # self.device_local_reward_bound = gen_params.local_reward_bound
-        # self.edge_reward_bound = gen_params.edge_reward_bound
-
         self.enable_actual_queue_reward = gen_params.enable_actual_queue_reward
         self.enable_virtual_queue_reward = gen_params.enable_virtual_queue_reward
 
@@ -68,14 +65,11 @@ class MECEnv():
         self._device_executor = ThreadPoolExecutor(max_workers=self.device_num)
 
     def reset(self):
-        edge_obs = self.edge_env.reset()
+        self.edge_env.reset()
         
-        device_obss = [None for i in range(self.device_num)]
         for i in range(self.device_num):
-            device_obss[i] = self.device_envs[i].reset()
-        
-        return edge_obs, device_obss
-    
+            self.device_envs[i].reset()
+
     def step(self, device_acts, e_id, t_id, visualize=False):
         writer = self.writer
         if e_id % 50 == 1:
@@ -92,36 +86,21 @@ class MECEnv():
             sched_tasks = self.device_envs[i].compute(device_acts[i], e_id = e_id, t_id = t_id, visualize = visualize)
             device_sched_tasks[i] = sched_tasks
 
-        # Parallel execution of device computations
-        # submit compute tasks to thread pool
-        # futures = []
-        # for i in range(self.device_num):
-        #     env = self.device_envs[i]
-        #     act = device_acts[i]
-        #     future = self._device_executor.submit(
-        #         env.compute, act, e_id, t_id, visualize
-        #     )
-        #     futures.append((i, future))
-
-        # # collect results
-        # for i, future in futures:
-        #     device_sched_tasks[i] = future.result()
-
         # 边缘服务器执行任务的远程卸载部分
         self.edge_env.compute(device_sched_tasks, e_id = e_id, t_id = t_id, visualize = visualize)
         
         # reward
         device_rewards = [0 for i in range(self.device_num)]
-        edge_queue_num = self.device_type_num
         device_queue_actual_rewards = [0 for i in range(self.device_num)]
         device_queue_virtual_rewards = [0 for i in range(self.device_num)]
+        edge_queue_num = self.device_type_num
+        edge_queue_rewards = [0 for i in range(edge_queue_num)]
         edge_queue_actual_rewards = [0 for i in range(edge_queue_num)]
         edge_queue_virtual_rewards = [0 for i in range(edge_queue_num)]
+        joint_rewards = [0 for i in range(edge_queue_num)]
+
         device_costs = [0 for i in range(self.device_num)]
-
-
         device_comp_dlys = [0 for i in range(self.device_num)]
-
         device_csum_engys = [0 for i in range(self.device_num)]
         device_esum_engys = [0 for i in range(self.device_num)]
         device_overtime_nums = [0 for i in range(self.device_num)]
@@ -181,9 +160,6 @@ class MECEnv():
 
                 if(enable_print): print(f"[DEBUG] the comp_dly in device {i} is {comp_dly}")
                 device_comp_dlys[i] += 1 / (j + 1) * (comp_dly - device_comp_dlys[i])
-                # print(f"[GDEBUG] the comp_dly in device {i} is {comp_dly}")
-                # print(f"[GDEBUG] the local comp_dly in device {i} is {task.l_comp_dly}")
-                # print(f"[GDEBUG] the edge comp_dly in device {i} is {task.e_comp_dly}")
                 local_engy = task.local_comp_engy + task.tran_engy
                 if(enable_print): print(f"[DEBUG] the local local_engy in device {i} is {task.local_comp_engy}")
                 if(enable_print): print(f"[DEBUG] the tran local_engy in device {i} is {task.tran_engy}")
@@ -193,43 +169,20 @@ class MECEnv():
                         {f"ep_{e_id}_local": task.local_comp_engy + task.tran_engy},
                         t_id
                     )
-                    # writer.add_scalars(
-                    #     f"detail/engy_{i}",
-                    #     {f"ep_{e_id}_edge": task.edge_comp_engy},
-                    #     t_id
-                    # )
-
 
                 device_csum_engys[i] += 1 / (j + 1) * (local_engy - device_csum_engys[i])
                 edge_comp_engy = task.edge_comp_engy
-                # device_esum_engys[i] += 1 / (j + 1) * (edge_comp_engy - device_esum_engys[i])
                 
                 device_costs[i] += self.device_energy_weights[device_type] * local_engy 
                                 #    + self.edge_energy_weights[device_type] * edge_comp_engy
                 
-                # if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
-                #     print("[DEBUG] The device index is: ", i)
-                    # print("[DEBUG] The task", j ,"'s dly_cons is: ", task.dly_cons, " The comp_dly is: ", comp_dly)
-                    # print("[DEBUG] The task", j ,"'s norm_csum_engy is: ", task.norm_csum_engy, " The local_engy is: ", local_engy)
-                    # print("[DEBUG] The task", j ,"'s norm_esum_engy is: ", task.norm_esum_engy, " The edge_comp_engy is: ", edge_comp_engy)
-                    # print("[DEBUG] The device", i, "'s virtual comp ql is: ", self.device_envs[i].virtual_comp_ql)
-                    # print("[DEBUG] The device", i, "'s completed comp is: ", self.device_envs[i].completed_comp)
                 # 计算超时惩罚，其中task.dly_cons是按照设备计算能力为2Gcycles/s计算的，实际的设备计算能力在2.1~2.4Gcycles/s之间
                 if comp_dly > task.dly_cons:
                     device_overtime_nums[i] += 1
 
                 if comp_dly > task.dly_cons and not (self.enable_virtual_queue_reward or self.enable_actual_queue_reward):
-                    #! 考虑到每个任务的超时程度会影响到任务的执行效果，在原有惩罚的基础上多乘一个log函数（表示超时程度）
-                    # device_rewards[i] += -5000 * torch.log(torch.exp(torch.tensor(1.0)) -1.0 + comp_dly / task.dly_cons)
                     device_rewards[i] += self.timeout_reward_penalty
                     #! 当设备i超时严重时，其他设备的动态时间阈值调整系数应适当增大
-                    # if t_id % 20 == 0 and e_id % 20 == 0 and j == 0:
-                    #     print("[DEBUG] The ratio of comp_dly to task.dly_cons in device", i, "is: ", comp_dly / task.dly_cons)
-                    # if comp_dly > 1.5 * task.dly_cons:
-                    #     for k in range(self.device_num):
-                    #         if k == i:
-                    #             continue
-                    #         device_delay_adjust_coefs[k] = max(device_delay_adjust_coefs[k], comp_dly / task.dly_cons)
                 else:
                     norm_csum_engy = task.norm_csum_engy
                     norm_esum_engy = task.norm_esum_engy
@@ -266,9 +219,6 @@ class MECEnv():
                             self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
                     device_queue_actual_rewards[i] = min(max(device_act_queue_reward_min_bound + device_vir_queue_reward_min_bound, device_queue_actual_rewards[i]), device_act_queue_reward_max_bound + device_vir_queue_reward_max_bound)
 
-                # print(f"[DEBUG] The device", i, "'s device_queue_actual_rewards is: ", device_queue_actual_rewards[i])
-                # print(f"[DEBUG] The device", i, "'s device_queue_virtual_rewards is: ", device_queue_virtual_rewards[i])
-
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_actual_rewards is: ", device_queue_actual_rewards[i])
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_virtual_rewards is: ", device_queue_virtual_rewards[i])
                 if visualize:
@@ -287,14 +237,23 @@ class MECEnv():
                         {f"ep_{e_id}_navie": device_rewards[i]},
                         t_id
                     )
+                device_rewards[i] += device_queue_actual_rewards[i] + device_queue_virtual_rewards[i] 
+                if(enable_print): print(f"[DEBUG] The device", i, "'s final reward is: ", device_rewards[i])
+                if visualize:
+                    writer.add_scalars(
+                        f"detail/dev_reward_{i}",
+                        {f"ep_{e_id}_final": device_rewards[i]},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail/dev_timeout_num_{i}",
+                        {f"ep_{e_id}": device_overtime_nums[i]},
+                        t_id
+                    )
 
         for i in range(edge_queue_num):
             edge_queue_actual_rewards[i] = 0.0
             edge_queue_virtual_rewards[i] = 0.0
-            # actual_queue_type_scale_posfac = self.device_num_per_type[i] * device_act_queue_reward_max_bound
-            # virtual_queue_type_scale_posfac = self.device_num_per_type[i] * device_vir_queue_reward_max_bound
-            # actual_queue_type_scale_negfac = self.device_num_per_type[i] * device_act_queue_reward_min_bound
-            # virtual_queue_type_scale_negfac = self.device_num_per_type[i] * device_vir_queue_reward_min_bound
             actual_queue_type_scale_posfac = device_act_queue_reward_max_bound
             virtual_queue_type_scale_posfac = device_vir_queue_reward_max_bound
             actual_queue_type_scale_negfac = device_act_queue_reward_min_bound
@@ -319,9 +278,6 @@ class MECEnv():
                     self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
                 edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)
 
-            # print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
-            # print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])
-
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
             if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])
             if visualize:
@@ -336,56 +292,19 @@ class MECEnv():
                         {f"ep_{e_id}_edge_vir": edge_queue_virtual_rewards[i]},
                         t_id
                     )
-                # writer.add_scalars(
-                #     f"detail/edge_reward_{i}",
-                #     {f"ep_{e_id}_act": edge_queue_actual_rewards[i]},
-                #     t_id
-                # )
-                # writer.add_scalars(
-                #     f"detail/edge_reward_{i}",
-                #     {f"ep_{e_id}_vir": edge_queue_virtual_rewards[i]},
-                #     t_id
-                # )
-
-        for i in range(self.device_num):
-            device_rewards[i] += device_queue_actual_rewards[i] + device_queue_virtual_rewards[i] + \
-                edge_queue_actual_rewards[self.device_envs[i].device_type] + \
-                edge_queue_virtual_rewards[self.device_envs[i].device_type]
-                # edge_queue_actual_rewards[self.device_envs[i].device_type] / self.device_num_per_type[self.device_envs[i].device_type] + \
-                # edge_queue_virtual_rewards[self.device_envs[i].device_type] / self.device_num_per_type[self.device_envs[i].device_type]
-
-            if(enable_print): print(f"[DEBUG] The device", i, "'s final reward is: ", device_rewards[i])
+            edge_queue_rewards[i] = edge_queue_actual_rewards[i] + edge_queue_virtual_rewards[i]
+            joint_rewards[i] = edge_queue_rewards[i]
+            for j in self.device_in_types[i]:
+                joint_rewards[i] += device_rewards[j]
             if visualize:
                 writer.add_scalars(
-                    f"detail/dev_reward_{i}",
-                    {f"ep_{e_id}_final": device_rewards[i]},
+                    f"detail/joint_reward_{i}",
+                    {f"ep_{e_id}": joint_rewards[i]},
                     t_id
                 )
-                writer.add_scalars(
-                    f"detail/dev_timeout_num_{i}",
-                    {f"ep_{e_id}": device_overtime_nums[i]},
-                    t_id
-                )
-                # writer.add_scalars(
-                #     f"overall/timeout_alldev_ep_{e_id}",
-                #     {"device": device_overtime_nums[i]},
-                #     i
-                # )
-                # writer.add_scalars(
-                #     f"overall/comp_dly_alldev_ep_{e_id}",
-                #     {"device": device_comp_dlys[i]},
-                #     i
-                # )
-
-        joint_reward = sum(device_rewards)
         joint_cost = sum(device_costs)
         
         if visualize:
-            writer.add_scalars(
-                f"detail/joint_reward",
-                {f"ep_{e_id}": joint_reward},
-                t_id
-            )
             writer.add_scalars(
                 f"detail/joint_cost",
                 {f"ep_{e_id}": joint_cost},
@@ -397,12 +316,8 @@ class MECEnv():
         next_device_obss = [None for i in range(self.device_num)]
         for i in range(self.device_num):
             next_device_obss[i] = self.device_envs[i].get_obs()
-        
-        # #! 更新其他设备的动态时间阈值调整系数
-        # for i in range(self.device_num):
-        #     self.device_envs[i].adjust_delay_threshold_coef(device_delay_adjust_coefs[i])
 
-        return joint_reward, device_rewards, \
+        return joint_rewards, device_rewards, \
                joint_cost, device_costs, \
                device_comp_dlys, device_csum_engys, \
                device_esum_engys, device_overtime_nums, \

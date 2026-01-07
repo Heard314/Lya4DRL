@@ -24,34 +24,58 @@ class RunningMeanStd():
             self.std = np.sqrt(self.S / self.n)
             
 class ObsScaling():
-    def __init__(self, gen_params, alg_params, max_task_num, max_data_size, max_comp_dens, std_comp_freq):
-        self.max_task_num = max_task_num
-        # unit: Mb
-        self.max_data_size = max_data_size
-        # unit: Gcycles/Mb
-        self.max_comp_dens = max_comp_dens
-        # unit: Gcycles/s 
-        self.std_comp_freq = std_comp_freq
+    def __init__(self, gen_params, alg_params, clip_obs=5.0, eps=1e-8, vq_clip=1e6):
         self.gen_params = gen_params
         self.alg_params = alg_params
-        # unit: s
-        # self.max_dly_cons = self.max_data_size * self.max_comp_dens \
-        #                     / self.std_comp_freq
-        #! 最大延时设置为1s
-        self.max_dly_cons = 1
-        self.device_type_num = gen_params.device_type_num
         self.device_num = gen_params.device_num
-        
+        self.device_obs_dim = alg_params.device_obs_dim
+        self.device_type_num = gen_params.device_type_num
+        self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
+        self.device_rmss = []
+        for i in range(self.device_num):
+            device_rms = RunningMeanStd(self.device_obs_dim)
+            self.device_rmss.append(device_rms)
+        self.edge_rms = RunningMeanStd(self.edge_queue_obs_dim * self.device_type_num)
+
+        self.clip_obs = clip_obs
+        self.eps = eps
+        self.vq_clip = vq_clip
+
+    # device_obss: max_trans_rate, local_queue, local_vir_queue, task_data_size, task_comp_dens, task_dly_cons
+    # edge_obs: edge_queue, vir_edge_queue for all queues
     def __call__(self, edge_obs, device_obss):
-        for i in range(len(edge_obs)):
-            edge_obs[i] = np.clip(edge_obs[i], 0, 20) / 10
-        for i in range(len(device_obss)):
-            device_obss[i][self.device_type_num] = np.clip(device_obss[i][0], 0, 20) / 10
-            device_obss[i][self.device_type_num+1] = np.clip(device_obss[i][1], 0, 20) / 10
-            for j in range(self.max_task_num):
-                device_obss[i][self.device_type_num+2 + j * 3] /= self.max_data_size
-                device_obss[i][self.device_type_num+2 + j * 3 + 1] /= self.max_comp_dens
-                device_obss[i][self.device_type_num+2 + j * 3 + 2] /= self.max_dly_cons
+
+        # print("[DEBUG] Before Scaling")
+        # for i in range(self.device_num):
+        #     print(f"[DEBUG] the device obs of device_{i} is {device_obss[i]}")
+        # for i in range(self.device_type_num):
+        #     print(f"[DEBUG] the edge obs of queue_{i} is {edge_obs[i*self.edge_queue_obs_dim:(i+1)*self.edge_queue_obs_dim]}")
+        
+        for i in range(self.device_num):
+            device_obss[i][0] /= 10
+            device_obss[i][1] = np.log1p(np.clip(device_obss[i][1],  0.0, self.vq_clip))
+            device_obss[i][2] = np.log1p(np.clip(device_obss[i][2], 0.0, self.vq_clip))
+        
+        # RMS
+        # for i in range(self.device_num):
+        #     self.device_rmss[i].update(device_obss[i])
+        #     device_obss[i] = (device_obss[i] - self.device_rmss[i].mean) / (self.device_rmss[i].std + self.eps)
+        # self.edge_rms.update(edge_obs)
+        # edge_obs = (edge_obs - self.edge_rms.mean) / (self.edge_rms.std + self.eps)
+        
+        # device_obss_ = []
+        # for i in range(self.device_num):
+        #     device_obss_.append(device_obss[i].tolist())
+        edge_obs_ = edge_obs
+        device_obss_ = device_obss
+        # print("[DEBUG] After Scaling")
+        # for i in range(self.device_num):
+        #     print(f"[DEBUG] the device obs of device_{i} is {device_obss_[i]}")
+        # for i in range(self.device_type_num):
+        #     print(f"[DEBUG] the edge obs of queue_{i} is {edge_obs_[i*self.edge_queue_obs_dim:(i+1)*self.edge_queue_obs_dim]}")
+        
+        return device_obss_, edge_obs_
+
                 
 class RewardScaling():
     def __init__(self, gamma):
@@ -94,15 +118,30 @@ def GetPolicyInputs(obs):
     
     return inputs
 
-def GetValueInputs(edge_obs, device_obss):
-    inputs = []
+# concatenate 1D array for 'numpy array' or 'list'
+def concatenate(a, b, dtype=np.float32):
+    """
+    Concatenate two 1D arrays/lists into one 1D numpy array.
+
+    Supports:
+      - Python list/tuple
+      - numpy.ndarray
+    Returns:
+      - Python list (1D)
+    """
+    a = np.asarray(a, dtype=dtype).reshape(-1)
+    b = np.asarray(b, dtype=dtype).reshape(-1)
+    return np.concatenate([a, b], axis=0).tolist()
+
+# def GetValueInputs(edge_obs, device_obss):
+#     inputs = []
     
-    inputs += edge_obs
-    for i in range(len(device_obss)):
-        inputs += device_obss[i]
-    inputs = torch.tensor(inputs, dtype = torch.float).reshape([1, -1])
+#     inputs += edge_obs
+#     for i in range(len(device_obss)):
+#         inputs += device_obss[i]
+#     inputs = torch.tensor(inputs, dtype = torch.float).reshape([1, -1])
     
-    return inputs
+#     return inputs
 
 import matplotlib
 matplotlib.use("Agg")  # use non-GUI backend
