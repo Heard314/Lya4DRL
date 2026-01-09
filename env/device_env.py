@@ -162,6 +162,11 @@ class DeviceEnv():
         self.total_comp_time = 0.0
         self.total_tran_time = 0.0
 
+        # 为了平衡reward_act与reward_vir之间的比例，为增长率添加一个系数（与任务计算时间成反比）
+        self.device_act_reward_fac = 1.0
+        self.device_act_reward_fac /= 0.8 * (data_size_mean * comp_dens_mean) / self.device_comp_freq
+        self.device_act_reward_fac *= self.device_act_reward_fac
+        print(f"[DEBUG] The device {self.env_id} 's device_act_reward_fac is {self.device_act_reward_fac}")
         self.device_act_queue_growth_rate = gen_params.device_act_queue_growth_rate
         self.device_vir_queue_growth_rate = gen_params.device_vir_queue_growth_rate
     
@@ -351,6 +356,12 @@ class DeviceEnv():
                 task.edge_comp_engy = 0
             else:
                 task.trans_time = tran_queue_delay + task.offl_dz / trans_rate
+                # print(f"[DEBUG] The device {self.env_id} 's offl_dz is {task.offl_dz}")
+                # print(f"[DEBUG] The device {self.env_id} 's trans_rate is {trans_rate}")
+                # print(f"[DEBUG] The device {self.env_id} 's total_tran_time before is {self.total_tran_time}")
+                # print(f"[DEBUG] The device {self.env_id} 's tran_queue_delay is {tran_queue_delay}")
+                # print(f"[DEBUG] The device {self.env_id} 's trans_time is {task.trans_time}")
+
                 self.total_tran_time += task.offl_dz / trans_rate
                 task.tran_engy = trans_power * pow(10, -3) * \
                                    task.offl_dz / trans_rate
@@ -389,7 +400,14 @@ class DeviceEnv():
                 self.time_ql = max(0, old_time_ql_ + device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta))
                 self.new_ql_change = self.time_ql - old_time_ql_
                 self.act_backlog = local_comp / device_comp_freq
-
+                # print(f"[DEBUG] The device", self.env_id, "'s time_ql is: ", self.time_ql)
+                # print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)
+                # print(f"[DEBUG] The device", self.env_id, "'s new_ql_change is: ", self.new_ql_change)
+                # print(f"[DEBUG] The device", self.env_id, "'s local_comp is: ", local_comp)
+                # print(f"[DEBUG] The device", self.env_id, "'s device_comp_freq is: ", device_comp_freq)
+                # print(f"[DEBUG] The device", self.env_id, "'s delta is: ", self.delta)
+                # print(f"[DEBUG] The device", self.env_id, "'s fine_ql_change is: ", device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta))
+                        
             self.avail_task_num += 1
             # avg_local_time：只使用最近时隙的计算时间的平均值
             self.old_comp_times.append(local_comp / device_comp_freq)
@@ -403,9 +421,19 @@ class DeviceEnv():
 
         if self.avg_local_time > EPS:
             old_vir_time_ql_ = self.virtual_time_ql
-            self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time - self.device_dly_adj_val))
+            self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta - self.device_dly_adj_val))
             self.new_vir_ql_change = self.virtual_time_ql - old_vir_time_ql_
-            self.vir_backlog = self.time_ql/self.avg_local_time
+            self.vir_backlog = self.time_ql / self.avg_local_time * self.delta
+
+    
+        # print(f"[DEBUG] The device", self.env_id, "'s avg_local_time is: ", self.avg_local_time)
+        # print(f"[DEBUG] The device", self.env_id, "'s device_dly_adj_val is: ", self.device_dly_adj_val)
+
+        # print(f"[DEBUG] The device", self.env_id, "'s virtual_time_ql is: ", self.virtual_time_ql)
+        # print(f"[DEBUG] The device", self.env_id, "'s old_virtual_time_ql is: ", self.old_virtual_time_ql)
+        # print(f"[DEBUG] The device", self.env_id, "'s new_vir_ql_change is: ", self.new_vir_ql_change)
+        # print(f"[DEBUG] The device", self.env_id, "'s fine_vir_ql_change is: ", device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time - self.device_dly_adj_val))
+        
 
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s avg_local_time is: ", self.avg_local_time)
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)

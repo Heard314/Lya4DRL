@@ -38,6 +38,16 @@ class EdgeEnv():
         self.total_comp_time = [0 for _ in range(self.edge_queue_num)]
         self.total_comp_amount = [0 for _ in range(self.edge_queue_num)]
 
+    
+        
+        self.edge_act_reward_fac = [1.0 for _ in range(self.edge_queue_num)]
+        self.avg_data_sizes = [(general_params.data_size_inls[i][0]+general_params.data_size_inls[i][1])/2 for i in range(self.edge_queue_num)]
+        self.avg_comp_denss = [(general_params.comp_dens_inls[i][0]+general_params.comp_dens_inls[i][1])/2 for i in range(self.edge_queue_num)]
+        # 为了平衡reward_act与reward_vir之间的比例，为增长率添加一个系数（与任务计算时间成反比）
+        self.edge_act_reward_fac = [self.edge_act_reward_fac[i] / (0.8 * self.device_num_per_type[i] * self.avg_data_sizes[i] * self.avg_comp_denss[i] / self.alloc_edge_freq[i]) for i in range(self.edge_queue_num)]
+        self.edge_act_reward_fac = [self.edge_act_reward_fac[i] * self.edge_act_reward_fac[i] for i in range(self.edge_queue_num)]
+        print(f"[DEBUG] The edge's edge_act_reward_fac are {self.edge_act_reward_fac}")
+        
         self.edge_act_queue_growth_rate = general_params.edge_act_queue_growth_rate
         self.edge_vir_queue_growth_rate = general_params.edge_vir_queue_growth_rate
 
@@ -81,7 +91,6 @@ class EdgeEnv():
             sorted(sub_list, key=lambda x: x.trans_time)
             for sub_list in device_type_sched_tasks
         ]
-
 
         for i in range(self.edge_queue_num):
             self.old_edge_queue_time_ql[i] = self.edge_queue_time_ql[i]
@@ -131,12 +140,12 @@ class EdgeEnv():
             self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type]), 0)
             
             self.new_edge_ql_change[device_type] = self.edge_queue_time_ql[device_type] - old_edge_queue_time_ql_
-            self.act_backlog = self.edge_queue_time_ql[device_type] - old_edge_queue_time_ql_
+            self.act_backlog = total_comp_need_time_this_epi
             self.old_virtual_edge_queue_time_ql[device_type] = self.virtual_edge_queue_time_ql[device_type]
             
             edge_vir_queue_growth_rate = self.edge_vir_queue_growth_rate
             old_virtual_edge_queue_time_ql_ = self.virtual_edge_queue_time_ql[device_type]
-            self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type] - self.edge_dly_adj_val[device_type]), 0)
+            self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta - self.edge_dly_adj_val[device_type]), 0)
             self.new_vir_edge_ql_change[device_type] = self.virtual_edge_queue_time_ql[device_type] - old_virtual_edge_queue_time_ql_
             self.vir_backlog = self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]
 

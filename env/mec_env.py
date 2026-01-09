@@ -201,8 +201,10 @@ class MECEnv():
                 device_vir_queue_reward_max_bound = self.device_vir_queue_reward_max_bound #800
                 device_vir_queue_reward_min_bound = self.device_vir_queue_reward_min_bound #-1200
 
+                device_act_reward_fac = self.device_envs[i].device_act_reward_fac
+
                 if(self.enable_actual_queue_reward and self.enable_virtual_queue_reward):
-                    device_queue_actual_rewards[i] = self.device_queue_reward_weight * \
+                    device_queue_actual_rewards[i] = device_act_reward_fac * self.device_queue_reward_weight * \
                             self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
                     device_queue_actual_rewards[i] = min(max(device_act_queue_reward_min_bound, device_queue_actual_rewards[i]), device_act_queue_reward_max_bound)
                     device_queue_virtual_rewards[i] = self.device_queue_reward_weight * \
@@ -215,7 +217,7 @@ class MECEnv():
                     device_queue_virtual_rewards[i] = min(max(device_act_queue_reward_min_bound + device_vir_queue_reward_min_bound, device_queue_virtual_rewards[i]), device_act_queue_reward_max_bound + device_vir_queue_reward_max_bound)
                 
                 elif(self.enable_actual_queue_reward):
-                    device_queue_actual_rewards[i] = self.device_queue_reward_weight * \
+                    device_queue_actual_rewards[i] = device_act_reward_fac * self.device_queue_reward_weight * \
                             self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
                     device_queue_actual_rewards[i] = min(max(device_act_queue_reward_min_bound + device_vir_queue_reward_min_bound, device_queue_actual_rewards[i]), device_act_queue_reward_max_bound + device_vir_queue_reward_max_bound)
 
@@ -254,12 +256,13 @@ class MECEnv():
         for i in range(edge_queue_num):
             edge_queue_actual_rewards[i] = 0.0
             edge_queue_virtual_rewards[i] = 0.0
-            actual_queue_type_scale_posfac = device_act_queue_reward_max_bound
-            virtual_queue_type_scale_posfac = device_vir_queue_reward_max_bound
-            actual_queue_type_scale_negfac = device_act_queue_reward_min_bound
-            virtual_queue_type_scale_negfac = device_vir_queue_reward_min_bound
+            actual_queue_type_scale_posfac = self.device_num_per_type[i]*device_act_queue_reward_max_bound
+            virtual_queue_type_scale_posfac = self.device_num_per_type[i]*device_vir_queue_reward_max_bound
+            actual_queue_type_scale_negfac = self.device_num_per_type[i]*device_act_queue_reward_min_bound
+            virtual_queue_type_scale_negfac = self.device_num_per_type[i]*device_vir_queue_reward_min_bound
+            edge_act_reward_fac = self.edge_env.edge_act_reward_fac[i]
             if(self.enable_actual_queue_reward and self.enable_virtual_queue_reward):
-                edge_queue_actual_rewards[i] = self.edge_queue_reward_weight * \
+                edge_queue_actual_rewards[i] = edge_act_reward_fac * self.edge_queue_reward_weight * \
                     max(1.0, math.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
                     self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
                 edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
@@ -273,7 +276,7 @@ class MECEnv():
                 edge_queue_virtual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)
             
             elif(self.enable_actual_queue_reward):
-                edge_queue_actual_rewards[i] = self.edge_queue_reward_weight * \
+                edge_queue_actual_rewards[i] = edge_act_reward_fac * self.edge_queue_reward_weight * \
                     max(1.0, math.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
                     self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
                 edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)

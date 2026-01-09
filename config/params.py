@@ -111,7 +111,7 @@ def get_general_params():
 
     # 修改为10-15Mbps
     parser.add_argument("--total_bandwidth", type = float, 
-                        default = 10 * pow(10, 6),
+                        default = 30 * pow(10, 6),
                         help = "total bandwidth (Hz)")
     
     parser.add_argument("--device_trans_powers", type = list, 
@@ -358,16 +358,16 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 10000,
+    parser.add_argument("--train_episodes", type = int, default = 20000,
                         help = "the number of training episodes")
 
-    parser.add_argument("--train_time_slots", type = int, default = 450,
+    parser.add_argument("--train_time_slots", type = int, default = 600,
                         help = "the number of training time-slots")
     
     parser.add_argument("--train_freq", type = int, default = 4,
                         help = "training frequency")
     
-    parser.add_argument("--train_batch_size", type = int, default = 1800,
+    parser.add_argument("--train_batch_size", type = int, default = 2400,
                         help = "training batch-size")
     
     parser.add_argument("--v_epochs", type = int, default = 4,

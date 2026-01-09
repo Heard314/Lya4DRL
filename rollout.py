@@ -20,7 +20,7 @@ class Rollout:
         self.eval_mode = gen_params.eval_mode
         self.resume_episode = 1 # the episode number to be held
         self.device_type_num = gen_params.device_type_num
-        #resume
+        # resume
         self.load_weights = gen_params.load_weights
         # project storage path
         root_path = gp.settings.exp_result_dir
@@ -30,8 +30,7 @@ class Rollout:
         if not self.evaluate and self.train_mode == "mappo":
             print("The training mode is in rollout: mappo")
             self.edge_agent = MappoEdgeAgent(gen_params, alg_params)
-            for i in range(self.device_type_num):
-                self.replay_buffer = MappoReplayBuffer(gen_params, alg_params)
+            self.replay_buffer = MappoReplayBuffer(gen_params, alg_params)
         if not self.evaluate and self.train_mode == "maddpg":
             print("The training mode is in rollout: maddpg")
             self.edge_agent = MaddpgEdgeAgent(gen_params, alg_params)
