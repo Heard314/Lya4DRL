@@ -251,24 +251,31 @@ class MaddpgEdgeAgent():
         self.decay_intl = alg_params.decay_intl
         self.decay_fac = alg_params.decay_fac
         
-        # value network
-        self.v_net = MaddpgValueNet(alg_params)
-        # target value network 
-        self.target_v_net = MaddpgValueNet(alg_params) 
-        self.target_v_net.load_state_dict(self.v_net.state_dict())
-        # optimizer
-        self.v_optimizer = torch.optim.Adam(self.v_net.parameters(),
+        self.v_nets = []
+        self.target_v_nets = []
+        self.v_optimizers = []
+        for i in range(self.device_type_num):
+            # value network
+            v_net = MaddpgValueNet(alg_params, i).to(self.device)
+            self.v_nets.append(v_net)
+            # target value network
+            target_v_net = MaddpgValueNet(alg_params, i).to(self.device)
+            target_v_net.load_state_dict(v_net.state_dict())
+            self.target_v_nets.append(target_v_net)
+            # optimizer
+            v_optimizer = torch.optim.Adam(v_net.parameters(),
                                             lr = self.v_lr)
-        
+            self.v_optimizers.append(v_optimizer)
+
         self.p_nets = []
         self.target_p_nets = []
         self.p_optimizers = []
         for i in range(self.device_num):
             # policy network
-            p_net = MaddpgPolicyNet(alg_params)
+            p_net = MaddpgPolicyNetLSTM(alg_params)
             self.p_nets.append(p_net)
             # target policy network
-            target_p_net = MaddpgPolicyNet(alg_params)
+            target_p_net = MaddpgPolicyNetLSTM(alg_params)
             target_p_net.load_state_dict(p_net.state_dict())
             self.target_p_nets.append(target_p_net)
             # optimizer
@@ -278,15 +285,16 @@ class MaddpgEdgeAgent():
             
         # load networks' weights
         if gen_params.load_weights:
-            v_path = self.weights_dir + "v_net_params.pkl"
-            self.v_net.load_state_dict(torch.load(v_path))
-            target_v_path = self.weights_dir + "target_v_net_params.pkl"
-            self.target_v_net.load_state_dict(torch.load(target_v_path))
-            
+            for i in range(self.device_type_num):
+                v_path = self.weights_dir + "v_net_params_" + str(i) + f"{gen_params.resume_episode}.pkl"
+                self.v_nets[i].load_state_dict(torch.load(v_path, map_location=self.device))
+                target_v_path = self.weights_dir + "target_v_net_params_" + str(i) + f"{gen_params.resume_episode}.pkl"
+                self.target_v_nets[i].load_state_dict(torch.load(target_v_path, map_location=self.device))
+        
             for i in range(self.device_num):
-                p_path = self.weights_dir + "p_net_params_" + str(i) + ".pkl"
+                p_path = self.weights_dir + "p_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
                 self.p_nets[i].load_state_dict(torch.load(p_path))
-                target_p_path = self.weights_dir + "target_p_net_params_" + str(i) + ".pkl"
+                target_p_path = self.weights_dir + "target_p_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
                 self.target_p_nets[i].load_state_dict(torch.load(target_p_path))
         
     def train_nets(self, total_time_slots, replay_buffer):
@@ -390,7 +398,7 @@ class MaddpgEdgeAgent():
     def save_nets(self, total_time_slots):
         if not os.path.exists(self.weights_dir):
             os.makedirs(self.weights_dir)
-            
+        
         torch.save(self.v_net.state_dict(),
                    self.weights_dir + "v_net_params_" + 
                    str(total_time_slots) + ".pkl")
