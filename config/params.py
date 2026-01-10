@@ -31,7 +31,7 @@ def get_general_params():
     parser.add_argument("--eval_seed", type = int, default = 2345,
                         help = "evaluation random-seed")
     
-    parser.add_argument("--train_seed", type = int, default = 4399,
+    parser.add_argument("--train_seed", type = int, default = 6689,
                     help = "training random-seed")
 
     # choices: mappo or maddpg or local_comp or edge_comp or random_comp
@@ -358,7 +358,7 @@ def get_mappo_params():
     parser.add_argument("--train_seed", type = int, default = 1234,
                         help = "training random-seed")
     
-    parser.add_argument("--train_episodes", type = int, default = 20000,
+    parser.add_argument("--train_episodes", type = int, default = 30000,
                         help = "the number of training episodes")
 
     parser.add_argument("--train_time_slots", type = int, default = 600,
