@@ -444,16 +444,16 @@ class DeviceEnv():
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s virtual_time_ql is: ", self.virtual_time_ql)
 
         if visualize:
-            writer.add_scalars(
-                f"detail/device_total_comp_time_{self.env_id}",
-                {f"ep_{e_id}": self.total_comp_time},
-                t_id
-            )
-            writer.add_scalars(
-                f"detail/device_total_comp_time_{self.env_id}",
-                {f"ep_{e_id}": self.total_tran_time},
-                t_id
-            )
+            # writer.add_scalars(
+            #     f"detail/device_total_comp_time_{self.env_id}",
+            #     {f"ep_{e_id}": self.total_comp_time},
+            #     t_id
+            # )
+            # writer.add_scalars(
+            #     f"detail/device_total_comp_time_{self.env_id}",
+            #     {f"ep_{e_id}": self.total_tran_time},
+            #     t_id
+            # )
             writer.add_scalars(
                 f"detail/device_avg_local_time_{self.env_id}",
                 {f"ep_{e_id}": self.avg_local_time},
@@ -469,11 +469,11 @@ class DeviceEnv():
                 {f"ep_{e_id}_act_chg": self.new_ql_change},
                 t_id
             )
-            writer.add_scalars(
-                f"detail/device_time_ql_{self.env_id}",
-                {f"ep_{e_id}_act_backlog": self.act_backlog},
-                t_id
-            )
+            # writer.add_scalars(
+            #     f"detail/device_time_ql_{self.env_id}",
+            #     {f"ep_{e_id}_act_backlog": self.act_backlog},
+            #     t_id
+            # )
             writer.add_scalars(
                 f"detail/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_vir": self.virtual_time_ql},
@@ -484,11 +484,11 @@ class DeviceEnv():
                 {f"ep_{e_id}_vir_chg": self.new_vir_ql_change},
                 t_id
             )
-            writer.add_scalars(
-                f"detail/device_time_ql_{self.env_id}",
-                {f"ep_{e_id}_vir_backlog": self.vir_backlog},
-                t_id
-            )
+            # writer.add_scalars(
+            #     f"detail/device_time_ql_{self.env_id}",
+            #     {f"ep_{e_id}_vir_backlog": self.vir_backlog},
+            #     t_id
+            # )
 
         # 随机生成新任务
         # update scheduling tasks

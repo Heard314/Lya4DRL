@@ -209,7 +209,12 @@ class Rollout:
             device_obss, edge_obs = self.obs_scaling(edge_obs, device_obss)
         # rollout
         time_slots = self.time_slots
+        visualize_this_episode = visualize
         for t_id in range(1, time_slots + 1):
+            if t_id % 5 == 0:
+                visualize = visualize_this_episode
+            else:
+                visualize = False
             # print("-------------time slot: " + str(t_id) + "-------------")
             # choose action (use deterministic strategy during evaluation)
             device_acts = [None for i in range(self.device_num)]
@@ -346,8 +351,8 @@ class Rollout:
             print(f"comp_dlys_{i}: {comp_dlys[i]}")
             writer.add_scalar("device_csum_engys_"+str(i), device_csum_engys[i], e_id)
             print(f"device_csum_engys_{i}: {device_csum_engys[i]}")
-            writer.add_scalar("device_comp_expns_"+str(i), device_esum_engys[i], e_id)
-            print(f"device_comp_expns_{i}: {device_esum_engys[i]}")
+            # writer.add_scalar("device_comp_expns_"+str(i), device_esum_engys[i], e_id)
+            # print(f"device_comp_expns_{i}: {device_esum_engys[i]}")
             writer.add_scalar("device_overtime_nums_"+str(i), device_overtime_nums[i], e_id)
             print(f"device_overtime_nums_{i}: {device_overtime_nums[i]}")
         

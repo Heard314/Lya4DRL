@@ -174,11 +174,11 @@ class EdgeEnv():
                     {f"ep_{e_id}_act_chg": self.new_edge_ql_change[device_type]},
                     t_id
                 )
-                writer.add_scalars(
-                    f"detail/edge_time_ql_{device_type}",
-                    {f"ep_{e_id}_act_backlog": self.act_backlog},
-                    t_id
-                )
+                # writer.add_scalars(
+                #     f"detail/edge_time_ql_{device_type}",
+                #     {f"ep_{e_id}_act_backlog": self.act_backlog},
+                #     t_id
+                # )
                 writer.add_scalars(
                     f"detail/edge_time_ql_{device_type}",
                     {f"ep_{e_id}_vir": self.virtual_edge_queue_time_ql[device_type]},
@@ -189,26 +189,26 @@ class EdgeEnv():
                     {f"ep_{e_id}_vir_chg": self.new_vir_edge_ql_change[device_type]},
                     t_id
                 )
-                writer.add_scalars(
-                    f"detail/edge_time_ql_{device_type}",
-                    {f"ep_{e_id}_vir_backlog": self.vir_backlog},
-                    t_id
-                )
+                # writer.add_scalars(
+                #     f"detail/edge_time_ql_{device_type}",
+                #     {f"ep_{e_id}_vir_backlog": self.vir_backlog},
+                #     t_id
+                # )
 
-                writer.add_scalars(
-                    f"detail/total_comp_{device_type}",
-                    {f"ep_{e_id}_time": self.total_comp_time[device_type]},
-                    t_id
-                )
+                # writer.add_scalars(
+                #     f"detail/total_comp_{device_type}",
+                #     {f"ep_{e_id}_time": self.total_comp_time[device_type]},
+                #     t_id
+                # )
 
-                writer.add_scalars(
-                    f"detail/total_comp_{device_type}",
-                    {f"ep_{e_id}_amount": self.total_comp_amount[device_type]},
-                    t_id
-                )
+                # writer.add_scalars(
+                #     f"detail/total_comp_{device_type}",
+                #     {f"ep_{e_id}_amount": self.total_comp_amount[device_type]},
+                #     t_id
+                # )
 
-                writer.add_scalars(
-                    f"detail/alloc_edge_freq_{device_type}",
-                    {f"ep_{e_id}_freq": alloc_edge_freq[device_type]},
-                    t_id
-                )
+                # writer.add_scalars(
+                #     f"detail/alloc_edge_freq_{device_type}",
+                #     {f"ep_{e_id}_freq": alloc_edge_freq[device_type]},
+                #     t_id
+                # )
