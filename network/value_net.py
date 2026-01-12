@@ -25,7 +25,7 @@ class MappoValueNet(nn.Module):
         return v
     
 class MaddpgValueNet(nn.Module):
-    def __init__(self, alg_params):
+    def __init__(self, alg_params, queue_id):
         super(MaddpgValueNet, self).__init__()
                 
         self.fc1 = nn.Linear(alg_params.value_input_dims[queue_id], alg_params.v_hid_dims[0])
@@ -40,6 +40,8 @@ class MaddpgValueNet(nn.Module):
             OrthogonalInit(self.fc3)
             
     def forward(self, state, joint_act):
+        print(f"state shape in value net: {state.shape}")
+        print(f"joint_act shape in value net: {joint_act.shape}")
         x = self.tanh(self.fc1(torch.concat([state, joint_act], dim = -1)))
         x = self.tanh(self.fc2(x))
         v = self.fc3(x)

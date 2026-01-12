@@ -224,7 +224,14 @@ class MaddpgReplayBuffer():
     def __init__(self, gen_params, alg_params):
         self.device_num = gen_params.device_num
         self.buffer_size = alg_params.buffer_size
-        
+        self.device_type_num = gen_params.device_type_num
+        self.device_in_types = gen_params.device_in_types
+        self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
+        self.device_types = gen_params.device_types
+        self.policy_input_dim = alg_params.policy_input_dim
+        self.value_input_dims = alg_params.value_input_dims
+        self.value_input_obs_dims = alg_params.value_input_obs_dims
+        self.value_input_act_dims = alg_params.value_input_act_dims
         self.edge_obss = [None for i in range(self.buffer_size)]
         self.device_obss = [None for i in range(self.buffer_size)]
         self.device_acts = [None for i in range(self.buffer_size)]
@@ -330,33 +337,70 @@ class MaddpgReplayBuffer():
     def sample(self, batch_ids):
         # states and device obss
         # next states and device obss
-        batch_states = [[] for k in range(self.device_type_num)]
-        batch_device_obss = []
-        batch_next_states = [[] for k in range(self.device_type_num)]
-        batch_next_device_obss = []
+        
+        # batch_device_obss = []
+        # batch_next_device_obss = []
+
+        # batch_states = [[] for k in range(self.device_type_num)]
+        # batch_next_states = [[] for k in range(self.device_type_num)]
+        batch_states = [
+            torch.zeros((len(batch_ids), self.value_input_obs_dims[i]), dtype=torch.float32)
+            for i in range(self.device_type_num)
+        ]
+        batch_next_states = [
+            torch.zeros((len(batch_ids), self.value_input_obs_dims[i]), dtype=torch.float32)
+            for i in range(self.device_type_num)
+        ]
+        batch_device_obss = torch.zeros(
+            [len(batch_ids), self.device_num,  self.policy_input_dim],
+            dtype=torch.float32
+        )
+        batch_next_device_obss = torch.zeros(
+            [len(batch_ids), self.device_num,  self.policy_input_dim],
+            dtype=torch.float32
+        )
+        j = 0
         for id_ in batch_ids:
             for i in range(self.device_type_num):
                 state, next_state = self.package_value_inputs(id_,i)
-                batch_states[i].append(state)
-                batch_next_states[i].append(next_state)
+                # print("[DEBUG] state shape from package_value_inputs:", state.shape)
+                state = state.reshape(-1)
+                next_state = next_state.reshape(-1)
+                batch_states[i][j] = state
+                batch_next_states[i][j] = next_state
+            j += 1
+                
+        j = 0
         for id_ in batch_ids:
-            batch_device_obss_per_id = []
-            batch_next_device_obss_per_id = []
+            # batch_device_obss_per_id = []
+            # batch_next_device_obss_per_id = []
             for i in range(self.device_num):
                 device_obs, next_device_obs = self.package_policy_input(id_, i)
-                batch_device_obss_per_id.append(device_obs)
-                batch_next_device_obss_per_id.append(next_device_obs)
-            batch_device_obss.append(batch_device_obss_per_id)
-            batch_next_device_obss.append(batch_next_device_obss_per_id)
-
+                device_obs = device_obs.reshape(-1)
+                next_device_obs = next_device_obs.reshape(-1)
+                batch_device_obss[j][i] = device_obs
+                batch_next_device_obss[j][i] = next_device_obs
+                # batch_device_obss_per_id.append(device_obs)
+                # batch_next_device_obss_per_id.append(next_device_obs)
+            # batch_device_obss.append(batch_device_obss_per_id)
+            # batch_next_device_obss.append(batch_next_device_obss_per_id)
+            j += 1
         # [device_type_num, batch_size, state_dim]
-        batch_states = torch.tensor(batch_states, dtype = torch.float)
-        # [batch_size, device_num, obs_dim]
-        batch_device_obss = torch.tensor(batch_device_obss, dtype = torch.float)
-        # [device_type_num, batch_size, state_dim]
-        batch_next_states = torch.tensor(batch_next_states, dtype = torch.float)
-        # [batch_size, device_num, obs_dim]
-        batch_next_device_obss = torch.tensor(batch_next_device_obss, dtype = torch.float)
+        # print("[DEBUG] batch_states before tensor:")
+        # print(type(batch_states), len(batch_states))
+        # print(type(batch_states[0]))
+        # if isinstance(batch_states[0], torch.Tensor):
+        #     print("state[0].shape =", batch_states[0].shape)
+        # else:
+        #     import numpy as np
+        #     print("len(state[0]) =", np.asarray(batch_states[0]).shape)
+        # batch_states = torch.tensor(batch_states, dtype = torch.float)
+        # # [batch_size, device_num, obs_dim]
+        # batch_device_obss = torch.tensor(batch_device_obss, dtype = torch.float)
+        # # [device_type_num, batch_size, state_dim]
+        # batch_next_states = torch.tensor(batch_next_states, dtype = torch.float)
+        # # [batch_size, device_num, obs_dim]
+        # batch_next_device_obss = torch.tensor(batch_next_device_obss, dtype = torch.float)
 
         # for id_ in batch_ids:
         #     state = []
@@ -371,24 +415,35 @@ class MaddpgReplayBuffer():
         # batch_device_obss = torch.tensor(batch_device_obss, dtype = torch.float)
         
         # joint actions
-        batch_joint_acts = [[] for k in range(self.device_type_num)]
+        batch_joint_acts = [
+            torch.zeros((len(batch_ids), self.value_input_act_dims[i]), dtype=torch.float32)
+            for i in range(self.device_type_num)
+        ]
+        j = 0
         for id_ in batch_ids:
             for k in range(self.device_type_num):
                 joint_act = []
-                for i in range(self.device_in_types[k]):
+                for i in self.device_in_types[k]:
                     joint_act += self.device_acts[id_][i]
-                batch_joint_acts[k].append(joint_act)
+                joint_act = torch.tensor(joint_act, dtype=torch.float32).reshape(-1)
+                batch_joint_acts[k][j] = joint_act
+            j += 1
         # [device_type_num, batch_size, joint_act_dim]
-        batch_joint_acts = torch.tensor(batch_joint_acts, dtype = torch.float)
+        # batch_joint_acts = torch.tensor(batch_joint_acts, dtype = torch.float)
         
         # joint rewards
-        batch_joint_rewards = [[] for k in range(self.device_type_num)]
+        batch_joint_rewards = [
+            torch.zeros((len(batch_ids), 1), dtype=torch.float32)
+            for i in range(self.device_type_num)
+        ]
+        j = 0
         for id_ in batch_ids:
             for k in range(self.device_type_num):
-                batch_joint_rewards[k].append(self.joint_rewards[id_][k])
+                batch_joint_rewards[k][j] = self.joint_rewards[id_][k]
+            j += 1
         # [device_type_num, batch_size, device_type_num]
-        batch_joint_rewards = torch.tensor(batch_joint_rewards, dtype = torch.float) \
-                                .reshape([-1, self.device_type_num])
+        # batch_joint_rewards = torch.tensor(batch_joint_rewards, dtype = torch.float) \
+        #                         .reshape([-1, self.device_type_num])
         
         # next states and device obss
         # batch_next_states = []

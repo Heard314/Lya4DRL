@@ -1,4 +1,4 @@
-importimport argparse
+import argparse
 from argparse import BooleanOptionalAction
 from multiprocessing.connection import deliver_challenge
 
@@ -47,14 +47,14 @@ def get_general_params():
     parser.add_argument("--load_weights", action="store_true",
                         help = "whether to load network parameters")
     
-    parser.add_argument("--weights_dir", type = str, default = "weight/mappo/", 
+    parser.add_argument("--weights_dir", type = str, default = "weight/", 
                         help = "the directory for saving network parameters")
     
     parser.add_argument("--resume_episode", type = int, default = 0, 
                         help = "the episode to resume training from")
 
     # environment
-    parser.add_argument("--delta", type = float, default = 0.1, 
+    parser.add_argument("--delta", type = float, default = 0.1,
                         help = "the duration of each time-slot (s)")
     
     parser.add_argument("--device_num", type = int, default = device_num,
@@ -433,11 +433,13 @@ def get_mappo_params():
     return params
 
 """
-mddpg params
+maddpg params
 """
 device_obs_dim = 6 # 3 + max_task_num * 3
 edge_queue_obs_dim = 2 # comp_ql_length + vir_comp_ql_length
 action_dim = 30 # 动作包含卸载率、传输功率利用率和本地计算频率利用率，每个值用10维表示
+value_input_obs_dims = [n * (device_obs_dim) + edge_queue_obs_dim for n in [2, 4, 4]] # 包含整个集群的观测信息
+value_input_act_dims = [n * action_dim for n in [2, 4, 4]] # 包含所有智能体的动作信息
 value_input_dims = [n * (device_obs_dim + action_dim) + edge_queue_obs_dim for n in [2, 4, 4]] # 包含整个集群的观测信息和所有智能体的动作信息
 policy_input_dim = device_obs_dim + edge_queue_obs_dim
 def get_maddpg_params():
@@ -449,6 +451,12 @@ def get_maddpg_params():
     
     parser.add_argument("--edge_queue_obs_dim", type = int, default = edge_queue_obs_dim,
                         help = "the dimension of edge queues' observations")
+
+    parser.add_argument("--value_input_obs_dims", type = list, default = value_input_obs_dims,
+                        help = "the dimension of value network input's obs part")
+
+    parser.add_argument("--value_input_act_dims", type = list, default = value_input_act_dims,
+                        help = "the dimension of value network input's action part")
 
     parser.add_argument("--value_input_dims", type = list, default = value_input_dims,
                         help = "the dimension of value network input")
@@ -475,10 +483,10 @@ def get_maddpg_params():
     parser.add_argument("--train_time_slots", type = int, default = 600,
                         help = "the number of training time-slots")
     
-    parser.add_argument("--warm_time_slots", type = int, default = 12000,
+    parser.add_argument("--warm_time_slots", type = int, default = 2400,
                         help = "the number of warming time-slots")
     
-    parser.add_argument("--train_freq", type = int, default = 2400,
+    parser.add_argument("--train_freq", type = int, default = 600, #2400
                         help = "training frequency")
     
     parser.add_argument("--target_update_freq", type = int, default = 24000,
@@ -547,6 +555,9 @@ def get_maddpg_params():
     parser.add_argument("--results_dir", type = str, default = "result/maddpg/",
                         help = "the directory for saving training results")
     
+    parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
+                        help = "the directory for saving plot images")
+
     params, unknown = parser.parse_known_args()
     
     return params

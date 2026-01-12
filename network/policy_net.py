@@ -125,7 +125,7 @@ class MappoPolicyNetLSTM(nn.Module):
         if single_step:
             mean = mean.squeeze(1)
             std = std.squeeze(1)
-
+        
         return mean, std, (h_n, c_n)
 
 class MaddpgPolicyNet(nn.Module):
@@ -176,8 +176,8 @@ class MaddpgPolicyNetLSTM(nn.Module):
             nn.init.zeros_(self.fc3.bias)
 
         # ---------- action range ----------
-        low  = torch.tensor([0., 6., 6.])
-        high = torch.tensor([10., 10., 10.])
+        low  = torch.tensor([0., 1.2, 1.2])
+        high = torch.tensor([2., 2., 2.])
         self.register_buffer("act_low",  low)
         self.register_buffer("act_high", high)
         self.register_buffer("act_scale", (high - low) / 2.0)
@@ -193,5 +193,5 @@ class MaddpgPolicyNetLSTM(nn.Module):
         x = self.tanh(self.fc1(obs))
         out, (h_n, c_n) = self.lstm(x, h_in)
         x = self.tanh(out)
-        act = self.tanh(self.fc3(x)) + 1
+        act = self.tanh(self.fc3(x))
         return act, (h_n, c_n)

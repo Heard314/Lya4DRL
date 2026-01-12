@@ -2,7 +2,7 @@ from abc import abstractmethod
 import numpy as np
 import torch
 from torch.distributions import Normal
-from network.policy_net import MappoPolicyNet, MaddpgPolicyNet, MappoPolicyNetLSTM
+from network.policy_net import MaddpgPolicyNetLSTM, MappoPolicyNet, MaddpgPolicyNet, MappoPolicyNetLSTM
 from util.utils import GetPolicyInputs, GaussianNoise
 import math
 import config.global_params as gp
@@ -136,15 +136,20 @@ class MappoDeviceAgent():
 
     def update_net(self, params):
         self.p_net.load_state_dict(params)
-        
+
     def load_net(self, path):
         self.update_net(torch.load(path))
 
 class MaddpgDeviceAgent():
     def __init__(self, agent_id, gen_params, alg_params):
+        # general
+        self.device_type_num = gen_params.device_type_num
+        self.device_in_types = gen_params.device_in_types
+        self.device = gp.settings.device
+
         # agent id
         self.agent_id = agent_id
-        
+
         # policy network
         # self.p_net = MaddpgPolicyNet(alg_params)
         self.p_net = MaddpgPolicyNetLSTM(alg_params)
@@ -180,11 +185,23 @@ class MaddpgDeviceAgent():
             return h
         lstm_hidden_h = to_hidden(lstm_hidden_h)
         lstm_hidden_c = to_hidden(lstm_hidden_c)
+        
         with torch.no_grad():
             act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
         if not self.evaluate:
-            act = np.clip((act + self.action_noise.sample()), 0, 2).tolist()
-        
+            act = np.clip((act + self.action_noise.sample()), -1, 1).tolist()
+                # ===== 逐维映射参数 =====
+        # dim0 -> [0,10]: scale=1, loc=1
+        # dim1 -> [6,10]: scale=0.4, loc=1.6
+        # dim2 -> [6,10]: scale=0.4, loc=1.6
+        act = torch.tensor(act, dtype=torch.float32)
+        scale = self.p_net.act_scale
+        loc   = self.p_net.act_bias
+        # 每个动作元素用10维表示
+        scale = scale.repeat_interleave(10)
+        loc = loc.repeat_interleave(10)
+        action = act * scale + loc
+        act = action.view(-1).tolist()
         return act, next_lstm_hidden_h, next_lstm_hidden_c
         
     def update_net(self, params):

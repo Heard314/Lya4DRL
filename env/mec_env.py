@@ -142,11 +142,11 @@ class MECEnv():
                         {f"ep_{e_id}_total": task.e_comp_dly},
                         t_id
                     )
-                    writer.add_scalars(
-                        f"detail/e_comp_dly_{i}",
-                        {f"ep_{e_id}_tran": task.trans_time},
-                        t_id
-                    )
+                    # writer.add_scalars(
+                    #     f"detail/e_comp_dly_{i}",
+                    #     {f"ep_{e_id}_tran": task.trans_time},
+                    #     t_id
+                    # )
                     writer.add_scalars(
                         f"detail/e_comp_dly_{i}",
                         {f"ep_{e_id}_queue": task.e_queue_dly},

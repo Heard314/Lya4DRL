@@ -228,7 +228,6 @@ class Rollout:
                     task_num = self.mec_env.device_envs[i].task_num
                     device_active[i] = task_num >= 1
                     device_type = self.device_types[i]
-
                     device_value_obs = concatenate(device_obss[i], edge_obs[device_type * self.edge_queue_obs_dim : (device_type + 1) * self.edge_queue_obs_dim]) 
                     act, act_logprob, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i], active=device_active[i])
                     device_acts[i] = act
@@ -241,8 +240,11 @@ class Rollout:
                 # store actions used for interacting with the MEC env
                 device_acts_ = [[] for i in range(self.device_num)]
                 for i in range(self.device_num):
-                    act = self.device_agents[i].choose_action(device_obss[i])
+                    device_type = self.device_types[i]
+                    device_value_obs = concatenate(device_obss[i], edge_obs[device_type * self.edge_queue_obs_dim : (device_type + 1) * self.edge_queue_obs_dim])
+                    act, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i])
                     device_acts[i] = act
+                    # print(f"[DEBUG] device {i} action: {act} action_dim: {len(act)}")
                     for j in range(self.action_dim // 10):
                         device_acts_[i].append((act[j * 10] + act[j * 10 + 1] + act[j * 10 + 2] + 
                                                 act[j * 10 + 3] + act[j * 10 + 4] + act[j * 10 + 5] +

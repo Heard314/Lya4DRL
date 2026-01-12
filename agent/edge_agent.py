@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 from torch.distributions import Normal
 from network.value_net import MappoValueNet, MaddpgValueNet
-from network.policy_net import MappoPolicyNet, MaddpgPolicyNet, MappoPolicyNetLSTM
+from network.policy_net import MaddpgPolicyNetLSTM, MappoPolicyNet, MaddpgPolicyNet, MappoPolicyNetLSTM
 import config.global_params as gp
 
 class MappoEdgeAgent():
@@ -225,6 +225,11 @@ class MappoEdgeAgent():
             
 class MaddpgEdgeAgent():
     def __init__(self, gen_params, alg_params):
+        # general 
+        self.device_type_num = gen_params.device_type_num
+        self.device_in_types = gen_params.device_in_types
+        self.device = gp.settings.device
+
         self.device_num = gen_params.device_num
         self.action_dim = alg_params.action_dim
         
@@ -272,10 +277,10 @@ class MaddpgEdgeAgent():
         self.p_optimizers = []
         for i in range(self.device_num):
             # policy network
-            p_net = MaddpgPolicyNetLSTM(alg_params)
+            p_net = MaddpgPolicyNetLSTM(alg_params).to(self.device)
             self.p_nets.append(p_net)
             # target policy network
-            target_p_net = MaddpgPolicyNetLSTM(alg_params)
+            target_p_net = MaddpgPolicyNetLSTM(alg_params).to(self.device)
             target_p_net.load_state_dict(p_net.state_dict())
             self.target_p_nets.append(target_p_net)
             # optimizer
@@ -316,14 +321,21 @@ class MaddpgEdgeAgent():
             batch_states, batch_device_obss, \
             batch_joint_acts, batch_joint_rewards, \
             batch_next_states, batch_next_device_obss = replay_buffer.sample(batch_ids)
-            
+
+            batch_states = batch_states
+            batch_device_obss = batch_device_obss
+            batch_joint_acts = batch_joint_acts
+            batch_joint_rewards = batch_joint_rewards
+            batch_next_states = batch_next_states
+            batch_next_device_obss = batch_next_device_obss
+
             for i in range(self.device_type_num):
                 self.train_value_net(i, batch_states[i], batch_joint_acts[i], 
-                                    batch_joint_rewards[i], 
+                                    batch_joint_rewards[i],
                                     batch_next_states[i], batch_next_device_obss)
             
             for i in range(self.device_type_num):
-                for j in range(self.device_in_types[i]):
+                for j in self.device_in_types[i]:
                     self.train_policy_net(j, i, batch_states[i], batch_device_obss[:, j], 
                                           batch_joint_acts[i])
 
@@ -333,15 +345,22 @@ class MaddpgEdgeAgent():
     def train_value_net(self, queue_id, batch_states, batch_joint_acts, 
                               batch_joint_rewards, 
                               batch_next_states, batch_next_device_obss):
+        batch_states = batch_states.to(self.device)
+        batch_joint_acts = batch_joint_acts.to(self.device)
+        batch_joint_rewards = batch_joint_rewards.to(self.device)
+        batch_next_states = batch_next_states.to(self.device)
+        batch_next_device_obss = batch_next_device_obss.to(self.device)
         with torch.no_grad():
             batch_next_joint_acts = []
-            for i in range(self.device_in_types[queue_id]):
-                batch_next_acts = self.target_p_nets[i](batch_next_device_obss[:, i])
+            for i in self.device_in_types[queue_id]:
+                batch_next_acts, _ = self.target_p_nets[i](batch_next_device_obss[:, i])
                 batch_next_joint_acts.append(batch_next_acts)
+                # print(f"batch_next_acts shape: {len(batch_next_acts)}")
+                # print(f"batch_next_acts : {batch_next_acts}")
             # [batch_size, joint_act_dim]
-            batch_next_joint_acts = torch.concat(batch_next_joint_acts, dim = -1)
+            batch_next_joint_acts = torch.concat(batch_next_joint_acts, dim = -1).squeeze(1)
             # [batch_size, 1]
-            next_qs = self.target_v_nets[i](batch_next_states, batch_next_joint_acts)
+            next_qs = self.target_v_nets[queue_id](batch_next_states, batch_next_joint_acts)
             target_qs = batch_joint_rewards + self.gamma * next_qs
             # normalization
             target_qs = (target_qs - target_qs.mean()) / (target_qs.std() + 1e-5)
@@ -352,20 +371,25 @@ class MaddpgEdgeAgent():
             
             v_loss = F.mse_loss(target_qs, qs)
             
-            self.v_optimizer.zero_grad()
+            self.v_optimizers[queue_id].zero_grad()
             v_loss.backward()
             # gradient clip
             if self.use_grad_clip:
                 torch.nn.utils.clip_grad_norm_(self.v_nets[queue_id].parameters(), 
                                                self.v_grad_clip)
-            self.v_optimizer.step()
+            self.v_optimizers[queue_id].step()
             
     def train_policy_net(self, agent_id, queue_id, batch_states, batch_device_obss, batch_joint_acts):
+        batch_states = batch_states.to(self.device)
+        batch_device_obss = batch_device_obss.to(self.device)
+        batch_joint_acts = batch_joint_acts.to(self.device)
+        agent_id_in_type = agent_id - self.device_in_types[queue_id][0]
         for i in range(self.p_epochs):
             batch_joint_acts_ = batch_joint_acts.clone()
-            batch_acts = self.p_nets[agent_id](batch_device_obss)
-            batch_joint_acts_[:, agent_id * self.action_dim:
-                                (agent_id + 1) * self.action_dim] = batch_acts
+            batch_acts, _ = self.p_nets[agent_id](batch_device_obss)
+            batch_acts = batch_acts.squeeze(1)
+            batch_joint_acts_[:, agent_id_in_type * self.action_dim:
+                                (agent_id_in_type + 1) * self.action_dim] = batch_acts
 
             p_loss = (-self.v_nets[queue_id](batch_states, batch_joint_acts_)).mean()
 
@@ -389,8 +413,9 @@ class MaddpgEdgeAgent():
         if total_time_slots % self.decay_intl == 0:
             if self.v_lr > self.min_v_lr:
                 self.v_lr -= self.decay_fac
-                for params in self.v_optimizer.param_groups:
-                    params['lr'] = self.v_lr
+                for i in range(self.device_type_num):
+                    for params in self.v_optimizers[i].param_groups:
+                        params['lr'] = self.v_lr
             
             if self.p_lr > self.min_p_lr:
                 self.p_lr -= self.decay_fac
