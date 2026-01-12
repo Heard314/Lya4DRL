@@ -146,23 +146,46 @@ class MaddpgDeviceAgent():
         self.agent_id = agent_id
         
         # policy network
-        self.p_net = MaddpgPolicyNet(alg_params)
-        
+        # self.p_net = MaddpgPolicyNet(alg_params)
+        self.p_net = MaddpgPolicyNetLSTM(alg_params)
+
         # action noise
         self.use_action_noise = alg_params.use_action_noise
         if self.use_action_noise:
             self.action_noise = GaussianNoise(alg_params.action_dim)
             
         self.evaluate = gen_params.evaluate
+        self.lstm_hidden_dim = alg_params.p_hid_dims[1]
         
-    def choose_action(self, obs):
+    def choose_action(self, obs, lstm_hidden_h, lstm_hidden_c):
         p_inputs = GetPolicyInputs(obs)
+
+        # process the lstm hidden state
+        hid_dim = self.p_net.lstm.hidden_size
+        batch_size = p_inputs.size(0)  
+        def to_hidden(h):
+            # 如果是 None，就初始化为 0
+            if h is None:
+                return torch.zeros(1, batch_size, hid_dim)
+            # 如果是 list -> 转成 tensor
+            if isinstance(h, list):
+                h = torch.tensor(h, dtype=torch.float32)
+            # 如果是一维 [hid_dim] -> [1,1,hid_dim]
+            if h.dim() == 1:
+                h = h.view(1, 1, -1)
+            # 如果是二维 [1,hid_dim] -> [1,1,hid_dim]
+            elif h.dim() == 2:
+                h = h.unsqueeze(1)
+            # 如果已经是 [1,B,hid_dim] -> 不动
+            return h
+        lstm_hidden_h = to_hidden(lstm_hidden_h)
+        lstm_hidden_c = to_hidden(lstm_hidden_c)
         with torch.no_grad():
-            act = self.p_net(p_inputs).squeeze(0).tolist()
+            act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
         if not self.evaluate:
             act = np.clip((act + self.action_noise.sample()), 0, 2).tolist()
         
-        return act
+        return act, next_lstm_hidden_h, next_lstm_hidden_c
         
     def update_net(self, params):
         self.p_net.load_state_dict(params)

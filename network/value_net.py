@@ -28,7 +28,7 @@ class MaddpgValueNet(nn.Module):
     def __init__(self, alg_params):
         super(MaddpgValueNet, self).__init__()
                 
-        self.fc1 = nn.Linear(alg_params.state_action_dim, alg_params.v_hid_dims[0])
+        self.fc1 = nn.Linear(alg_params.value_input_dims[queue_id], alg_params.v_hid_dims[0])
         self.fc2 = nn.Linear(alg_params.v_hid_dims[0], alg_params.v_hid_dims[1])
         self.fc3 = nn.Linear(alg_params.v_hid_dims[1], 1)
         self.tanh = nn.Tanh()

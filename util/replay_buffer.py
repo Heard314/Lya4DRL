@@ -190,10 +190,6 @@ class MappoReplayBuffer():
             vs = vs.cpu().reshape([self.train_freq, self.train_time_slots + 1, 1])
 
         # compute GAE etc. on CPU -----
-        # rewards: [train_freq, train_time_slots, 1]
-        # rewards = torch.tensor(
-        #     self.joint_rewards[:,:,queue_id:queue_id+1], dtype=torch.float32
-        # )[:, 0:self.train_time_slots].unsqueeze(-1)
         jr = torch.as_tensor(self.joint_rewards, dtype=torch.float32)
         rewards = jr[:, :self.train_time_slots, queue_id:queue_id+1]
 
@@ -250,55 +246,164 @@ class MaddpgReplayBuffer():
         
         # update position
         self.ps = (self.ps + 1) % self.buffer_size
-        
+
+    def package_value_inputs(self, batch_id, queue_id):
+        v_input = []
+        next_v_input = []
+        def add(x):
+            if isinstance(x, torch.Tensor):
+                v_input.extend(x.detach().cpu().reshape(-1).tolist())
+            elif isinstance(x, np.ndarray):
+                v_input.extend(x.reshape(-1).tolist())
+            elif isinstance(x, (list, tuple)):
+                v_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
+            else:
+                v_input.append(float(x))
+
+        def add_next(x):
+            if isinstance(x, torch.Tensor):
+                next_v_input.extend(x.detach().cpu().reshape(-1).tolist())
+            elif isinstance(x, np.ndarray):
+                next_v_input.extend(x.reshape(-1).tolist())
+            elif isinstance(x, (list, tuple)):
+                next_v_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
+            else:
+                next_v_input.append(float(x))
+
+        start = queue_id * self.edge_queue_obs_dim
+        end = (queue_id + 1) * self.edge_queue_obs_dim
+        for i in range(start, end):
+            add(self.edge_obss[batch_id][i])
+            add_next(self.next_edge_obss[batch_id][i])
+
+        for dev_id in self.device_in_types[queue_id]:
+            add(self.device_obss[batch_id][dev_id])
+            add_next(self.next_device_obss[batch_id][dev_id])
+
+        return torch.tensor(v_input, dtype=torch.float32).reshape(1, -1), torch.tensor(next_v_input, dtype=torch.float32).reshape(1, -1)
+
+
+    def package_policy_input(self, batch_id, device_id):
+        p_input = []
+        next_p_input = []
+
+        def add(x):
+            if isinstance(x, torch.Tensor):
+                p_input.extend(x.detach().cpu().reshape(-1).tolist())
+            elif isinstance(x, np.ndarray):
+                p_input.extend(x.reshape(-1).tolist())
+            elif isinstance(x, (list, tuple)):
+                p_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
+            else:
+                p_input.append(float(x))
+
+        def add_next(x):
+            if isinstance(x, torch.Tensor):
+                next_p_input.extend(x.detach().cpu().reshape(-1).tolist())
+            elif isinstance(x, np.ndarray):
+                next_p_input.extend(x.reshape(-1).tolist())
+            elif isinstance(x, (list, tuple)):
+                next_p_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
+            else:
+                next_p_input.append(float(x))
+
+        queue_id = self.device_types[device_id]
+        start = queue_id * self.edge_queue_obs_dim
+        end = (queue_id + 1) * self.edge_queue_obs_dim
+        for i in range(start, end):
+            add(self.edge_obss[batch_id][i])
+            add_next(self.next_edge_obss[batch_id][i])
+
+        add(self.device_obss[batch_id][device_id])
+        add_next(self.next_device_obss[batch_id][device_id])
+
+        return torch.tensor(p_input, dtype=torch.float32).reshape(1, -1), torch.tensor(next_p_input, dtype=torch.float32).reshape(1, -1)
+
+    '''
+    batch_states:             v_net输入,按queue_id划分 [device_type_num, batch_size, state_dim]
+    batch_device_obss:        p_net输入,按device_id划分 [batch_size, device_num, obs_dim]
+    batch_joint_acts:         v_net输出,按queue_id划分 [device_type_num, batch_size, joint_act_dim]
+    batch_joint_rewards:      v_net输入,按queue_id划分 [device_type_num, batch_size, device_type_num]
+    batch_next_states:        v_net输入,按queue_id划分 [device_type_num, batch_size, state_dim]
+    batch_next_device_obss:   p_net输入,按device_id划分 [batch_size, device_num, obs_dim]
+    '''
     def sample(self, batch_ids):
         # states and device obss
-        batch_states = []
+        # next states and device obss
+        batch_states = [[] for k in range(self.device_type_num)]
         batch_device_obss = []
+        batch_next_states = [[] for k in range(self.device_type_num)]
+        batch_next_device_obss = []
         for id_ in batch_ids:
-            state = [] 
-            state += self.edge_obss[id_]
+            for i in range(self.device_type_num):
+                state, next_state = self.package_value_inputs(id_,i)
+                batch_states[i].append(state)
+                batch_next_states[i].append(next_state)
+        for id_ in batch_ids:
+            batch_device_obss_per_id = []
+            batch_next_device_obss_per_id = []
             for i in range(self.device_num):
-                state += self.device_obss[id_][i]
-            batch_states.append(state)
-            batch_device_obss.append(self.device_obss[id_])
-        # [batch_size, state_dim]
+                device_obs, next_device_obs = self.package_policy_input(id_, i)
+                batch_device_obss_per_id.append(device_obs)
+                batch_next_device_obss_per_id.append(next_device_obs)
+            batch_device_obss.append(batch_device_obss_per_id)
+            batch_next_device_obss.append(batch_next_device_obss_per_id)
+
+        # [device_type_num, batch_size, state_dim]
         batch_states = torch.tensor(batch_states, dtype = torch.float)
         # [batch_size, device_num, obs_dim]
         batch_device_obss = torch.tensor(batch_device_obss, dtype = torch.float)
-        
-        # joint actions
-        batch_joint_acts = []
-        for id_ in batch_ids:
-            joint_act = []
-            for i in range(self.device_num):
-                joint_act += self.device_acts[id_][i]
-            batch_joint_acts.append(joint_act)
-        # [batch_size, joint_act_dim]
-        batch_joint_acts = torch.tensor(batch_joint_acts, dtype = torch.float)
-        
-        # joint rewards
-        batch_joint_rewards = []
-        for id_ in batch_ids:
-            batch_joint_rewards.append(self.joint_rewards[id_])
-        # [batch_size, 1]
-        batch_joint_rewards = torch.tensor(batch_joint_rewards, dtype = torch.float) \
-                                .reshape([-1, 1])
-        
-        # next states and device obss
-        batch_next_states = []
-        batch_next_device_obss = []
-        for id_ in batch_ids:
-            next_state = []
-            next_state += self.next_edge_obss[id_]
-            for i in range(self.device_num):
-                next_state += self.next_device_obss[id_][i]
-            batch_next_states.append(next_state)
-            batch_next_device_obss.append(self.next_device_obss[id_])
-        # [batch_size, state_dim]
+        # [device_type_num, batch_size, state_dim]
         batch_next_states = torch.tensor(batch_next_states, dtype = torch.float)
         # [batch_size, device_num, obs_dim]
         batch_next_device_obss = torch.tensor(batch_next_device_obss, dtype = torch.float)
+
+        # for id_ in batch_ids:
+        #     state = []
+        #     state += self.edge_obss[id_]
+        #     for i in range(self.device_num):
+        #         state += self.device_obss[id_][i]
+        #     batch_states.append(state)
+        #     batch_device_obss.append(self.device_obss[id_])
+        # # [batch_size, state_dim]
+        # batch_states = torch.tensor(batch_states, dtype = torch.float)
+        # # [batch_size, device_num, obs_dim]
+        # batch_device_obss = torch.tensor(batch_device_obss, dtype = torch.float)
+        
+        # joint actions
+        batch_joint_acts = [[] for k in range(self.device_type_num)]
+        for id_ in batch_ids:
+            for k in range(self.device_type_num):
+                joint_act = []
+                for i in range(self.device_in_types[k]):
+                    joint_act += self.device_acts[id_][i]
+                batch_joint_acts[k].append(joint_act)
+        # [device_type_num, batch_size, joint_act_dim]
+        batch_joint_acts = torch.tensor(batch_joint_acts, dtype = torch.float)
+        
+        # joint rewards
+        batch_joint_rewards = [[] for k in range(self.device_type_num)]
+        for id_ in batch_ids:
+            for k in range(self.device_type_num):
+                batch_joint_rewards[k].append(self.joint_rewards[id_][k])
+        # [device_type_num, batch_size, device_type_num]
+        batch_joint_rewards = torch.tensor(batch_joint_rewards, dtype = torch.float) \
+                                .reshape([-1, self.device_type_num])
+        
+        # next states and device obss
+        # batch_next_states = []
+        # batch_next_device_obss = []
+        # for id_ in batch_ids:
+        #     next_state = []
+        #     next_state += self.next_edge_obss[id_]
+        #     for i in range(self.device_num):
+        #         next_state += self.next_device_obss[id_][i]
+        #     batch_next_states.append(next_state)
+        #     batch_next_device_obss.append(self.next_device_obss[id_])
+        # [batch_size, state_dim]
+        # batch_next_states = torch.tensor(batch_next_states, dtype = torch.float)
+        # [batch_size, device_num, obs_dim]
+        # batch_next_device_obss = torch.tensor(batch_next_device_obss, dtype = torch.float)
         
         return batch_states, batch_device_obss, \
                 batch_joint_acts, batch_joint_rewards, \

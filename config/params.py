@@ -1,4 +1,4 @@
-import argparse
+importimport argparse
 from argparse import BooleanOptionalAction
 from multiprocessing.connection import deliver_challenge
 
@@ -355,9 +355,6 @@ def get_mappo_params():
                         help = "whether to use orthogonal-initialization")
     
     # training
-    parser.add_argument("--train_seed", type = int, default = 1234,
-                        help = "training random-seed")
-    
     parser.add_argument("--train_episodes", type = int, default = 30000,
                         help = "the number of training episodes")
 
@@ -438,19 +435,28 @@ def get_mappo_params():
 """
 mddpg params
 """
+device_obs_dim = 6 # 3 + max_task_num * 3
+edge_queue_obs_dim = 2 # comp_ql_length + vir_comp_ql_length
+action_dim = 30 # 动作包含卸载率、传输功率利用率和本地计算频率利用率，每个值用10维表示
+value_input_dims = [n * (device_obs_dim + action_dim) + edge_queue_obs_dim for n in [2, 4, 4]] # 包含整个集群的观测信息和所有智能体的动作信息
+policy_input_dim = device_obs_dim + edge_queue_obs_dim
 def get_maddpg_params():
     parser = argparse.ArgumentParser(description = "maddpg params", add_help=False, allow_abbrev=False)
     
     # networks
-    parser.add_argument("--obs_dim", type = int, default = 11,
+    parser.add_argument("--device_obs_dim", type = int, default = device_obs_dim,
                         help = "the dimension of agents' observations")
     
-    parser.add_argument("--state_action_dim", type = int, default = 1+51*device_num,
-    # parser.add_argument("--state_action_dim", type = int, default = 256,
-                        help = "the dimension of global states")
+    parser.add_argument("--edge_queue_obs_dim", type = int, default = edge_queue_obs_dim,
+                        help = "the dimension of edge queues' observations")
+
+    parser.add_argument("--value_input_dims", type = list, default = value_input_dims,
+                        help = "the dimension of value network input")
     
-    # 包含一个任务卸载决策和传输功率决策
-    parser.add_argument("--action_dim", type = int, default = 10,
+    parser.add_argument("--policy_input_dim", type = int, default = policy_input_dim,
+                        help = "the dimension of policy network input")
+
+    parser.add_argument("--action_dim", type = int, default = action_dim,
                         help = "the dimension of agents' actions")
     
     parser.add_argument("--v_hid_dims", type = list, default = [400, 400],
@@ -462,26 +468,23 @@ def get_maddpg_params():
     parser.add_argument("--use_orthogonal_init", type = bool, default = True,
                         help = "whether to use orthogonal-initialization")
     
-    # training
-    parser.add_argument("--train_seed", type = int, default = 1234,
-                        help = "training random-seed")
-    
-    parser.add_argument("--train_episodes", type = int, default = 8000,
+    # training  
+    parser.add_argument("--train_episodes", type = int, default = 30000,
                         help = "the number of training episodes")
     
-    parser.add_argument("--train_time_slots", type = int, default = 200,
+    parser.add_argument("--train_time_slots", type = int, default = 600,
                         help = "the number of training time-slots")
     
-    parser.add_argument("--warm_time_slots", type = int, default = 4000,
+    parser.add_argument("--warm_time_slots", type = int, default = 12000,
                         help = "the number of warming time-slots")
     
-    parser.add_argument("--train_freq", type = int, default = 400,
+    parser.add_argument("--train_freq", type = int, default = 2400,
                         help = "training frequency")
     
-    parser.add_argument("--target_update_freq", type = int, default = 8000,
+    parser.add_argument("--target_update_freq", type = int, default = 24000,
                         help = "the updating frequency of target networks")
     
-    parser.add_argument("--train_batch_size", type = int, default = 1000,
+    parser.add_argument("--train_batch_size", type = int, default = 2400,
                         help = "training batch-size")
     
     parser.add_argument("--v_epochs", type = int, default = 4,
@@ -490,7 +493,7 @@ def get_maddpg_params():
     parser.add_argument("--p_epochs", type = int, default = 1,
                         help = "the number of training epochs of policy networks")
     
-    parser.add_argument("--buffer_size", type = int, default = 40000,       
+    parser.add_argument("--buffer_size", type = int, default = 42000,       
                         help = "the size of replay buffer")
     
     parser.add_argument("--gamma", type = float, default = 0.99,
@@ -535,11 +538,8 @@ def get_maddpg_params():
     parser.add_argument("--p_grad_clip", type = float, default = 2,   
                         help = "the parameter about policy networks' gradient clip")
     
-    parser.add_argument("--save_freq", type = int, default = 100000,
+    parser.add_argument("--save_freq", type = int, default = 240000,
                         help = "the saving frequency of networks")
-    
-    parser.add_argument("--load_weights", type = bool, default = False, 
-                        help = "whether to load network parameters")
     
     parser.add_argument("--weights_dir", type = str, default = "weight/maddpg/", 
                         help = "the directory for saving network parameters")

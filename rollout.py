@@ -237,7 +237,24 @@ class Rollout:
                             device_acts_[i].append(act[j] / 10)
                     if not (act_logprob == None):
                         device_act_logprobs[i] = act_logprob
+            if "Maddpg" in type(self.device_agents[0]).__name__:
+                # store actions used for interacting with the MEC env
+                device_acts_ = [[] for i in range(self.device_num)]
+                for i in range(self.device_num):
+                    act = self.device_agents[i].choose_action(device_obss[i])
+                    device_acts[i] = act
+                    for j in range(self.action_dim // 10):
+                        device_acts_[i].append((act[j * 10] + act[j * 10 + 1] + act[j * 10 + 2] + 
+                                                act[j * 10 + 3] + act[j * 10 + 4] + act[j * 10 + 5] +
+                                                act[j * 10 + 6] + act[j * 10 + 7] + act[j * 10 + 8] +
+                                                act[j * 10 + 9]) / 20)
+            if "Computing" in type(self.device_agents[0]).__name__:
+                for i in range(self.device_num):
+                    act = self.device_agents[i].choose_action()
+                    device_acts[i] = act
+                device_acts_ = device_acts
 
+            # step
             joint_rewards, device_rewards, \
             joint_cost, device_costs, \
             comp_dlys, device_csum_engys, \
@@ -268,7 +285,7 @@ class Rollout:
                                         joint_rewards, device_active)
             if not self.evaluate and self.train_mode == "maddpg":
                 self.replay_buffer.store(edge_obs, device_obss, 
-                                        device_acts, joint_reward,
+                                        device_acts, joint_rewards,
                                         next_edge_obs, next_device_obss)
             
             # update obs

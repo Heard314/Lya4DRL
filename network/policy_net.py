@@ -97,30 +97,8 @@ class MappoPolicyNetLSTM(nn.Module):
         self.register_buffer("act_bias",  (high + low) / 2.0)
 
         # self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0 # 正态分布std越小，越接近确定性策略
-        self.LOG_STD_MIN, self.LOG_STD_MAX = -2.0, 2.0
+        self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0
         self.EPS = 1e-6
-
-        # ---------- debug flag ----------
-        # Set this to False if you want to disable NaN/Inf checks
-        self.debug_nan = False
-        # print(f"The debug_nan is {self.debug_nan}")
-
-    def _check_tensor(self, name, t):
-        """Check whether a tensor contains NaN or Inf values."""
-        if t is None:
-            return
-        if not torch.is_tensor(t):
-            return
-        has_nan = torch.isnan(t).any()
-        has_inf = torch.isinf(t).any()
-        if has_nan or has_inf:
-            print(f"[NaN/Inf Detect] {name} has invalid values.")
-            print(f"  shape: {tuple(t.shape)}")
-            print(f"  has_nan: {bool(has_nan)}, has_inf: {bool(has_inf)}")
-            # print a small sample for inspection
-            flat = t.detach().reshape(-1).cpu()
-            print("  sample values:", flat[:10])
-            raise ValueError(f"NaN/Inf detected in {name}")
 
     def forward(self, obs, h_in=None):
         """
@@ -132,52 +110,21 @@ class MappoPolicyNetLSTM(nn.Module):
             std:  same shape as mean
             h_out: (h1, c1)
         """
-        if self.debug_nan:
-            self._check_tensor("obs(input)", obs)
-            if h_in is not None:
-                h0, c0 = h_in
-                self._check_tensor("h_in[0] (h0)", h0)
-                self._check_tensor("h_in[1] (c0)", c0)
 
         single_step = False
         if obs.dim() == 2:  # [B, obs_dim]
             single_step = True
             obs = obs.unsqueeze(1)  # [B,1,D]
 
-        if self.debug_nan:
-            self._check_tensor("obs(after unsqueeze)", obs)
-
         x = self.tanh(self.fc1(obs))           # [B,T,hid1]
-
-        if self.debug_nan:
-            self._check_tensor("x(after fc1+tanh)", x)
         out, (h_n, c_n) = self.lstm(x, h_in)   # [B,T,hid2], ([1,B,hid2],[1,B,hid2])
-
-        if self.debug_nan:
-            self._check_tensor("out(after lstm)", out)
-            self._check_tensor("h_n(output h)", h_n)
-            self._check_tensor("c_n(output c)", c_n)
-
         x = self.tanh(out)
-        if self.debug_nan:
-            self._check_tensor("x(after lstm+tanh)", x)
-
         mean = self.mu_head(x)                 # [B,T,act_dim]
-        if self.debug_nan:
-            self._check_tensor("mean(before squeeze)", mean)
-
         log_std = torch.clamp(self.log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
         std = log_std.exp().expand_as(mean)
-        if self.debug_nan:
-            self._check_tensor("log_std(clamped)", log_std)
-            self._check_tensor("std(expanded)", std)
-
         if single_step:
             mean = mean.squeeze(1)
             std = std.squeeze(1)
-            if self.debug_nan:
-                self._check_tensor("mean(single_step)", mean)
-                self._check_tensor("std(single_step)", std)
 
         return mean, std, (h_n, c_n)
 
@@ -213,9 +160,7 @@ class MaddpgPolicyNetLSTM(nn.Module):
         act_dim = alg_params.action_dim
         self.fc1 = nn.Linear(obs_dim, hid1)
         self.lstm = nn.LSTM(hid1, hid2, batch_first=True)
-        self.mu_head = nn.Linear(hid2, act_dim)
-        
-
+        self.fc3 = nn.Linear(hid2, act_dim)
         self.tanh = nn.Tanh()
         
         # orthogonal initialization
@@ -227,8 +172,8 @@ class MaddpgPolicyNetLSTM(nn.Module):
                     nn.init.orthogonal_(param)
                 elif "bias" in name:
                     nn.init.zeros_(param)
-            nn.init.orthogonal_(self.mu_head.weight, gain=0.01)
-            nn.init.zeros_(self.mu_head.bias)
+            nn.init.orthogonal_(self.fc3.weight, gain=0.01)
+            nn.init.zeros_(self.fc3.bias)
 
         # ---------- action range ----------
         low  = torch.tensor([0., 6., 6.])
@@ -238,10 +183,15 @@ class MaddpgPolicyNetLSTM(nn.Module):
         self.register_buffer("act_scale", (high - low) / 2.0)
         self.register_buffer("act_bias",  (high + low) / 2.0)
     
+
     def forward(self, obs, h_in=None):
+
+        single_step = False
+        if obs.dim() == 2:  # [B, obs_dim]
+            single_step = True
+            obs = obs.unsqueeze(1)  # [B,1,D]
         x = self.tanh(self.fc1(obs))
         out, (h_n, c_n) = self.lstm(x, h_in)
         x = self.tanh(out)
-        act = self.tanh(self.mu_head(x)) + 1
-        
-        return act
+        act = self.tanh(self.fc3(x)) + 1
+        return act, (h_n, c_n)
