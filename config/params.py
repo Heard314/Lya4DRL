@@ -344,11 +344,11 @@ def get_mappo_params():
     # 包含：任务远程卸载率、传输能耗利用率、本地计算频率利用率
     parser.add_argument("--action_dim", type = int, default = 3,
                         help = "the dimension of agents' actions")
-    
-    parser.add_argument("--v_hid_dims", type = list, default = [200, 200],
+
+    parser.add_argument("--v_hid_dims", type = list, default = [400, 400],
                         help = "the dimension of value network's hidden layers")
-    
-    parser.add_argument("--p_hid_dims", type = list, default = [200, 200],
+
+    parser.add_argument("--p_hid_dims", type = list, default = [400, 400],
                         help = "the dimension of policy network's hidden layers")
 
     parser.add_argument("--use_orthogonal_init", type = bool, default = True,
@@ -486,7 +486,7 @@ def get_maddpg_params():
     parser.add_argument("--warm_time_slots", type = int, default = 2400,
                         help = "the number of warming time-slots")
     
-    parser.add_argument("--train_freq", type = int, default = 600, #2400
+    parser.add_argument("--train_freq", type = int, default = 2400,
                         help = "training frequency")
     
     parser.add_argument("--target_update_freq", type = int, default = 24000,

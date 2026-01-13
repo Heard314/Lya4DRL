@@ -63,7 +63,7 @@ class MappoDeviceAgent():
 
         # process the lstm hidden state
         hid_dim = self.p_net.lstm.hidden_size
-        batch_size = p_inputs.size(0)  
+        batch_size = p_inputs.size(0)
         def to_hidden(h):
             # 如果是 None，就初始化为 0
             if h is None:

@@ -120,6 +120,8 @@ class MappoPolicyNetLSTM(nn.Module):
         out, (h_n, c_n) = self.lstm(x, h_in)   # [B,T,hid2], ([1,B,hid2],[1,B,hid2])
         x = self.tanh(out)
         mean = self.mu_head(x)                 # [B,T,act_dim]
+        mean_scale = 0.3
+        mean = mean * mean_scale
         log_std = torch.clamp(self.log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
         std = log_std.exp().expand_as(mean)
         if single_step:
