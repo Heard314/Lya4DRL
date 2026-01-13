@@ -109,6 +109,12 @@ def get_general_params():
     parser.add_argument("--max_task_num", type = int, default = 1,
                         help = "the maximum number of tasks at each time slot")
 
+    parser.add_argument("--gen_task_cycle", type = int, default = 5,
+                        help = "the cycle of generating tasks (unit: time slots)")
+
+    parser.add_argument("--start_slot", type = int, default = 1,
+                        help = "the cycle of generating tasks (unit: time slots)")
+
     # 修改为10-15Mbps
     parser.add_argument("--total_bandwidth", type = float, 
                         default = 30 * pow(10, 6),
@@ -190,7 +196,8 @@ def get_general_params():
     parser.add_argument(
         "--comp_dens_inls",
         type=list,
-        default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
+        # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
+        default=[[1.5, 2], [2.5, 4], [0.8, 1]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     # #! 数值待修改
@@ -361,7 +368,7 @@ def get_mappo_params():
     parser.add_argument("--train_time_slots", type = int, default = 600,
                         help = "the number of training time-slots")
     
-    parser.add_argument("--train_freq", type = int, default = 4,
+    parser.add_argument("--train_freq", type = int, default = 20,
                         help = "training frequency")
     
     parser.add_argument("--train_batch_size", type = int, default = 2400,
@@ -483,7 +490,7 @@ def get_maddpg_params():
     parser.add_argument("--train_time_slots", type = int, default = 600,
                         help = "the number of training time-slots")
     
-    parser.add_argument("--warm_time_slots", type = int, default = 2400,
+    parser.add_argument("--warm_time_slots", type = int, default = 12000,
                         help = "the number of warming time-slots")
     
     parser.add_argument("--train_freq", type = int, default = 2400,

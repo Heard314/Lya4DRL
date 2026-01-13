@@ -4,6 +4,11 @@ class EdgeEnv():
         
         # Summary Writer
         self.writer = writer
+
+        # task generation cycle
+        self.gen_task_cycle = general_params.gen_task_cycle
+        self.start_slot = general_params.start_slot
+
         # unit: s
         self.delta = general_params.delta
         
@@ -38,8 +43,6 @@ class EdgeEnv():
         self.total_comp_time = [0 for _ in range(self.edge_queue_num)]
         self.total_comp_amount = [0 for _ in range(self.edge_queue_num)]
 
-    
-        
         self.edge_act_reward_fac = [1.0 for _ in range(self.edge_queue_num)]
         self.avg_data_sizes = [(general_params.data_size_inls[i][0]+general_params.data_size_inls[i][1])/2 for i in range(self.edge_queue_num)]
         self.avg_comp_denss = [(general_params.comp_dens_inls[i][0]+general_params.comp_dens_inls[i][1])/2 for i in range(self.edge_queue_num)]
@@ -142,7 +145,6 @@ class EdgeEnv():
             self.new_edge_ql_change[device_type] = self.edge_queue_time_ql[device_type] - old_edge_queue_time_ql_
             self.act_backlog = total_comp_need_time_this_epi
             self.old_virtual_edge_queue_time_ql[device_type] = self.virtual_edge_queue_time_ql[device_type]
-            
             edge_vir_queue_growth_rate = self.edge_vir_queue_growth_rate
             old_virtual_edge_queue_time_ql_ = self.virtual_edge_queue_time_ql[device_type]
             EPS = 1e-6

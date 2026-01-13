@@ -74,26 +74,28 @@ class ObsScaling():
         # for i in range(self.device_type_num):
         #     print(f"[DEBUG] the edge obs of queue_{i} is {edge_obs_[i*self.edge_queue_obs_dim:(i+1)*self.edge_queue_obs_dim]}")
         
-        return device_obss_, edge_obs_
+        return edge_obs_, device_obss_
 
                 
 class RewardScaling():
-    def __init__(self, gamma):
+    def __init__(self, gamma, dim=3):
         # discount factor
         self.gamma = gamma
-        self.R = 0
-        self.r_running_ms = RunningMeanStd(1)
+        self.dim = dim
+        # config: the queue num is 3
+        self.R = [0.0 for _ in range(dim)]
+        self.r_running_ms = [RunningMeanStd(1) for _ in range(dim)]
 
-    def __call__(self, reward):
-        self.R = self.gamma * self.R + reward
-        self.r_running_ms.update(self.R)
-        reward = float(reward / (self.r_running_ms.std + 1e-8))
-        
-        return reward
+    def __call__(self, rewards):
+        for i in range(len(self.R)):
+            self.R[i] = self.gamma * self.R[i] + rewards[i]
+            self.r_running_ms[i].update(self.R[i])
+        rewards = [float(rewards[i] / (self.r_running_ms[i].std + 1e-8)) for i in range(len(rewards))]
+        return rewards
         
     # reset 'R' when an episode is done 
     def reset(self):
-        self.R = 0
+        self.R = self.R = [0.0 for _ in range(self.dim)]
         
 class GaussianNoise():
     def __init__(self, action_dim, mu = 0.25, sigma = 0.5):

@@ -304,12 +304,12 @@ class MaddpgEdgeAgent():
         
     def train_nets(self, total_time_slots, replay_buffer):
         if total_time_slots >= self.warm_time_slots:
-            if total_time_slots < self.buffer_size:
-                batch_ids = np.random.choice(range(total_time_slots),
-                                             self.train_batch_size, replace = False)
-            else:
-                batch_ids = np.random.choice(range(self.buffer_size),
-                                             self.train_batch_size, replace = False)
+            # if total_time_slots < self.buffer_size:
+            #     batch_ids = np.random.choice(range(total_time_slots),
+            #                                  self.train_batch_size, replace = False)
+            # else:
+            batch_ids = np.random.choice(range(self.buffer_size),
+                                            self.train_batch_size, replace = False)
             
             '''training data'''
             # batch_states: [device_type_num, batch_size, state_dim]

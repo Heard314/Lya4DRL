@@ -17,6 +17,11 @@ class MECEnv():
         self.device_type_num = gen_params.device_type_num
         self.device_num_per_type = gen_params.device_num_per_type
         self.device_in_types = gen_params.device_in_types
+
+        # task generation cycle
+        self.gen_task_cycle = gen_params.gen_task_cycle
+        self.start_slot = gen_params.start_slot
+
         # edge env
         self.edge_env = EdgeEnv(gen_params, writer)
 
@@ -71,6 +76,10 @@ class MECEnv():
             self.device_envs[i].reset()
 
     def step(self, device_acts, e_id, t_id, visualize=False):
+        
+        gen_task_cycle = self.gen_task_cycle
+        start_slot = self.start_slot
+
         writer = self.writer
         if e_id % 50 == 1:
             # gp.settings.enable_print = True
@@ -98,7 +107,7 @@ class MECEnv():
         edge_queue_actual_rewards = [0 for i in range(edge_queue_num)]
         edge_queue_virtual_rewards = [0 for i in range(edge_queue_num)]
         joint_rewards = [0 for i in range(edge_queue_num)]
-
+        joint_cost = 0
         device_costs = [0 for i in range(self.device_num)]
         device_comp_dlys = [0 for i in range(self.device_num)]
         device_csum_engys = [0 for i in range(self.device_num)]
@@ -136,7 +145,6 @@ class MECEnv():
                         {f"ep_{e_id}_proc": task.l_proc_dly},
                         t_id
                     )
-
                     writer.add_scalars(
                         f"detail/e_comp_dly_{i}",
                         {f"ep_{e_id}_total": task.e_comp_dly},
@@ -252,73 +260,76 @@ class MECEnv():
                         {f"ep_{e_id}": device_overtime_nums[i]},
                         t_id
                     )
+        
+        if t_id % gen_task_cycle == start_slot:
+            for i in range(edge_queue_num):
+                edge_queue_actual_rewards[i] = 0.0
+                edge_queue_virtual_rewards[i] = 0.0
+                actual_queue_type_scale_posfac = self.device_num_per_type[i]*device_act_queue_reward_max_bound
+                virtual_queue_type_scale_posfac = self.device_num_per_type[i]*device_vir_queue_reward_max_bound
+                actual_queue_type_scale_negfac = self.device_num_per_type[i]*device_act_queue_reward_min_bound
+                virtual_queue_type_scale_negfac = self.device_num_per_type[i]*device_vir_queue_reward_min_bound
+                edge_act_reward_fac = self.edge_env.edge_act_reward_fac[i]
+                if(self.enable_actual_queue_reward and self.enable_virtual_queue_reward):
+                    edge_queue_actual_rewards[i] = edge_act_reward_fac * self.edge_queue_reward_weight * \
+                        max(1.0, math.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
+                        self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
+                    edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
+                    edge_queue_virtual_rewards[i] = self.edge_queue_reward_weight * \
+                        self.edge_env.virtual_edge_queue_time_ql[i] * (self.edge_env.new_vir_edge_ql_change[i])
+                    edge_queue_virtual_rewards[i] = min(max(virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), virtual_queue_type_scale_posfac)
+                
+                elif(self.enable_virtual_queue_reward):
+                    edge_queue_virtual_rewards[i] = self.edge_queue_reward_weight * \
+                        self.edge_env.virtual_edge_queue_time_ql[i] * (self.edge_env.new_vir_edge_ql_change[i])
+                    edge_queue_virtual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)
+                
+                elif(self.enable_actual_queue_reward):
+                    edge_queue_actual_rewards[i] = edge_act_reward_fac * self.edge_queue_reward_weight * \
+                        max(1.0, math.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
+                        self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
+                    edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)
 
-        for i in range(edge_queue_num):
-            edge_queue_actual_rewards[i] = 0.0
-            edge_queue_virtual_rewards[i] = 0.0
-            actual_queue_type_scale_posfac = self.device_num_per_type[i]*device_act_queue_reward_max_bound
-            virtual_queue_type_scale_posfac = self.device_num_per_type[i]*device_vir_queue_reward_max_bound
-            actual_queue_type_scale_negfac = self.device_num_per_type[i]*device_act_queue_reward_min_bound
-            virtual_queue_type_scale_negfac = self.device_num_per_type[i]*device_vir_queue_reward_min_bound
-            edge_act_reward_fac = self.edge_env.edge_act_reward_fac[i]
-            if(self.enable_actual_queue_reward and self.enable_virtual_queue_reward):
-                edge_queue_actual_rewards[i] = edge_act_reward_fac * self.edge_queue_reward_weight * \
-                    max(1.0, math.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
-                    self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
-                edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
-                edge_queue_virtual_rewards[i] = self.edge_queue_reward_weight * \
-                    self.edge_env.virtual_edge_queue_time_ql[i] * (self.edge_env.new_vir_edge_ql_change[i])
-                edge_queue_virtual_rewards[i] = min(max(virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), virtual_queue_type_scale_posfac)
-            
-            elif(self.enable_virtual_queue_reward):
-                edge_queue_virtual_rewards[i] = self.edge_queue_reward_weight * \
-                    self.edge_env.virtual_edge_queue_time_ql[i] * (self.edge_env.new_vir_edge_ql_change[i])
-                edge_queue_virtual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)
-            
-            elif(self.enable_actual_queue_reward):
-                edge_queue_actual_rewards[i] = edge_act_reward_fac * self.edge_queue_reward_weight * \
-                    max(1.0, math.pow(self.edge_env.alloc_edge_freq[i]/self.device_freqs[i]/self.device_num_per_type[i],2)) * \
-                    self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
-                edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac + virtual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac + virtual_queue_type_scale_posfac)
-
-            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
-            if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])
-            if visualize:
+                if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
+                if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])
+                if visualize:
+                    for j in self.device_in_types[i]:
+                        writer.add_scalars(
+                            f"detail/dev_reward_{j}",
+                            {f"ep_{e_id}_edge_act": edge_queue_actual_rewards[i]},
+                            t_id
+                        )
+                        writer.add_scalars(
+                            f"detail/dev_reward_{j}",
+                            {f"ep_{e_id}_edge_vir": edge_queue_virtual_rewards[i]},
+                            t_id
+                        )
+                edge_queue_rewards[i] = edge_queue_actual_rewards[i] + edge_queue_virtual_rewards[i]
+                joint_rewards[i] = edge_queue_rewards[i]
                 for j in self.device_in_types[i]:
+                    joint_rewards[i] += device_rewards[j]
+                if visualize:
                     writer.add_scalars(
-                        f"detail/dev_reward_{j}",
-                        {f"ep_{e_id}_edge_act": edge_queue_actual_rewards[i]},
+                        f"detail/joint_reward_{i}",
+                        {f"ep_{e_id}": joint_rewards[i]},
                         t_id
                     )
-                    writer.add_scalars(
-                        f"detail/dev_reward_{j}",
-                        {f"ep_{e_id}_edge_vir": edge_queue_virtual_rewards[i]},
-                        t_id
-                    )
-            edge_queue_rewards[i] = edge_queue_actual_rewards[i] + edge_queue_virtual_rewards[i]
-            joint_rewards[i] = edge_queue_rewards[i]
-            for j in self.device_in_types[i]:
-                joint_rewards[i] += device_rewards[j]
+            joint_cost = sum(device_costs)
+            
             if visualize:
                 writer.add_scalars(
-                    f"detail/joint_reward_{i}",
-                    {f"ep_{e_id}": joint_rewards[i]},
+                    f"detail/joint_cost",
+                    {f"ep_{e_id}": joint_cost},
                     t_id
                 )
-        joint_cost = sum(device_costs)
-        
-        if visualize:
-            writer.add_scalars(
-                f"detail/joint_cost",
-                {f"ep_{e_id}": joint_cost},
-                t_id
-            )
 
         # next obs
         next_edge_obs = self.edge_env.get_obs()
+        # print(f"next_edge_obs: {next_edge_obs}")
         next_device_obss = [None for i in range(self.device_num)]
         for i in range(self.device_num):
             next_device_obss[i] = self.device_envs[i].get_obs()
+            # print(f"device_id {i}, next_device_obss: {next_device_obss[i]}")
 
         return joint_rewards, device_rewards, \
                joint_cost, device_costs, \
