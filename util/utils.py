@@ -45,34 +45,12 @@ class ObsScaling():
     # edge_obs: edge_queue, vir_edge_queue for all queues
     def __call__(self, edge_obs, device_obss):
 
-        # print("[DEBUG] Before Scaling")
-        # for i in range(self.device_num):
-        #     print(f"[DEBUG] the device obs of device_{i} is {device_obss[i]}")
-        # for i in range(self.device_type_num):
-        #     print(f"[DEBUG] the edge obs of queue_{i} is {edge_obs[i*self.edge_queue_obs_dim:(i+1)*self.edge_queue_obs_dim]}")
-        
         for i in range(self.device_num):
             device_obss[i][0] /= 10
             device_obss[i][1] = np.log1p(np.clip(device_obss[i][1],  0.0, self.vq_clip))
             device_obss[i][2] = np.log1p(np.clip(device_obss[i][2], 0.0, self.vq_clip))
-        
-        # RMS
-        # for i in range(self.device_num):
-        #     self.device_rmss[i].update(device_obss[i])
-        #     device_obss[i] = (device_obss[i] - self.device_rmss[i].mean) / (self.device_rmss[i].std + self.eps)
-        # self.edge_rms.update(edge_obs)
-        # edge_obs = (edge_obs - self.edge_rms.mean) / (self.edge_rms.std + self.eps)
-        
-        # device_obss_ = []
-        # for i in range(self.device_num):
-        #     device_obss_.append(device_obss[i].tolist())
         edge_obs_ = edge_obs
         device_obss_ = device_obss
-        # print("[DEBUG] After Scaling")
-        # for i in range(self.device_num):
-        #     print(f"[DEBUG] the device obs of device_{i} is {device_obss_[i]}")
-        # for i in range(self.device_type_num):
-        #     print(f"[DEBUG] the edge obs of queue_{i} is {edge_obs_[i*self.edge_queue_obs_dim:(i+1)*self.edge_queue_obs_dim]}")
         
         return edge_obs_, device_obss_
 
@@ -82,7 +60,6 @@ class RewardScaling():
         # discount factor
         self.gamma = gamma
         self.dim = dim
-        # config: the queue num is 3
         self.R = [0.0 for _ in range(dim)]
         self.r_running_ms = [RunningMeanStd(1) for _ in range(dim)]
 
@@ -93,7 +70,7 @@ class RewardScaling():
         rewards = [float(rewards[i] / (self.r_running_ms[i].std + 1e-8)) for i in range(len(rewards))]
         return rewards
         
-    # reset 'R' when an episode is done 
+    # reset 'R' when an episode is done
     def reset(self):
         self.R = self.R = [0.0 for _ in range(self.dim)]
         

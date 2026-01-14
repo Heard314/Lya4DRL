@@ -9,7 +9,7 @@ class MappoReplayBuffer():
         self.device_types = gen_params.device_types
         self.device_in_types = gen_params.device_in_types
         self.train_freq = alg_params.train_freq
-        self.train_time_slots = alg_params.train_time_slots
+        self.buffer_train_time_slots = alg_params.buffer_train_time_slots
         self.value_input_dims = alg_params.value_input_dims
         self.policy_input_dim = alg_params.policy_input_dim
         self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
@@ -19,23 +19,23 @@ class MappoReplayBuffer():
         self.lamda = alg_params.lamda
         
         self.ps = [0, 0]
-        self.edge_obs = [[None for j in range(self.train_time_slots + 1)]
+        self.edge_obs = [[None for j in range(self.buffer_train_time_slots + 1)]
                                 for i in range(self.train_freq)]
-        self.device_obss = [[None for j in range(self.train_time_slots + 1)]
+        self.device_obss = [[None for j in range(self.buffer_train_time_slots + 1)]
                                     for i in range(self.train_freq)]
-        self.lstm_hidden_hs = [[None for j in range(self.train_time_slots + 1)]
+        self.lstm_hidden_hs = [[None for j in range(self.buffer_train_time_slots + 1)]
                                     for i in range(self.train_freq)]
-        self.lstm_hidden_cs = [[None for j in range(self.train_time_slots + 1)]
+        self.lstm_hidden_cs = [[None for j in range(self.buffer_train_time_slots + 1)]
                                     for i in range(self.train_freq)]
-        self.device_acts = [[None for j in range(self.train_time_slots + 1)]
+        self.device_acts = [[None for j in range(self.buffer_train_time_slots + 1)]
                                     for i in range(self.train_freq)]
-        self.device_act_logprobs = [[None for j in range(self.train_time_slots + 1)]
+        self.device_act_logprobs = [[None for j in range(self.buffer_train_time_slots + 1)]
                                             for i in range(self.train_freq)]
-        self.joint_rewards = [[None for j in range(self.train_time_slots + 1)]
+        self.joint_rewards = [[None for j in range(self.buffer_train_time_slots + 1)]
                                     for i in range(self.train_freq)]
-        self.device_active = [[None for j in range(self.train_time_slots + 1)]
+        self.device_active = [[None for j in range(self.buffer_train_time_slots + 1)]
                                     for i in range(self.train_freq)]
-       
+        
     def store(self, edge_obs, device_obss, lstm_hidden_hs, lstm_hidden_cs, device_acts, device_act_logprobs, joint_rewards, device_active):
         self.edge_obs[self.ps[0]][self.ps[1]] = copy.copy(edge_obs)
         self.device_obss[self.ps[0]][self.ps[1]] = copy.copy(device_obss)
@@ -47,9 +47,9 @@ class MappoReplayBuffer():
         self.device_active[self.ps[0]][self.ps[1]] = copy.copy(device_active)
 
         # update positions
-        if self.ps[1] == self.train_time_slots:
+        if self.ps[1] == self.buffer_train_time_slots:
             self.ps[0] = (self.ps[0] + 1) % (self.train_freq)
-        self.ps[1] = (self.ps[1] + 1) % (self.train_time_slots + 1)
+        self.ps[1] = (self.ps[1] + 1) % (self.buffer_train_time_slots + 1)
 
     def package_value_inputs(self, train_episode, train_time_slot, queue_id):
         v_input = []
@@ -101,33 +101,34 @@ class MappoReplayBuffer():
     def get_policy_net_training_data(self):
         # build policy training data (still on CPU) -----
         p_inputs = torch.zeros(
-            [self.train_freq, self.train_time_slots, self.device_num, self.policy_input_dim],
+            [self.train_freq, self.buffer_train_time_slots, self.device_num, self.policy_input_dim],
             dtype=torch.float32
         )
         acts = torch.zeros(
-            [self.train_freq, self.train_time_slots, self.device_num, self.action_dim],
+            [self.train_freq, self.buffer_train_time_slots, self.device_num, self.action_dim],
             dtype=torch.float32
         )
         act_logprobs = torch.zeros(
-            [self.train_freq, self.train_time_slots, self.device_num, 1],
+            [self.train_freq, self.buffer_train_time_slots, self.device_num, 1],
             dtype=torch.float32
         )
         device_active = torch.zeros(
-            [self.train_freq, self.train_time_slots, self.device_num, 1],
+            [self.train_freq, self.buffer_train_time_slots, self.device_num, 1],
             dtype=torch.float32
         )
         lstm_hidden_hs = torch.zeros(
-            [self.train_freq, self.train_time_slots, self.device_num, self.lstm_hidden_dim],
+            [self.train_freq, self.buffer_train_time_slots, self.device_num, self.lstm_hidden_dim],
             dtype=torch.float32
         )
         lstm_hidden_cs = torch.zeros(
-            [self.train_freq, self.train_time_slots, self.device_num, self.lstm_hidden_dim],
+            [self.train_freq, self.buffer_train_time_slots, self.device_num, self.lstm_hidden_dim],
             dtype=torch.float32
         )
 
         for i in range(self.train_freq):
-            for j in range(self.train_time_slots):
+            for j in range(self.buffer_train_time_slots):
                 for k in range(self.device_num):
+                    
                     obs = copy.copy(self.device_obss[i][j][k])
                     inputs = self.package_policy_input(i,j,k)
                     if not torch.is_tensor(inputs):
@@ -153,7 +154,7 @@ class MappoReplayBuffer():
                     lstm_hidden_hs[i, j, k] = h
                     lstm_hidden_cs[i, j, k] = c
 
-        # reshape to [train_freq * train_time_slots, ...]
+        # reshape to [train_freq * buffer_train_time_slots, ...]
         p_inputs = p_inputs.reshape([-1, self.device_num, self.policy_input_dim])
         acts = acts.reshape([-1, self.device_num, self.action_dim])
         act_logprobs = act_logprobs.reshape([-1, self.device_num, 1])
@@ -169,12 +170,14 @@ class MappoReplayBuffer():
         Build training data and compute GAE.
         value_net is already on some device (CPU or GPU).
         """
+        # print(f"get_value_net_training_data:value_input_dims {self.value_input_dims}")
         v_inputs = torch.zeros(
-            [self.train_freq, self.train_time_slots + 1, self.value_input_dims[queue_id]],
+            [self.train_freq, self.buffer_train_time_slots + 1, self.value_input_dims[queue_id]],
             dtype=torch.float32
         )
+        # print(f"v_inputs {v_inputs.shape}")
         for i in range(self.train_freq):
-            for j in range(self.train_time_slots + 1):
+            for j in range(self.buffer_train_time_slots + 1):
                 inputs = self.package_value_inputs(i,j,queue_id)
                 if not torch.is_tensor(inputs):
                     inputs = torch.as_tensor(inputs, dtype=torch.float32)
@@ -187,33 +190,33 @@ class MappoReplayBuffer():
             v_inputs_flat = v_inputs.reshape([-1, self.value_input_dims[queue_id]]).to(dev_v)
             vs = value_net(v_inputs_flat)  # [train_freq*(T+1), 1] on dev_v
             # move back to CPU for further processing
-            vs = vs.cpu().reshape([self.train_freq, self.train_time_slots + 1, 1])
+            vs = vs.cpu().reshape([self.train_freq, self.buffer_train_time_slots + 1, 1])
 
         # compute GAE etc. on CPU -----
         jr = torch.as_tensor(self.joint_rewards, dtype=torch.float32)
-        rewards = jr[:, :self.train_time_slots, queue_id:queue_id+1]
+        rewards = jr[:, :self.buffer_train_time_slots, queue_id:queue_id+1]
 
-        # deltas: [train_freq, train_time_slots, 1]
-        deltas = rewards + self.gamma * vs[:, 1: self.train_time_slots + 1] - \
-                 vs[:, 0: self.train_time_slots]
+        # deltas: [train_freq, buffer_train_time_slots, 1]
+        deltas = rewards + self.gamma * vs[:, 1: self.buffer_train_time_slots + 1] - \
+                 vs[:, 0: self.buffer_train_time_slots]
 
         gae = 0.0
-        advs = torch.zeros([self.train_freq, self.train_time_slots, 1],
+        advs = torch.zeros([self.train_freq, self.buffer_train_time_slots, 1],
                            dtype=torch.float32)
-        for t in reversed(range(self.train_time_slots)):
+        for t in reversed(range(self.buffer_train_time_slots)):
             gae = deltas[:, t] + self.lamda * self.gamma * gae
             advs[:, t] = gae
 
         # value targets
-        v_tags = advs + vs[:, 0: self.train_time_slots]
+        v_tags = advs + vs[:, 0: self.buffer_train_time_slots]
 
         # normalize advantages
         advs = (advs - advs.mean()) / (advs.std() + 1e-5)
 
         # flatten value training data -----
-        # [train_freq * train_time_slots, state_dim]
-        v_inputs = v_inputs[:, 0: self.train_time_slots].reshape([-1, self.value_input_dims[queue_id]])
-        # [train_freq * train_time_slots, 1]
+        # [train_freq * buffer_train_time_slots, state_dim]
+        v_inputs = v_inputs[:, 0: self.buffer_train_time_slots].reshape([-1, self.value_input_dims[queue_id]])
+        # [train_freq * buffer_train_time_slots, 1]
         v_tags = v_tags.reshape([-1, 1])
 
         advs = advs.reshape([-1, 1])
@@ -337,12 +340,6 @@ class MaddpgReplayBuffer():
     def sample(self, batch_ids):
         # states and device obss
         # next states and device obss
-        
-        # batch_device_obss = []
-        # batch_next_device_obss = []
-
-        # batch_states = [[] for k in range(self.device_type_num)]
-        # batch_next_states = [[] for k in range(self.device_type_num)]
         batch_states = [
             torch.zeros((len(batch_ids), self.value_input_obs_dims[i]), dtype=torch.float32)
             for i in range(self.device_type_num)
@@ -363,57 +360,22 @@ class MaddpgReplayBuffer():
         for id_ in batch_ids:
             for i in range(self.device_type_num):
                 state, next_state = self.package_value_inputs(id_,i)
-                # print("[DEBUG] state shape from package_value_inputs:", state.shape)
                 state = state.reshape(-1)
                 next_state = next_state.reshape(-1)
                 batch_states[i][j] = state
                 batch_next_states[i][j] = next_state
             j += 1
-                
+        
         j = 0
         for id_ in batch_ids:
-            # batch_device_obss_per_id = []
-            # batch_next_device_obss_per_id = []
             for i in range(self.device_num):
                 device_obs, next_device_obs = self.package_policy_input(id_, i)
                 device_obs = device_obs.reshape(-1)
                 next_device_obs = next_device_obs.reshape(-1)
                 batch_device_obss[j][i] = device_obs
                 batch_next_device_obss[j][i] = next_device_obs
-                # batch_device_obss_per_id.append(device_obs)
-                # batch_next_device_obss_per_id.append(next_device_obs)
-            # batch_device_obss.append(batch_device_obss_per_id)
-            # batch_next_device_obss.append(batch_next_device_obss_per_id)
             j += 1
-        # [device_type_num, batch_size, state_dim]
-        # print("[DEBUG] batch_states before tensor:")
-        # print(type(batch_states), len(batch_states))
-        # print(type(batch_states[0]))
-        # if isinstance(batch_states[0], torch.Tensor):
-        #     print("state[0].shape =", batch_states[0].shape)
-        # else:
-        #     import numpy as np
-        #     print("len(state[0]) =", np.asarray(batch_states[0]).shape)
-        # batch_states = torch.tensor(batch_states, dtype = torch.float)
-        # # [batch_size, device_num, obs_dim]
-        # batch_device_obss = torch.tensor(batch_device_obss, dtype = torch.float)
-        # # [device_type_num, batch_size, state_dim]
-        # batch_next_states = torch.tensor(batch_next_states, dtype = torch.float)
-        # # [batch_size, device_num, obs_dim]
-        # batch_next_device_obss = torch.tensor(batch_next_device_obss, dtype = torch.float)
 
-        # for id_ in batch_ids:
-        #     state = []
-        #     state += self.edge_obss[id_]
-        #     for i in range(self.device_num):
-        #         state += self.device_obss[id_][i]
-        #     batch_states.append(state)
-        #     batch_device_obss.append(self.device_obss[id_])
-        # # [batch_size, state_dim]
-        # batch_states = torch.tensor(batch_states, dtype = torch.float)
-        # # [batch_size, device_num, obs_dim]
-        # batch_device_obss = torch.tensor(batch_device_obss, dtype = torch.float)
-        
         # joint actions
         batch_joint_acts = [
             torch.zeros((len(batch_ids), self.value_input_act_dims[i]), dtype=torch.float32)
@@ -428,9 +390,7 @@ class MaddpgReplayBuffer():
                 joint_act = torch.tensor(joint_act, dtype=torch.float32).reshape(-1)
                 batch_joint_acts[k][j] = joint_act
             j += 1
-        # [device_type_num, batch_size, joint_act_dim]
-        # batch_joint_acts = torch.tensor(batch_joint_acts, dtype = torch.float)
-        
+
         # joint rewards
         batch_joint_rewards = [
             torch.zeros((len(batch_ids), 1), dtype=torch.float32)
@@ -441,25 +401,6 @@ class MaddpgReplayBuffer():
             for k in range(self.device_type_num):
                 batch_joint_rewards[k][j] = self.joint_rewards[id_][k]
             j += 1
-        # [device_type_num, batch_size, device_type_num]
-        # batch_joint_rewards = torch.tensor(batch_joint_rewards, dtype = torch.float) \
-        #                         .reshape([-1, self.device_type_num])
-        
-        # next states and device obss
-        # batch_next_states = []
-        # batch_next_device_obss = []
-        # for id_ in batch_ids:
-        #     next_state = []
-        #     next_state += self.next_edge_obss[id_]
-        #     for i in range(self.device_num):
-        #         next_state += self.next_device_obss[id_][i]
-        #     batch_next_states.append(next_state)
-        #     batch_next_device_obss.append(self.next_device_obss[id_])
-        # [batch_size, state_dim]
-        # batch_next_states = torch.tensor(batch_next_states, dtype = torch.float)
-        # [batch_size, device_num, obs_dim]
-        # batch_next_device_obss = torch.tensor(batch_next_device_obss, dtype = torch.float)
-        
         return batch_states, batch_device_obss, \
                 batch_joint_acts, batch_joint_rewards, \
                 batch_next_states, batch_next_device_obss

@@ -39,7 +39,7 @@ class Controller:
             assert gen_params.resume_episode == train_info["resume_episode"], \
                 "The resume episode in alg_params does not match that in train_info!"
         else:
-            # fix random seed  
+            # fix random seed
             self.seed = gen_params.evaluate and gen_params.eval_seed or gen_params.train_seed
             # runtime storage path
             import datetime

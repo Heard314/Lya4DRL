@@ -16,6 +16,7 @@ class MappoEdgeAgent():
         # training
         self.train_time_slots = alg_params.train_time_slots
         self.train_freq = alg_params.train_freq
+        self.buffer_train_freq = alg_params.buffer_train_freq
         self.train_batch_size = alg_params.train_batch_size
         self.v_epochs = alg_params.v_epochs
         self.p_epochs = alg_params.p_epochs
@@ -112,7 +113,7 @@ class MappoEdgeAgent():
     
     def train_value_net(self, queue_id, v_inputs, v_tags):
         
-        total_size = self.train_freq * self.train_time_slots
+        total_size = self.buffer_train_freq * self.train_time_slots
         for e in range(self.v_epochs):
             for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
                                     self.train_batch_size, False):
@@ -131,7 +132,7 @@ class MappoEdgeAgent():
 
     def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs,
                           active_masks,lstm_hidden_hs=None, lstm_hidden_cs=None):
-        total_size = self.train_freq * self.train_time_slots
+        total_size = self.buffer_train_freq * self.train_time_slots
         for e in range(self.p_epochs):
             for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
                                         self.train_batch_size, False):
@@ -304,10 +305,6 @@ class MaddpgEdgeAgent():
         
     def train_nets(self, total_time_slots, replay_buffer):
         if total_time_slots >= self.warm_time_slots:
-            # if total_time_slots < self.buffer_size:
-            #     batch_ids = np.random.choice(range(total_time_slots),
-            #                                  self.train_batch_size, replace = False)
-            # else:
             batch_ids = np.random.choice(range(self.buffer_size),
                                             self.train_batch_size, replace = False)
             
@@ -342,7 +339,7 @@ class MaddpgEdgeAgent():
             if self.use_lr_decay:
                 self.decay_lr(total_time_slots)
 
-    def train_value_net(self, queue_id, batch_states, batch_joint_acts, 
+    def train_value_net(self, queue_id, batch_states, batch_joint_acts,
                               batch_joint_rewards, 
                               batch_next_states, batch_next_device_obss):
         batch_states = batch_states.to(self.device)
@@ -355,8 +352,6 @@ class MaddpgEdgeAgent():
             for i in self.device_in_types[queue_id]:
                 batch_next_acts, _ = self.target_p_nets[i](batch_next_device_obss[:, i])
                 batch_next_joint_acts.append(batch_next_acts)
-                # print(f"batch_next_acts shape: {len(batch_next_acts)}")
-                # print(f"batch_next_acts : {batch_next_acts}")
             # [batch_size, joint_act_dim]
             batch_next_joint_acts = torch.concat(batch_next_joint_acts, dim = -1).squeeze(1)
             # [batch_size, 1]

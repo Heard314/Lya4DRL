@@ -22,7 +22,6 @@ class Rollout:
         self.eval_mode = gen_params.eval_mode
         self.resume_episode = 1 # the episode number to be held
         self.device_type_num = gen_params.device_type_num
-
         # task generation cycle
         self.gen_task_cycle = gen_params.gen_task_cycle
         self.start_slot = gen_params.start_slot
@@ -141,10 +140,10 @@ class Rollout:
         print(f"[DEBUG] enable_virtual_queue_reward: {gen_params.enable_virtual_queue_reward}")
 
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        # log_txt_file = open(log_path, "a", encoding = "utf-8")
-        # sys.stdout = log_txt_file
-        # sys.stderr = log_txt_file
-        # atexit.register(log_txt_file.close)
+        log_txt_file = open(log_path, "a", encoding = "utf-8")
+        sys.stdout = log_txt_file
+        sys.stderr = log_txt_file
+        atexit.register(log_txt_file.close)
 
         self.time_slots = self.train_time_slots + 1 if not self.evaluate else self.eval_time_slots
 
@@ -265,8 +264,6 @@ class Rollout:
                     assert ((task_num >= 1) == (t_id % self.gen_task_cycle == self.start_slot))
                     if task_num >= 1:
                         device_value_obs = concatenate(device_obss[i], edge_obs[device_type * self.edge_queue_obs_dim : (device_type + 1) * self.edge_queue_obs_dim])
-                        # print(f"edge_obs: {edge_obs[device_type * self.edge_queue_obs_dim : (device_type + 1) * self.edge_queue_obs_dim]}")
-                        # print(f"device_id {i}, device_obss: {device_obss[i]}")
                         act, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i])
                         device_acts[i] = act
                         for j in range(self.action_dim // 10):
@@ -384,7 +381,7 @@ class Rollout:
                 out_dir=gp.settings.plot_dir
             )
 
-        # tensorboard日志保存
+        # tensorboard log
         for i in range(self.device_type_num):
             writer.add_scalar("joint_reward_"+str(i), joint_rewards[i], e_id)
             print(f"joint_reward_{i}: {joint_rewards[i]}")
@@ -420,6 +417,7 @@ class Rollout:
                comp_dlys, device_csum_engys, \
                device_esum_engys, device_overtime_nums
     
+    # Update only when new tasks arrive in the time slot
     def average(self, t_id, joint_rewards, device_rewards, 
                             joint_cost, device_costs, 
                             comp_dlys, device_csum_engys, 
@@ -444,7 +442,7 @@ class Rollout:
             self.device_csum_engys[i] /= self.device_task_avail_nums[i]
             self.device_esum_engys[i] /= self.device_task_avail_nums[i]
     
-    # 任务延迟、能耗、费用都是按照可用任务数量来平均的
+    # Update queue information at every time slot
     def average_always(self, t_id, edge_comp_qls, device_comp_qls):
         self.edge_comp_qls += 1 / t_id * (edge_comp_qls - self.edge_comp_qls)
         self.device_comp_qls += 1 / t_id * (device_comp_qls - self.device_comp_qls)

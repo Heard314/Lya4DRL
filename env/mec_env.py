@@ -31,7 +31,6 @@ class MECEnv():
         self.device_envs = []
         for i in range(self.device_num):
             self.device_envs.append(DeviceEnv(i, gen_params, self.edge_env, writer))
-        # self.lyaV = gen_params.lyaV
         self.device_queue_reward_weight = gen_params.device_queue_reward_weight
         self.edge_queue_reward_weight = gen_params.edge_queue_reward_weight
 
@@ -87,7 +86,8 @@ class MECEnv():
         else:
             gp.settings.enable_print = False
         enable_print = gp.settings.enable_print
-        # 首先每个设备对待执行任务做出卸载决策，然后执行任务的本地计算部分，返回远程卸载部分（以下代码中的sched_tasks）
+        # First, each device makes an offloading decision for the pending task
+        # Then, execute the local computation part and return the remote offloading part (sched_tasks in the code below)
         device_sched_tasks = [None for i in range(self.device_num)]
 
         # Serial execution of device computations
@@ -113,7 +113,6 @@ class MECEnv():
         device_csum_engys = [0 for i in range(self.device_num)]
         device_esum_engys = [0 for i in range(self.device_num)]
         device_overtime_nums = [0 for i in range(self.device_num)]
-        # device_delay_adjust_coefs = [1.0 for i in range(self.device_num)]
         device_task_is_available = [False for i in range(self.device_num)] #在该时间间隙下是否有任务到达
         for i in range(self.device_num):
             sched_tasks = device_sched_tasks[i]
@@ -184,7 +183,6 @@ class MECEnv():
                 device_costs[i] += self.device_energy_weights[device_type] * local_engy 
                                 #    + self.edge_energy_weights[device_type] * edge_comp_engy
                 
-                # 计算超时惩罚，其中task.dly_cons是按照设备计算能力为2Gcycles/s计算的，实际的设备计算能力在2.1~2.4Gcycles/s之间
                 if comp_dly > task.dly_cons:
                     device_overtime_nums[i] += 1
 
@@ -194,7 +192,6 @@ class MECEnv():
                 else:
                     norm_csum_engy = task.norm_csum_engy
                     norm_esum_engy = task.norm_esum_engy
-                    # 奖励函数 能耗比重 *实际总能耗 / 标准化能耗 + 成本比重 *实际总成本 / 标准化成本
                     device_rewards[i] += self.target_reward_penalty * (self.device_energy_weights[device_type] * 
                                                   local_engy / norm_csum_engy
                                                 #   + self.edge_energy_weights[device_type] * 

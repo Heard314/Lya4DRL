@@ -327,25 +327,25 @@ def get_general_params():
 """
 mappo params
 """
-device_obs_dim = 6 # 3 + max_task_num * 3
-edge_queue_obs_dim = 2 # comp_ql_length + vir_comp_ql_length
-value_input_dims = [n * device_obs_dim + edge_queue_obs_dim for n in [2, 4, 4]]
-policy_input_dim = device_obs_dim + edge_queue_obs_dim
+ppo_device_obs_dim = 6 # 3 + max_task_num * 3
+ppo_edge_queue_obs_dim = 2 # comp_ql_length + vir_comp_ql_length
+ppo_value_input_dims = [n * ppo_device_obs_dim + ppo_edge_queue_obs_dim for n in [2, 4, 4]]
+ppo_policy_input_dim = ppo_device_obs_dim + ppo_edge_queue_obs_dim
 def get_mappo_params():
     parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
 
     #! 修改后，ObsScaling类的代码也需要改
     # env obs dim and networks input dim
-    parser.add_argument("--device_obs_dim", type = int, default = device_obs_dim,
+    parser.add_argument("--device_obs_dim", type = int, default = ppo_device_obs_dim,
                         help = "the dimension of devices' observations")
     
-    parser.add_argument("--edge_queue_obs_dim", type = int, default = edge_queue_obs_dim,
+    parser.add_argument("--edge_queue_obs_dim", type = int, default = ppo_edge_queue_obs_dim,
                         help = "the dimension of edge queues' observations")
 
-    parser.add_argument("--value_input_dims", type = list, default = value_input_dims,
+    parser.add_argument("--value_input_dims", type = list, default = ppo_value_input_dims,
                         help = "the dimension of value network input")
     
-    parser.add_argument("--policy_input_dim", type = int, default = policy_input_dim,
+    parser.add_argument("--policy_input_dim", type = int, default = ppo_policy_input_dim,
                         help = "the dimension of policy network input")
 
     # 包含：任务远程卸载率、传输能耗利用率、本地计算频率利用率
@@ -368,6 +368,12 @@ def get_mappo_params():
     parser.add_argument("--train_time_slots", type = int, default = 600,
                         help = "the number of training time-slots")
     
+    parser.add_argument("--buffer_train_time_slots", type = int, default = 120,
+                        help = "the number of training time-slots storing in the replay buffer.")
+
+    # parser.add_argument("--buffer_train_freq", type = int, default = 4,
+    #                     help = "training frequency")
+
     parser.add_argument("--train_freq", type = int, default = 20,
                         help = "training frequency")
     
@@ -425,7 +431,7 @@ def get_mappo_params():
     parser.add_argument("--enty_coef", type = float, default = 0.05,   
                         help = "the coefficient about policy's entropy")
 
-    parser.add_argument("--save_freq", type = int, default = 400, 
+    parser.add_argument("--save_freq", type = int, default = 1000, 
                         help = "the saving frequency of networks")
 
     parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
@@ -493,7 +499,7 @@ def get_maddpg_params():
     parser.add_argument("--warm_time_slots", type = int, default = 12000,
                         help = "the number of warming time-slots")
     
-    parser.add_argument("--train_freq", type = int, default = 2400,
+    parser.add_argument("--train_freq", type = int, default = 12000,
                         help = "training frequency")
     
     parser.add_argument("--target_update_freq", type = int, default = 24000,
@@ -508,7 +514,7 @@ def get_maddpg_params():
     parser.add_argument("--p_epochs", type = int, default = 1,
                         help = "the number of training epochs of policy networks")
     
-    parser.add_argument("--buffer_size", type = int, default = 42000,       
+    parser.add_argument("--buffer_size", type = int, default = 24000, 
                         help = "the size of replay buffer")
     
     parser.add_argument("--gamma", type = float, default = 0.99,
@@ -553,7 +559,7 @@ def get_maddpg_params():
     parser.add_argument("--p_grad_clip", type = float, default = 2,   
                         help = "the parameter about policy networks' gradient clip")
     
-    parser.add_argument("--save_freq", type = int, default = 240000,
+    parser.add_argument("--save_freq", type = int, default = 600000,
                         help = "the saving frequency of networks")
     
     parser.add_argument("--weights_dir", type = str, default = "weight/maddpg/", 

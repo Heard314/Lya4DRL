@@ -71,7 +71,6 @@ class DeviceEnv():
         # task generation cycle
         self.gen_task_cycle = gen_params.gen_task_cycle
         self.start_slot = gen_params.start_slot
-
         self.edge_env = edge_env
         # env id
         self.env_id = env_id
@@ -165,7 +164,7 @@ class DeviceEnv():
         self.total_comp_time = 0.0
         self.total_tran_time = 0.0
 
-        # 为了平衡reward_act与reward_vir之间的比例，为增长率添加一个系数（与任务计算时间成反比）
+        # To balance reward_act and reward_vir, add a scaling factor to the growth rate (inversely proportional to task computation time)
         self.device_act_reward_fac = 1.0
         self.device_act_reward_fac /= 0.8 * (data_size_mean * comp_dens_mean) / self.device_comp_freq
         self.device_act_reward_fac *= self.device_act_reward_fac
@@ -176,7 +175,6 @@ class DeviceEnv():
     def reset(self):
         # reset computation-queue length
         self.avail_task_num = 0
-
         # reset computation time queue length
         self.time_ql = 0
         self.old_time_ql = 0
@@ -202,9 +200,6 @@ class DeviceEnv():
         # reset scheduling tasks
         self.sched_tasks.clear()
 
-        #! 重置动态时间阈值
-        self.dynamic_delay_adjust_coef = 1.0
-
         self.position_x, self.position_y = self.gen_position(self.min_distance_from_edge, self.max_distance_from_edge)
         self.position_z = 1.8
 
@@ -229,7 +224,7 @@ class DeviceEnv():
             task.norm_esum_engy = comp * self.engy_fac * 1600
             self.sched_tasks.append(task)
 
-    # 信达增益、本地队列长度，任务信息
+    # Channel gain, local queue information, and task information
     def get_obs(self):
         max_trans_rate = self.max_trans_rate
         local_queue = self.time_ql
@@ -347,15 +342,12 @@ class DeviceEnv():
             '''offload computing part'''
             local_comps = []
             for task_id, offl_dz in enumerate(offl_dzs):
-                # offl_dz = min(offl_dz, total_trans_dz)
-                # total_trans_dz -= offl_dz
                 total_offl_dz += offl_dz
                 tran_queue_delay = max(self.total_tran_time - (t_id-1) * self.delta,0)
                 total_trans_dz += offl_dz
                 task = self.sched_tasks[task_id]
                 task.offl_dz = offl_dz
                 total_offl_comp += offl_dz * task.comp_dens
-                # if offl_dz = 0, there is no need to queue
                 if task.offl_dz == 0:
                     task.trans_time = 0
                     task.tran_engy = 0
@@ -407,7 +399,7 @@ class DeviceEnv():
                     # print(f"[DEBUG] The device", self.env_id, "'s delta is: ", self.delta)
                     # print(f"[DEBUG] The device", self.env_id, "'s fine_ql_change is: ", device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta))
                 self.avail_task_num += 1
-                # avg_local_time：只使用最近时隙的计算时间的平均值
+                # avg_local_time: use only the average computation time of the most recent time slots
                 self.old_comp_times.append(local_comp / device_comp_freq)
                 tail = self.old_comp_times[-self.statSlotNum:]
                 self.avg_local_time = sum(tail) / len(tail) if tail else 0

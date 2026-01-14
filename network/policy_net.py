@@ -24,13 +24,11 @@ class MappoPolicyNet(nn.Module):
             nn.init.zeros_(self.mu_head.bias)
 
         # -------- per-dimension action range --------
-        # 维度0: [0,10]  维度1: [6,10]  维度2: [6,10]
-        # low = torch.zeros(alg_params.action_dim)
-        # high = torch.full((alg_params.action_dim,), 10.) # 10
+        # Dimension 0: range [0, 10]
+        # Dimension 1: range [6, 10]
+        # Dimension 2: range [6, 10]
         low  = torch.tensor([0., 6., 6.])
         high = torch.tensor([10., 10., 10.])
-        # assert low.numel() == alg_params.action_dim and high.numel() == alg_params.action_dim, \
-        #     "low/high 的长度应与 action_dim 一致"
         self.register_buffer("act_low",  low)
         self.register_buffer("act_high", high)
         self.register_buffer("act_scale", (high - low) / 2.0)
@@ -38,26 +36,14 @@ class MappoPolicyNet(nn.Module):
 
         self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0
         self.EPS = 1e-6
-    
-    # def forward(self, obs):
-    #     x = self.tanh(self.fc1(obs))
-    #     x = self.tanh(self.fc2(x))
-    #     # 平均值生成
-    #     mean = self.tanh(self.fc3(x)) * 5 + 5
-    #     # 方差生成
-    #     log_std = self.log_std.expand_as(mean)
-    #     std = torch.exp(log_std)
-        
-    #     return mean, std
 
     def forward(self, obs):
-        assert(False) #正在测试LSTM网络
         x = self.tanh(self.fc1(obs))
         x = self.tanh(self.fc2(x))
-        # 平均值生成
+        # Generate the mean value
         mean = self.mu_head(x) # 暂不扩展到动作空间维度
         log_std = torch.clamp(self.log_std, min=self.LOG_STD_MIN, max=self.LOG_STD_MAX)       
-        # 方差生成
+        # Generate the variance
         std = torch.exp(log_std).expand_as(mean)
         return mean, std
 
@@ -96,7 +82,7 @@ class MappoPolicyNetLSTM(nn.Module):
         self.register_buffer("act_scale", (high - low) / 2.0)
         self.register_buffer("act_bias",  (high + low) / 2.0)
 
-        # self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0 # 正态分布std越小，越接近确定性策略
+        # self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0
         self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0
         self.EPS = 1e-6
 
@@ -119,9 +105,11 @@ class MappoPolicyNetLSTM(nn.Module):
         x = self.tanh(self.fc1(obs))           # [B,T,hid1]
         out, (h_n, c_n) = self.lstm(x, h_in)   # [B,T,hid2], ([1,B,hid2],[1,B,hid2])
         x = self.tanh(out)
+        # Generate the mean value
         mean = self.mu_head(x)                 # [B,T,act_dim]
         mean_scale = 0.3
         mean = mean * mean_scale
+        # Generate the variance
         log_std = torch.clamp(self.log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
         std = log_std.exp().expand_as(mean)
         if single_step:

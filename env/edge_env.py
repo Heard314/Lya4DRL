@@ -46,7 +46,7 @@ class EdgeEnv():
         self.edge_act_reward_fac = [1.0 for _ in range(self.edge_queue_num)]
         self.avg_data_sizes = [(general_params.data_size_inls[i][0]+general_params.data_size_inls[i][1])/2 for i in range(self.edge_queue_num)]
         self.avg_comp_denss = [(general_params.comp_dens_inls[i][0]+general_params.comp_dens_inls[i][1])/2 for i in range(self.edge_queue_num)]
-        # 为了平衡reward_act与reward_vir之间的比例，为增长率添加一个系数（与任务计算时间成反比）
+        # To balance reward_act and reward_vir, add a scaling factor to the growth rate (inversely proportional to task computation time)
         self.edge_act_reward_fac = [self.edge_act_reward_fac[i] / (0.8 * self.device_num_per_type[i] * self.avg_data_sizes[i] * self.avg_comp_denss[i] / self.alloc_edge_freq[i]) for i in range(self.edge_queue_num)]
         self.edge_act_reward_fac = [self.edge_act_reward_fac[i] * self.edge_act_reward_fac[i] for i in range(self.edge_queue_num)]
         print(f"[DEBUG] The edge's edge_act_reward_fac are {self.edge_act_reward_fac}")
@@ -176,11 +176,6 @@ class EdgeEnv():
                     {f"ep_{e_id}_act_chg": self.new_edge_ql_change[device_type]},
                     t_id
                 )
-                # writer.add_scalars(
-                #     f"detail/edge_time_ql_{device_type}",
-                #     {f"ep_{e_id}_act_backlog": self.act_backlog},
-                #     t_id
-                # )
                 writer.add_scalars(
                     f"detail/edge_time_ql_{device_type}",
                     {f"ep_{e_id}_vir": self.virtual_edge_queue_time_ql[device_type]},
@@ -191,26 +186,3 @@ class EdgeEnv():
                     {f"ep_{e_id}_vir_chg": self.new_vir_edge_ql_change[device_type]},
                     t_id
                 )
-                # writer.add_scalars(
-                #     f"detail/edge_time_ql_{device_type}",
-                #     {f"ep_{e_id}_vir_backlog": self.vir_backlog},
-                #     t_id
-                # )
-
-                # writer.add_scalars(
-                #     f"detail/total_comp_{device_type}",
-                #     {f"ep_{e_id}_time": self.total_comp_time[device_type]},
-                #     t_id
-                # )
-
-                # writer.add_scalars(
-                #     f"detail/total_comp_{device_type}",
-                #     {f"ep_{e_id}_amount": self.total_comp_amount[device_type]},
-                #     t_id
-                # )
-
-                # writer.add_scalars(
-                #     f"detail/alloc_edge_freq_{device_type}",
-                #     {f"ep_{e_id}_freq": alloc_edge_freq[device_type]},
-                #     t_id
-                # )

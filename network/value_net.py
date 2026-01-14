@@ -40,8 +40,6 @@ class MaddpgValueNet(nn.Module):
             OrthogonalInit(self.fc3)
             
     def forward(self, state, joint_act):
-        print(f"state shape in value net: {state.shape}")
-        print(f"joint_act shape in value net: {joint_act.shape}")
         x = self.tanh(self.fc1(torch.concat([state, joint_act], dim = -1)))
         x = self.tanh(self.fc2(x))
         v = self.fc3(x)
