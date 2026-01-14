@@ -11,7 +11,7 @@ device_num = 10
 edge_queue_num = 3
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
-    
+
     parser.add_argument("--enable_actual_queue_reward", action="store_true",
                         help = "whether to add actual queue punishment to reward")
 
@@ -38,7 +38,7 @@ def get_general_params():
     parser.add_argument("--eval_mode", type = str, default = "mappo",
                         help = "evaluation mode")
     
-    parser.add_argument("--eval_episodes", type = int, default = 500,
+    parser.add_argument("--eval_episodes", type = int, default = 800,
                         help = "the number of sample-episodes for evaluation")
     
     parser.add_argument("--eval_time_slots", type = int, default = 200,
@@ -112,7 +112,7 @@ def get_general_params():
     parser.add_argument("--gen_task_cycle", type = int, default = 5,
                         help = "the cycle of generating tasks (unit: time slots)")
 
-    parser.add_argument("--start_slot", type = int, default = 1,
+    parser.add_argument("--start_slot", type = int, default = 0,
                         help = "the cycle of generating tasks (unit: time slots)")
 
     # 修改为10-15Mbps

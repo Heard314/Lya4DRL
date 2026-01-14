@@ -218,17 +218,15 @@ class Rollout:
         gen_task_cycle = self.gen_task_cycle
 
         start_t_id = self.start_slot
-        end_t_id = time_slots + start_t_id
+        end_t_id = time_slots + start_t_id + 1
 
-        gen_t_id = 0
+        gen_t_id = -1 
         for t_id in range(start_t_id, end_t_id):
-            if t_id % 5 == 0:
+            if t_id % gen_task_cycle == start_t_id:
+                gen_t_id += 1
                 visualize = visualize_this_episode
             else:
                 visualize = False
-
-            if t_id % gen_task_cycle == start_t_id:
-                gen_t_id += 1
 
             # print("-------------time slot: " + str(t_id) + "-------------")
             # choose action (use deterministic strategy during evaluation)
@@ -293,20 +291,21 @@ class Rollout:
             comp_dlys, device_csum_engys, \
             device_esum_engys, device_overtime_nums, \
             next_edge_obs, next_device_obss, device_task_is_available = self.mec_env.step(device_acts_, e_id = e_id, t_id = t_id, visualize = visualize)
-
-            self.average(gen_t_id, joint_rewards, device_rewards,
-                               joint_cost, device_costs,
-                               comp_dlys, device_csum_engys,
-                               device_esum_engys, device_overtime_nums,
-                               device_task_is_available)
-
+            
+            if t_id % gen_task_cycle == start_t_id:
+                self.average(gen_t_id, joint_rewards, device_rewards,
+                                joint_cost, device_costs,
+                                comp_dlys, device_csum_engys,
+                                device_esum_engys, device_overtime_nums,
+                                device_task_is_available)
+            self.average_always(t_id, edge_comp_qls, device_comp_qls)
             # update computing-queue lengths
             edge_comp_qls = [next_edge_obs[i * self.edge_queue_obs_dim] for i in range(self.device_type_num)]
             device_comp_qls = [obs[1] for obs in next_device_obss]
-
+            
             # reward scaling
-            if hasattr(self, "reward_scaling"):
-                joint_rewards = self.reward_scaling(joint_rewards)
+            # if hasattr(self, "reward_scaling"):
+            #     joint_rewards = self.reward_scaling(joint_rewards)
 
             # obs scaling
             if hasattr(self, "obs_scaling"):
@@ -314,10 +313,23 @@ class Rollout:
 
             if t_id % gen_task_cycle == start_t_id:
                 if not self.evaluate and self.train_mode == "mappo":
+                    # print(f"[DEBUG] edge_obs: {edge_obs}")
+                    # print(f"[DEBUG] device_obss: {device_obss}")
+                    # print(f"[DEBUG] lstm_hidden_hs: {lstm_hidden_hs}")
+                    # print(f"[DEBUG] lstm_hidden_cs: {lstm_hidden_cs}")
+                    # print(f"[DEBUG] device_acts: {device_acts}")
+                    # print(f"[DEBUG] device_act_logprobs: {device_act_logprobs}")
+                    # print(f"[DEBUG] joint_rewards: {joint_rewards}")
                     self.replay_buffer.store(edge_obs, device_obss, lstm_hidden_hs, lstm_hidden_cs,
                                             device_acts, device_act_logprobs,
                                             joint_rewards, device_active)
                 if not self.evaluate and self.train_mode == "maddpg":
+                    # print(f"[DEBUG] edge_obs: {edge_obs}")
+                    # print(f"[DEBUG] device_obss: {device_obss}")
+                    # print(f"[DEBUG] device_acts: {device_acts}")
+                    # print(f"[DEBUG] joint_rewards: {joint_rewards}")
+                    # print(f"[DEBUG] next_edge_obs: {next_edge_obs}")
+                    # print(f"[DEBUG] next_device_obss: {next_device_obss}")
                     self.replay_buffer.store(edge_obs, device_obss, 
                                             device_acts, joint_rewards,
                                             next_edge_obs, next_device_obss)
@@ -330,7 +342,7 @@ class Rollout:
                 lstm_hidden_cs = next_lstm_hidden_cs
 
             if not self.evaluate and self.train_mode == "maddpg":
-                total_time_slots = (e_id - 1) * self.train_time_slots + t_id
+                total_time_slots = e_id * self.train_time_slots + t_id + 1
                 
                 # train networks
                 if total_time_slots % self.train_freq == 0:
@@ -357,8 +369,6 @@ class Rollout:
                     
             if e_id % self.save_freq == 0:
                 self.edge_agent.save_nets(e_id, self.seed)
-        
-        self.average_always(t_id, edge_comp_qls, device_comp_qls)
 
         joint_rewards = copy.copy(self.joint_rewards)
         device_rewards = copy.copy(self.device_rewards)
@@ -423,10 +433,11 @@ class Rollout:
                             comp_dlys, device_csum_engys, 
                             device_esum_engys, device_overtime_nums,
                             device_task_is_available):
-        self.joint_rewards += 1 / t_id * (joint_rewards - self.joint_rewards)
-        self.device_rewards += 1 / t_id * (device_rewards - self.device_rewards)
-        self.joint_cost += 1 / t_id * (joint_cost - self.joint_cost)
-        self.device_costs += 1 / t_id * (device_costs - self.device_costs)
+        t_id_ = t_id + 1
+        self.joint_rewards += 1 / t_id_ * (joint_rewards - self.joint_rewards)
+        self.device_rewards += 1 / t_id_ * (device_rewards - self.device_rewards)
+        self.joint_cost += 1 / t_id_ * (joint_cost - self.joint_cost)
+        self.device_costs += 1 / t_id_ * (device_costs - self.device_costs)
         self.comp_dlys += (comp_dlys)
         self.device_csum_engys += (device_csum_engys)
         self.device_esum_engys += (device_esum_engys)
@@ -443,6 +454,7 @@ class Rollout:
             self.device_esum_engys[i] /= self.device_task_avail_nums[i]
     
     # Update queue information at every time slot
-    def average_always(self, t_id, edge_comp_qls, device_comp_qls):
-        self.edge_comp_qls += 1 / t_id * (edge_comp_qls - self.edge_comp_qls)
-        self.device_comp_qls += 1 / t_id * (device_comp_qls - self.device_comp_qls)
+    def average_always(self, gen_t_id, edge_comp_qls, device_comp_qls):
+        gen_t_id_ = gen_t_id + 1
+        self.edge_comp_qls += 1 / gen_t_id_ * (edge_comp_qls - self.edge_comp_qls)
+        self.device_comp_qls += 1 / gen_t_id_ * (device_comp_qls - self.device_comp_qls)

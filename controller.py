@@ -94,7 +94,7 @@ class Controller:
     def train(self):
         
         start_epi = self.rollout.resume_episode
-        for e_id in range(start_epi, self.train_episodes + 1):
+        for e_id in range(start_epi, self.train_episodes):
             print("------------------train episode: " + str(e_id) + "------------------")
             
             visualize = False
@@ -121,7 +121,7 @@ class Controller:
             self.device_comp_expns_col.append(device_esum_engys)
             self.device_overtime_nums_col.append(device_overtime_nums)
             
-            if e_id % 1000 == 0:
+            if (e_id + 1) % 1000 == 0:
                 with open(self.results_dir + "joint_rewards_" + str(e_id) + ".pkl", "wb") as f:
                     pickle.dump(self.joint_rewards_col, f)
                 with open(self.results_dir + "device_rewards_" + str(e_id) + ".pkl", "wb") as f:

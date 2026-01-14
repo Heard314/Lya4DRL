@@ -15,8 +15,8 @@ class MappoEdgeAgent():
         self.device_in_types = gen_params.device_in_types
         # training
         self.train_time_slots = alg_params.train_time_slots
+        self.buffer_train_time_slots = alg_params.buffer_train_time_slots
         self.train_freq = alg_params.train_freq
-        self.buffer_train_freq = alg_params.buffer_train_freq
         self.train_batch_size = alg_params.train_batch_size
         self.v_epochs = alg_params.v_epochs
         self.p_epochs = alg_params.p_epochs
@@ -67,7 +67,6 @@ class MappoEdgeAgent():
             self.p_optimizers.append(p_optimizer)
             
         # load networks' weights 
-
         if gen_params.load_weights:
             print(f"Loading value network from: {self.weights_dir}v_net_params.pkl")
             for i in range(self.device_type_num):
@@ -80,13 +79,13 @@ class MappoEdgeAgent():
 
     def train_nets(self, replay_buffers):
         '''training data'''
-        # v_inputs: [train_freq x train_time_slots, state_dim]
-        # v_tags: [train_freq x train_time_slots, 1] 价值网络的目标值
-        # p_inputs: [train_freq x train_time_slots, device_num, obs_dim]
-        # acts: [train_freq x train_time_slots, device_num, action_dim]
-        # act_logprobs: [train_freq x train_time_slots, device_num, 1]
-        # advs: [train_freq x train_time_slots, 1]
-        # active_masks: [train_freq x train_time_slots, device_num, 1]
+        # v_inputs: [train_freq x buffer_train_time_slots, state_dim]
+        # v_tags: [train_freq x buffer_train_time_slots, 1]
+        # p_inputs: [train_freq x buffer_train_time_slots, device_num, obs_dim]
+        # acts: [train_freq x buffer_train_time_slots, device_num, action_dim]
+        # act_logprobs: [train_freq x buffer_train_time_slots, device_num, 1]
+        # advs: [train_freq x buffer_train_time_slots, 1]
+        # active_masks: [train_freq x buffer_train_time_slots, device_num, 1]
         p_inputs, lstm_hidden_hs, lstm_hidden_cs, \
         acts, act_logprobs, active_masks = replay_buffers.get_policy_net_training_data()
         p_inputs       = p_inputs.to(self.device)
@@ -113,7 +112,7 @@ class MappoEdgeAgent():
     
     def train_value_net(self, queue_id, v_inputs, v_tags):
         
-        total_size = self.buffer_train_freq * self.train_time_slots
+        total_size = self.train_freq * self.buffer_train_time_slots
         for e in range(self.v_epochs):
             for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
                                     self.train_batch_size, False):
@@ -132,7 +131,7 @@ class MappoEdgeAgent():
 
     def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs,
                           active_masks,lstm_hidden_hs=None, lstm_hidden_cs=None):
-        total_size = self.buffer_train_freq * self.train_time_slots
+        total_size = self.train_freq * self.buffer_train_time_slots
         for e in range(self.p_epochs):
             for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
                                         self.train_batch_size, False):
@@ -196,7 +195,7 @@ class MappoEdgeAgent():
             for i in range(self.device_type_num):
                 for params in self.v_optimizers[i].param_groups:
                     params['lr'] = self.v_lr
-       
+        
         if self.p_lr > self.min_p_lr:  
             self.p_lr *= self.decay_fac
             for i in range(self.device_num):
@@ -235,6 +234,7 @@ class MaddpgEdgeAgent():
         self.action_dim = alg_params.action_dim
         
         # training
+        self.gen_task_cycle = gen_params.gen_task_cycle
         self.warm_time_slots = alg_params.warm_time_slots
         self.train_batch_size = alg_params.train_batch_size
         self.v_epochs = alg_params.v_epochs
@@ -305,9 +305,14 @@ class MaddpgEdgeAgent():
         
     def train_nets(self, total_time_slots, replay_buffer):
         if total_time_slots >= self.warm_time_slots:
-            batch_ids = np.random.choice(range(self.buffer_size),
-                                            self.train_batch_size, replace = False)
-            
+            batch_slots = (total_time_slots + self.gen_task_cycle - 1)//self.gen_task_cycle
+            if batch_slots < self.buffer_size:
+                batch_ids = np.random.choice(range(batch_slots),
+                                                self.train_batch_size, replace = False)
+            else:
+                batch_ids = np.random.choice(range(self.buffer_size),
+                                                self.train_batch_size, replace = False)
+                
             '''training data'''
             # batch_states: [device_type_num, batch_size, state_dim]
             # batch_device_obss: [batch_size, device_num, obs_dim]

@@ -235,6 +235,8 @@ class DeviceEnv():
             comp_dens = self.sched_tasks[i].comp_dens
             dly_cons = self.sched_tasks[i].dly_cons
             task_msgs += [data_size, comp_dens, dly_cons]
+        if self.task_num == 0:
+            task_msgs = [0.0,0.0,0.0]
         obs = []
         obs += [max_trans_rate, local_queue, local_vir_queue] + task_msgs
 
@@ -343,7 +345,7 @@ class DeviceEnv():
             local_comps = []
             for task_id, offl_dz in enumerate(offl_dzs):
                 total_offl_dz += offl_dz
-                tran_queue_delay = max(self.total_tran_time - (t_id-1) * self.delta,0)
+                tran_queue_delay = max(self.total_tran_time - t_id * self.delta,0)
                 total_trans_dz += offl_dz
                 task = self.sched_tasks[task_id]
                 task.offl_dz = offl_dz
@@ -380,7 +382,7 @@ class DeviceEnv():
                     task.l_queue_dly = 0
                     task.local_comp_engy = 0
                 else:
-                    task.l_queue_dly = max(self.total_comp_time - (t_id-1)*self.delta, 0)
+                    task.l_queue_dly = max(self.total_comp_time - t_id * self.delta, 0)
                     task.l_proc_dly = local_comp / device_comp_freq
                     task.l_comp_dly = task.l_queue_dly + task.l_proc_dly
                     

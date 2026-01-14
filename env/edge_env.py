@@ -122,15 +122,14 @@ class EdgeEnv():
                     # config: energy coef = 1 J/GFlops
                     task.edge_comp_engy = task.offl_dz * task.comp_dens * pow(alloc_edge_freq[device_type],2)
                     # if(enable_print): print(f"[DEBUG] The edge freq pow2 is {pow(alloc_edge_freq[device_type],2)}")
-                    task.e_comp_dly = max(max(self.total_comp_time[device_type] - (t_id-1)*self.delta, 0), task.trans_time) + task.offl_dz * \
-                                    task.comp_dens / alloc_edge_freq[device_type]
-                    task.e_queue_dly = max(self.total_comp_time[device_type] - (t_id-1)*self.delta, 0)
+                    task.e_queue_dly = max(self.total_comp_time[device_type] - t_id * self.delta, 0)
                     task.e_proc_dly = task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
-                    total_comp_need_time_this_epi += task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
+                    task.e_comp_dly = max(task.e_queue_dly, task.trans_time) + task.e_proc_dly
+                    total_comp_need_time_this_epi += task.e_proc_dly
                     total_comp_used_time_this_epi[device_type] += min(task.offl_dz * task.comp_dens/alloc_edge_freq[device_type], max(0, self.delta-max(task.trans_time, comp_dlys[device_type])))
                     if(enable_print): print(f"[DEBUG] the edge comp_dly in device {task.device_id} is {task.e_comp_dly}")
-                    comp_dlys[device_type] = max(comp_dlys[device_type], task.trans_time) + task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
-                    self.total_comp_time[device_type] += task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
+                    comp_dlys[device_type] = max(comp_dlys[device_type], task.trans_time) + task.e_proc_dly
+                    self.total_comp_time[device_type] += task.e_proc_dly
                     self.total_comp_amount[device_type] += task.offl_dz * task.comp_dens
             
             # avg_edge_time: mean over last statSlotNum slots
