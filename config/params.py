@@ -244,11 +244,11 @@ def get_general_params():
                         help = "the b parameter for edge weight linear function")
 
     parser.add_argument("--device_dly_adj_fac", type = list, 
-                        default = [1.0]*edge_queue_num,
+                        default = [0.75]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     parser.add_argument("--edge_dly_adj_fac", type = list, 
-                        default = [1.0]*edge_queue_num,
+                        default = [0.75]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     # parser.add_argument("--vir_local_ql_growth_rate", type = float,
@@ -282,6 +282,9 @@ def get_general_params():
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     # navie reward
+    parser.add_argument("--base_reward_penalty", type = float, default = 10000,
+                        help = "the base reward penalty for each task")
+
     parser.add_argument("--timeout_reward_penalty", type = float, default = -4000,
                         help = "the reward if the task is timeout")
 
@@ -480,10 +483,10 @@ def get_maddpg_params():
     parser.add_argument("--action_dim", type = int, default = action_dim,
                         help = "the dimension of agents' actions")
     
-    parser.add_argument("--v_hid_dims", type = list, default = [400, 400],
+    parser.add_argument("--v_hid_dims", type = list, default = [200, 200],
                         help = "the dimension of value network's hidden layers")
     
-    parser.add_argument("--p_hid_dims", type = list, default = [400, 400], 
+    parser.add_argument("--p_hid_dims", type = list, default = [200, 200], 
                         help = "the dimension of policy network's hidden layers")
     
     parser.add_argument("--use_orthogonal_init", type = bool, default = True,

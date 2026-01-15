@@ -131,16 +131,16 @@ class EdgeEnv():
                     comp_dlys[device_type] = max(comp_dlys[device_type], task.trans_time) + task.e_proc_dly
                     self.total_comp_time[device_type] += task.e_proc_dly
                     self.total_comp_amount[device_type] += task.offl_dz * task.comp_dens
-            
-            # avg_edge_time: mean over last statSlotNum slots
-            old_edge_queue_time_ql_ = self.edge_queue_time_ql[device_type]
-            self.old_comp_times[device_type].append(total_comp_need_time_this_epi)
-            tail = self.old_comp_times[device_type][-self.statSlotNum:]
-            self.avg_edge_time[device_type] = sum(tail) / len(tail) if tail else 0
+        
+                # avg_edge_time: mean over last statSlotNum slots
+                self.old_comp_times[device_type].append(total_comp_need_time_this_epi)
+                tail = self.old_comp_times[device_type][-self.statSlotNum:]
+                self.avg_edge_time[device_type] = sum(tail) / len(tail) if tail else 0
             
             edge_act_queue_growth_rate = self.edge_act_queue_growth_rate
             self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type]), 0)
             
+            old_edge_queue_time_ql_ = self.edge_queue_time_ql[device_type]
             self.new_edge_ql_change[device_type] = self.edge_queue_time_ql[device_type] - old_edge_queue_time_ql_
             self.act_backlog = total_comp_need_time_this_epi
             self.old_virtual_edge_queue_time_ql[device_type] = self.virtual_edge_queue_time_ql[device_type]
@@ -148,7 +148,7 @@ class EdgeEnv():
             old_virtual_edge_queue_time_ql_ = self.virtual_edge_queue_time_ql[device_type]
             EPS = 1e-6
             if self.avg_edge_time[device_type] > EPS:
-                self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta - self.edge_dly_adj_val[device_type]), 0)
+                self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle - self.edge_dly_adj_val[device_type]), 0)
                 self.new_vir_edge_ql_change[device_type] = self.virtual_edge_queue_time_ql[device_type] - old_virtual_edge_queue_time_ql_
                 self.vir_backlog = self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]
 

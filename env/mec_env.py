@@ -31,6 +31,8 @@ class MECEnv():
         self.device_envs = []
         for i in range(self.device_num):
             self.device_envs.append(DeviceEnv(i, gen_params, self.edge_env, writer))
+
+        # reward parameters
         self.device_queue_reward_weight = gen_params.device_queue_reward_weight
         self.edge_queue_reward_weight = gen_params.edge_queue_reward_weight
 
@@ -44,7 +46,8 @@ class MECEnv():
         self.device_act_queue_reward_min_bound = gen_params.device_act_queue_reward_min_bound
         self.device_vir_queue_reward_max_bound = gen_params.device_vir_queue_reward_max_bound
         self.device_vir_queue_reward_min_bound = gen_params.device_vir_queue_reward_min_bound
-    
+        self.base_reward_penalty = gen_params.base_reward_penalty
+
         print(f"[DEBUG] device_act_queue_reward_max_bound: {self.device_act_queue_reward_max_bound}")
         print(f"[DEBUG] device_act_queue_reward_min_bound: {self.device_act_queue_reward_min_bound}")
         print(f"[DEBUG] device_vir_queue_reward_max_bound: {self.device_vir_queue_reward_max_bound}")
@@ -99,7 +102,7 @@ class MECEnv():
         self.edge_env.compute(device_sched_tasks, e_id = e_id, t_id = t_id, visualize = visualize)
         
         # reward
-        device_rewards = [0 for i in range(self.device_num)]
+        device_rewards = [self.base_reward_penalty for i in range(self.device_num)]
         device_queue_actual_rewards = [0 for i in range(self.device_num)]
         device_queue_virtual_rewards = [0 for i in range(self.device_num)]
         edge_queue_num = self.device_type_num
@@ -186,9 +189,9 @@ class MECEnv():
                 if comp_dly > task.dly_cons:
                     device_overtime_nums[i] += 1
 
+                print(f"[DEBUG] the comp_dly is {comp_dly}, the task.dly_cons is {task.dly_cons}")
                 if comp_dly > task.dly_cons and not (self.enable_virtual_queue_reward or self.enable_actual_queue_reward):
                     device_rewards[i] += self.timeout_reward_penalty
-                    #! 当设备i超时严重时，其他设备的动态时间阈值调整系数应适当增大
                 else:
                     norm_csum_engy = task.norm_csum_engy
                     norm_esum_engy = task.norm_esum_engy

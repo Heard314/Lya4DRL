@@ -107,7 +107,7 @@ class MappoPolicyNetLSTM(nn.Module):
         x = self.tanh(out)
         # Generate the mean value
         mean = self.mu_head(x)                 # [B,T,act_dim]
-        mean_scale = 0.3
+        mean_scale = 1.0
         mean = mean * mean_scale
         # Generate the variance
         log_std = torch.clamp(self.log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)

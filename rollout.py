@@ -428,17 +428,17 @@ class Rollout:
                device_esum_engys, device_overtime_nums
     
     # Update only when new tasks arrive in the time slot
-    def average(self, t_id, joint_rewards, device_rewards, 
+    def average(self, gen_t_id, joint_rewards, device_rewards, 
                             joint_cost, device_costs, 
                             comp_dlys, device_csum_engys, 
                             device_esum_engys, device_overtime_nums,
                             device_task_is_available):
-        t_id_ = t_id + 1
-        self.joint_rewards += 1 / t_id_ * (joint_rewards - self.joint_rewards)
-        self.device_rewards += 1 / t_id_ * (device_rewards - self.device_rewards)
-        self.joint_cost += 1 / t_id_ * (joint_cost - self.joint_cost)
-        self.device_costs += 1 / t_id_ * (device_costs - self.device_costs)
-        self.comp_dlys += (comp_dlys)
+        gen_t_id_ = gen_t_id + 1
+        self.joint_rewards += 1 / gen_t_id_ * (joint_rewards - self.joint_rewards)
+        self.device_rewards += 1 / gen_t_id_ * (device_rewards - self.device_rewards)
+        self.joint_cost += 1 / gen_t_id_ * (joint_cost - self.joint_cost)
+        self.device_costs += 1 / gen_t_id_ * (device_costs - self.device_costs)
+        self.comp_dlys += 1 / gen_t_id_ * (comp_dlys - self.comp_dlys)
         self.device_csum_engys += (device_csum_engys)
         self.device_esum_engys += (device_esum_engys)
         self.device_overtime_nums += device_overtime_nums
@@ -447,14 +447,14 @@ class Rollout:
             if device_task_is_available[i]:
                 self.device_task_avail_nums[i]+=1
 
-        for i in range(self.device_num):
-            self.device_task_avail_nums[i] = max(1.0, self.device_task_avail_nums[i])
-            self.comp_dlys[i] /= self.device_task_avail_nums[i]
-            self.device_csum_engys[i] /= self.device_task_avail_nums[i]
-            self.device_esum_engys[i] /= self.device_task_avail_nums[i]
+        # for i in range(self.device_num):
+        #     self.device_task_avail_nums[i] = max(1.0, self.device_task_avail_nums[i])
+        #     self.comp_dlys[i] /= self.device_task_avail_nums[i]
+        #     self.device_csum_engys[i] /= self.device_task_avail_nums[i]
+        #     self.device_esum_engys[i] /= self.device_task_avail_nums[i]
     
     # Update queue information at every time slot
-    def average_always(self, gen_t_id, edge_comp_qls, device_comp_qls):
-        gen_t_id_ = gen_t_id + 1
-        self.edge_comp_qls += 1 / gen_t_id_ * (edge_comp_qls - self.edge_comp_qls)
-        self.device_comp_qls += 1 / gen_t_id_ * (device_comp_qls - self.device_comp_qls)
+    def average_always(self, t_id, edge_comp_qls, device_comp_qls):
+        t_id_ = t_id + 1
+        self.edge_comp_qls += 1 / t_id_ * (edge_comp_qls - self.edge_comp_qls)
+        self.device_comp_qls += 1 / t_id_ * (device_comp_qls - self.device_comp_qls)
