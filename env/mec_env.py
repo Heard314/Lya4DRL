@@ -189,7 +189,7 @@ class MECEnv():
                 if comp_dly > task.dly_cons:
                     device_overtime_nums[i] += 1
 
-                print(f"[DEBUG] the comp_dly is {comp_dly}, the task.dly_cons is {task.dly_cons}")
+                # print(f"[DEBUG] the comp_dly is {comp_dly}, the task.dly_cons is {task.dly_cons}")
                 if comp_dly > task.dly_cons and not (self.enable_virtual_queue_reward or self.enable_actual_queue_reward):
                     device_rewards[i] += self.timeout_reward_penalty
                 else:

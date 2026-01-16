@@ -368,16 +368,16 @@ def get_mappo_params():
     parser.add_argument("--train_episodes", type = int, default = 30000,
                         help = "the number of training episodes")
 
-    parser.add_argument("--train_time_slots", type = int, default = 600,
+    parser.add_argument("--train_time_slots", type = int, default = 3000,
                         help = "the number of training time-slots")
     
-    parser.add_argument("--buffer_train_time_slots", type = int, default = 120,
+    parser.add_argument("--buffer_train_time_slots", type = int, default = 600,
                         help = "the number of training time-slots storing in the replay buffer.")
 
     # parser.add_argument("--buffer_train_freq", type = int, default = 4,
     #                     help = "training frequency")
 
-    parser.add_argument("--train_freq", type = int, default = 20,
+    parser.add_argument("--train_freq", type = int, default = 4,
                         help = "training frequency")
     
     parser.add_argument("--train_batch_size", type = int, default = 2400,
@@ -404,10 +404,10 @@ def get_mappo_params():
     parser.add_argument("--use_lr_decay", type = bool, default = False,
                         help = "whether to use learning-rate decay")
     
-    parser.add_argument("--min_v_lr", type = float, default = 1e-5,        
+    parser.add_argument("--min_v_lr", type = float, default = 1e-5, 
                         help = "the minimal learning-rate of value network")
     
-    parser.add_argument("--min_p_lr", type = float, default = 1e-5,        
+    parser.add_argument("--min_p_lr", type = float, default = 1e-5,
                         help = "the minimal learning-rate of policy networks")
     
     parser.add_argument("--decay_fac", type = float, default = 0.999, 
@@ -443,7 +443,6 @@ def get_mappo_params():
     parser.add_argument("--results_dir", type = str, default = "result/mappo/",
                         help = "the directory for saving training results")
     
-
     params, unknown = parser.parse_known_args()
     
     return params
@@ -496,7 +495,7 @@ def get_maddpg_params():
     parser.add_argument("--train_episodes", type = int, default = 30000,
                         help = "the number of training episodes")
     
-    parser.add_argument("--train_time_slots", type = int, default = 600,
+    parser.add_argument("--train_time_slots", type = int, default = 3000,
                         help = "the number of training time-slots")
     
     parser.add_argument("--warm_time_slots", type = int, default = 12000,
