@@ -90,7 +90,7 @@ class Controller:
         # evaluation
         else:
             self.eval_episodes = gen_params.eval_episodes
-    
+
     def train(self):
         
         start_epi = self.rollout.resume_episode
@@ -158,11 +158,15 @@ class Controller:
         
         for e_id in range(1, self.eval_episodes + 1):
             print("------------------evaluate episode: " + str(e_id) + "------------------")
+
+            visualize = False
+            if e_id % 20 == 0:
+                visualize = True
             joint_rewards_, device_rewards_, \
             joint_cost_, device_costs_, \
             edge_comp_ql_, device_comp_qls_, \
             device_comp_dlys_, device_csum_engys_, \
-            device_comp_expns_, device_overtime_nums_ = self.rollout.run(e_id)
+            device_comp_expns_, device_overtime_nums_ = self.rollout.run(e_id, visualize=visualize)
             
             joint_rewards += joint_rewards_
             device_rewards += device_rewards_

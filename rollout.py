@@ -94,8 +94,10 @@ class Rollout:
             np.random.seed(gen_params.eval_seed)
             
             self.eval_time_slots = gen_params.eval_time_slots
-            
+            self.eval_
+
             # initialize agents' policy networks
+            #! discard, load weight when the device agents are initialized 
             if self.eval_mode[0] == "m":
                 for i in range(self.device_num):
                     path = gen_params.weights_dir + "p_net_params_" + str(i) + ".pkl"
