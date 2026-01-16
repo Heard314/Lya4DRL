@@ -70,7 +70,7 @@ class MappoEdgeAgent():
         if gen_params.load_weights:
             print(f"Loading value network from: {self.weights_dir}v_net_params.pkl")
             for i in range(self.device_type_num):
-                v_path = self.weights_dir + "v_net_params_" + str(i) + f"{gen_params.resume_episode}.pkl"
+                v_path = self.weights_dir + "v_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
                 self.v_nets[i].load_state_dict(torch.load(v_path, map_location=self.device))
             print(f"Loading policy networks from: {self.weights_dir}p_net_params.pkl")
             for i in range(self.device_num):

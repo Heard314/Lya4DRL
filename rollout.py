@@ -32,11 +32,13 @@ class Rollout:
         run_dir = gp.settings.run_dir
 
         # edge agent and replay buffer
-        if not self.evaluate and self.train_mode == "mappo":
+        if (not self.evaluate and self.train_mode == "mappo") or \
+            (self.evaluate and self.eval_mode == "mappo"):
             print("The training mode is in rollout: mappo")
             self.edge_agent = MappoEdgeAgent(gen_params, alg_params)
             self.replay_buffer = MappoReplayBuffer(gen_params, alg_params)
-        if not self.evaluate and self.train_mode == "maddpg":
+        if (not self.evaluate and self.train_mode == "maddpg") or \
+            (self.evaluate and self.eval_mode == "maddpg"):
             print("The training mode is in rollout: maddpg")
             self.edge_agent = MaddpgEdgeAgent(gen_params, alg_params)
             self.replay_buffer = MaddpgReplayBuffer(gen_params, alg_params)
@@ -53,7 +55,7 @@ class Rollout:
                (self.evaluate and self.eval_mode == "mappo"):
                 self.device_agents.append(MappoDeviceAgent(i, gen_params, alg_params))
             if (not self.evaluate and self.train_mode == "maddpg") or \
-               (self.evaluate and self.eval_mode == "maddpg"):
+                (self.evaluate and self.eval_mode == "maddpg"):
                 self.device_agents.append(MaddpgDeviceAgent(i, gen_params, alg_params))
             if self.evaluate and self.eval_mode == "local_comp":
                 self.device_agents.append(LocalComputingDeviceAgent(i, gen_params))
@@ -94,14 +96,16 @@ class Rollout:
             np.random.seed(gen_params.eval_seed)
             
             self.eval_time_slots = gen_params.eval_time_slots
-            self.eval_
 
             # initialize agents' policy networks
             #! discard, load weight when the device agents are initialized 
+            
             if self.eval_mode[0] == "m":
                 for i in range(self.device_num):
-                    path = gen_params.weights_dir + "p_net_params_" + str(i) + ".pkl"
-                    self.device_agents[i].load_net(path)
+                    self.device_agents[i].update_net(self.edge_agent.p_nets[i].state_dict())
+            #     for i in range(self.device_num):
+            #         path = gen_params.weights_dir + "p_net_params_" + str(i) + ".pkl"
+            #         self.device_agents[i].load_net(path)
 
         self.tb_log_dir = (
                 root_path
@@ -243,6 +247,8 @@ class Rollout:
                     task_num = self.mec_env.device_envs[i].task_num
                     device_active[i] = task_num >= 1
                     device_type = self.device_types[i]
+                    # print(f"[DEBUG] device {i}, t_id {t_id}")
+                    # print(f"[DEBUG] task_num >= 1: {task_num >= 1}, t_id % gen_task_cycle == start_slot: {t_id % self.gen_task_cycle == self.start_slot}")
                     assert ((task_num >= 1) == (t_id % self.gen_task_cycle == self.start_slot))
                     if task_num >= 1:
                         device_value_obs = concatenate(device_obss[i], edge_obs[device_type * self.edge_queue_obs_dim : (device_type + 1) * self.edge_queue_obs_dim]) 

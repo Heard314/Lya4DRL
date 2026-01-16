@@ -9,7 +9,7 @@ import config.global_params as gp
 class Controller:
     def __init__(self, gen_params):
         self.device_num = gen_params.device_num
-        
+        self.device_type_num = gen_params.device_type_num
         # algorithm params
         alg_params = None
         if (not gen_params.evaluate and gen_params.train_mode == "mappo") or \
@@ -38,6 +38,29 @@ class Controller:
             resume_episode = gen_params.resume_episode
             assert gen_params.resume_episode == train_info["resume_episode"], \
                 "The resume episode in alg_params does not match that in train_info!"
+        elif gen_params.evaluate and gen_params.load_weights:
+            self.weights_dir = root_path + gen_params.weights_dir
+            gp.settings.weight_dir = self.weights_dir
+            train_info_path  = self.weights_dir + f"train_info_{gen_params.resume_episode}.pkl"
+            with open(train_info_path, "rb") as f:
+                train_info = pickle.load(f)
+            # fix random seed
+            self.seed = gen_params.evaluate and gen_params.eval_seed or gen_params.train_seed
+            # runtime storage path
+            import datetime
+            run_path =  (
+                    (gen_params.evaluate and "evaluate" or "train")
+                    + "/"
+                    + (gen_params.evaluate and gen_params.eval_mode or gen_params.train_mode)
+                    + "_s_"
+                    + str(self.seed)
+                    + "_t_"
+                    + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
+                    + "_d_"
+                    + gen_params.run_desc
+            )
+            run_dir = run_path + "/"
+            resume_episode = 0
         else:
             # fix random seed
             self.seed = gen_params.evaluate and gen_params.eval_seed or gen_params.train_seed

@@ -4,7 +4,7 @@ import torch
 @dataclass
 class Settings:
     enable_print: bool = False
-    exp_result_dir: str = "D:\\Desktop\\work\\yanjiushengbishe\\hupaper\\project\\MADDPG_CTDE\\MADRL-Based-Multi-Task-Partial-Computation-Offloading-in-MEC\\"
+    exp_result_dir: str = "/root/autodl-tmp/res/"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     run_dir: str = ""
     plot_dir: str = ""
