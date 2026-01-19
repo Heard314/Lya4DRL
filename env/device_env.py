@@ -391,7 +391,7 @@ class DeviceEnv():
                 # if(enable_print): print(f"[DEBUG] The device freq pow2 is {pow(device_comp_freq,2)}")
                 old_time_ql_ = self.time_ql
                 self.time_ql = max(0, old_time_ql_ + device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta))
-                self.new_ql_change = self.time_ql - old_time_ql_
+                self.new_ql_change = device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta)
                 self.act_backlog = local_comp / device_comp_freq
                     # print(f"[DEBUG] The device", self.env_id, "'s time_ql is: ", self.time_ql)
                     # print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)
@@ -413,7 +413,7 @@ class DeviceEnv():
             if self.avg_local_time > EPS:
                 old_vir_time_ql_ = self.virtual_time_ql
                 self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val))
-                self.new_vir_ql_change = self.virtual_time_ql - old_vir_time_ql_
+                self.new_vir_ql_change = device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val)
                 self.vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
         else:
             total_trans_dz = self.trans_ql
@@ -423,7 +423,7 @@ class DeviceEnv():
             self.old_time_ql = self.time_ql
             device_act_queue_growth_rate = self.device_act_queue_growth_rate
             self.time_ql = max(0, self.time_ql - device_act_queue_growth_rate * self.delta)
-            self.new_ql_change = self.time_ql - self.old_time_ql
+            self.new_ql_change = -device_act_queue_growth_rate * self.delta
             self.act_backlog = 0.0
             self.old_virtual_time_ql = self.virtual_time_ql
             device_vir_queue_growth_rate = self.device_vir_queue_growth_rate
@@ -431,7 +431,7 @@ class DeviceEnv():
             if self.avg_local_time > EPS:
                 old_vir_time_ql_ = self.virtual_time_ql
                 self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val))
-                self.new_vir_ql_change = self.virtual_time_ql - old_vir_time_ql_
+                self.new_vir_ql_change = device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val)
                 self.vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
 
     

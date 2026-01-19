@@ -138,10 +138,9 @@ class EdgeEnv():
                 self.avg_edge_time[device_type] = sum(tail) / len(tail) if tail else 0
             
             edge_act_queue_growth_rate = self.edge_act_queue_growth_rate
-            self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type]), 0)
-            
             old_edge_queue_time_ql_ = self.edge_queue_time_ql[device_type]
-            self.new_edge_ql_change[device_type] = self.edge_queue_time_ql[device_type] - old_edge_queue_time_ql_
+            self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type]), 0)
+            self.new_edge_ql_change[device_type] = edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type])
             self.act_backlog = total_comp_need_time_this_epi
             self.old_virtual_edge_queue_time_ql[device_type] = self.virtual_edge_queue_time_ql[device_type]
             edge_vir_queue_growth_rate = self.edge_vir_queue_growth_rate
@@ -149,7 +148,7 @@ class EdgeEnv():
             EPS = 1e-6
             if self.avg_edge_time[device_type] > EPS:
                 self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle - self.edge_dly_adj_val[device_type]), 0)
-                self.new_vir_edge_ql_change[device_type] = self.virtual_edge_queue_time_ql[device_type] - old_virtual_edge_queue_time_ql_
+                self.new_vir_edge_ql_change[device_type] = edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle - self.edge_dly_adj_val[device_type])
                 self.vir_backlog = self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]
 
             if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s old_edge_queue_time_ql is: ", self.old_edge_queue_time_ql[device_type])

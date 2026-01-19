@@ -244,11 +244,11 @@ def get_general_params():
                         help = "the b parameter for edge weight linear function")
 
     parser.add_argument("--device_dly_adj_fac", type = list, 
-                        default = [0.75]*edge_queue_num,
+                        default = [0.8]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     parser.add_argument("--edge_dly_adj_fac", type = list, 
-                        default = [0.75]*edge_queue_num,
+                        default = [0.6]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     # parser.add_argument("--vir_local_ql_growth_rate", type = float,
@@ -261,25 +261,29 @@ def get_general_params():
 
     # Hyperparameter
     # queue reward
-    parser.add_argument("--device_act_queue_reward_max_bound", type = float, default = 200, 
+    parser.add_argument("--device_act_queue_reward_max_bound", type = float, default = 400, 
                         help = "the max bound of actual device queue reward")
 
-    parser.add_argument("--device_act_queue_reward_min_bound", type = float, default = -300, 
+    parser.add_argument("--device_act_queue_reward_min_bound", type = float, default = -600,
                         help = "the min bound of actual device queue reward")
 
-    parser.add_argument("--device_vir_queue_reward_max_bound", type = float, default = 800, 
+    parser.add_argument("--device_vir_queue_reward_max_bound", type = float, default = 800,
                         help = "the max bound of virtual device queue reward")
 
     parser.add_argument("--device_vir_queue_reward_min_bound", type = float, default = -1200, 
                         help = "the min bound of virtual device queue reward")
 
     parser.add_argument("--device_queue_reward_weight", type = float,
-                        default = -300,
+                        default = -600,
                         help = "The Lyapunov Drift-Plus-Penalty weight for local queues")
     
     parser.add_argument("--edge_queue_reward_weight", type = float,
-                        default = -700,
+                        default = -1400,
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
+
+    parser.add_argument("--edge_queue_reward_bound_fac", type = float,
+                        default = 2.0,
+                        help = "The bound factor for edge queue reward")
 
     # navie reward
     parser.add_argument("--base_reward_penalty", type = float, default = 10000,
@@ -288,7 +292,7 @@ def get_general_params():
     parser.add_argument("--timeout_reward_penalty", type = float, default = -4000,
                         help = "the reward if the task is timeout")
 
-    parser.add_argument("--target_reward_penalty", type = float, default = -2000,
+    parser.add_argument("--target_reward_penalty", type = float, default = -1000,
                         help = "the reward if the task is completed within the threshold")
 
     # device queue growth rate
@@ -564,7 +568,7 @@ def get_maddpg_params():
     parser.add_argument("--save_freq", type = int, default = 600000,
                         help = "the saving frequency of networks")
     
-    parser.add_argument("--weights_dir", type = str, default = "weight/maddpg/", 
+    parser.add_argument("--weights_dir", type = str, default = "weight/", 
                         help = "the directory for saving network parameters")
     
     parser.add_argument("--results_dir", type = str, default = "result/maddpg/",
