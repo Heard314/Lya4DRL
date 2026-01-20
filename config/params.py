@@ -28,7 +28,7 @@ def get_general_params():
     parser.add_argument("--train_mode", type = str, default = "maddpg",
                         help = "training mode")
     
-    parser.add_argument("--eval_seed", type = int, default = 2345,
+    parser.add_argument("--eval_seed", type = int, default = 7878,
                         help = "evaluation random-seed")
     
     parser.add_argument("--train_seed", type = int, default = 7878,
@@ -197,7 +197,7 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[2.0, 2.4], [2.5, 4], [0.8, 1]],
+        default=[[2.2, 2.4], [2.5, 4], [0.8, 1]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     # #! 数值待修改

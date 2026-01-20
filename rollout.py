@@ -102,9 +102,11 @@ class Rollout:
             
             self.eval_time_slots = gen_params.eval_time_slots
 
+            # reward scaling
+            if alg_params.use_reward_scaling:
+                self.reward_scaling = RewardScaling(alg_params.gamma, dim = self.device_type_num)
+                
             # initialize agents' policy networks
-            #! discard, load weight when the device agents are initialized 
-            
             if self.eval_mode[0] == "m":
                 for i in range(self.device_num):
                     self.device_agents[i].update_net(self.edge_agent.p_nets[i].state_dict())

@@ -61,20 +61,22 @@ class MappoEdgeAgent():
             # p_net = MappoPolicyNet(alg_params)
             p_net = MappoPolicyNetLSTM(alg_params).to(self.device)
             self.p_nets.append(p_net)
-                
+
             p_optimizer = torch.optim.Adam(p_net.parameters(),
                                            lr = self.p_lr)
             self.p_optimizers.append(p_optimizer)
             
-        # load networks' weights 
+        # load networks' weights
         if gen_params.load_weights:
             print(f"Loading value network from: {self.weights_dir}v_net_params.pkl")
             for i in range(self.device_type_num):
                 v_path = self.weights_dir + "v_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
+                print(f"[DEBUG] Loading value network {i} from: ", v_path)
                 self.v_nets[i].load_state_dict(torch.load(v_path, map_location=self.device))
             print(f"Loading policy networks from: {self.weights_dir}p_net_params.pkl")
             for i in range(self.device_num):
                 p_path = self.weights_dir + "p_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
+                print(f"[DEBUG] Loading policy network {i} from: ", p_path)
                 self.p_nets[i].load_state_dict(torch.load(p_path, map_location=self.device))
 
     def train_nets(self, replay_buffers):

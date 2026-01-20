@@ -31,10 +31,6 @@ class ObsScaling():
         self.device_obs_dim = alg_params.device_obs_dim
         self.device_type_num = gen_params.device_type_num
         self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
-        self.device_rmss = []
-        for i in range(self.device_num):
-            device_rms = RunningMeanStd(self.device_obs_dim)
-            self.device_rmss.append(device_rms)
         self.edge_rms = RunningMeanStd(self.edge_queue_obs_dim * self.device_type_num)
 
         self.clip_obs = clip_obs
