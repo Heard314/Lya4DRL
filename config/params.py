@@ -41,7 +41,7 @@ def get_general_params():
     parser.add_argument("--eval_episodes", type = int, default = 800,
                         help = "the number of sample-episodes for evaluation")
     
-    parser.add_argument("--eval_time_slots", type = int, default = 200,
+    parser.add_argument("--eval_time_slots", type = int, default = 3000,
                         help = "the number of time-slots for evaluation")
     
     parser.add_argument("--load_weights", action="store_true",
@@ -197,7 +197,7 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[1.5, 2], [2.5, 4], [0.8, 1]],
+        default=[[2.0, 2.4], [2.5, 4], [0.8, 1]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     # #! 数值待修改
@@ -328,6 +328,12 @@ def get_general_params():
     parser.add_argument("--ou_scale", type = float, default = 1.0,
                         help = "the scale parameter of ou noise")
 
+    parser.add_argument("--results_dir", type = str, default = "result/",
+                        help = "the directory for saving training results")
+    
+    parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
+                        help = "the directory for saving plot images")
+
     params = parser.parse_args()
     
     return params
@@ -440,12 +446,6 @@ def get_mappo_params():
 
     parser.add_argument("--save_freq", type = int, default = 1000, 
                         help = "the saving frequency of networks")
-
-    parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
-                        help = "the directory for saving plot images")
-
-    parser.add_argument("--results_dir", type = str, default = "result/mappo/",
-                        help = "the directory for saving training results")
     
     params, unknown = parser.parse_known_args()
     
@@ -571,12 +571,6 @@ def get_maddpg_params():
     parser.add_argument("--weights_dir", type = str, default = "weight/", 
                         help = "the directory for saving network parameters")
     
-    parser.add_argument("--results_dir", type = str, default = "result/maddpg/",
-                        help = "the directory for saving training results")
-    
-    parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
-                        help = "the directory for saving plot images")
-
     params, unknown = parser.parse_known_args()
     
     return params

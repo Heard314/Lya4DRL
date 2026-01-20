@@ -84,20 +84,20 @@ class Controller:
         gp.settings.run_dir = run_dir
         print(f"The runtime file dir is {run_dir}")
         print(f"The weight file dir is {gp.settings.weight_dir}")
-        plot_dir = root_path + alg_params.plot_dir + run_dir
+        plot_dir = root_path + gen_params.plot_dir + run_dir
         gp.settings.plot_dir = plot_dir
         print(f"The plot file dir is {plot_dir}")
         gp.settings.seed = self.seed
 
         # rollout
         self.rollout = Rollout(gen_params, alg_params)
-        self.rollout.resume_episode = resume_episode + 1
+        self.rollout.resume_episode = resume_episode
         # training
         if not gen_params.evaluate:
             self.train_episodes = alg_params.train_episodes
             root_path = gp.settings.exp_result_dir
             run_dir = gp.settings.run_dir
-            self.results_dir = root_path + alg_params.results_dir + run_dir
+            self.results_dir = root_path + gen_params.results_dir + run_dir
             if not os.path.exists(self.results_dir):
                 os.makedirs(self.results_dir)
             self.joint_rewards_col = []

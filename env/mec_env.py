@@ -35,7 +35,7 @@ class MECEnv():
         # reward parameters
         self.device_queue_reward_weight = gen_params.device_queue_reward_weight
         self.edge_queue_reward_weight = gen_params.edge_queue_reward_weight
-        self.self.edge_queue_reward_bound_fac = gen_params.edge_queue_reward_bound_fac
+        self.edge_queue_reward_bound_fac = gen_params.edge_queue_reward_bound_fac
 
         print(f"[DEBUG] device_queue_reward_weight: {self.device_queue_reward_weight}")
         print(f"[DEBUG] edge_queue_reward_weight: {self.edge_queue_reward_weight}")
@@ -177,7 +177,7 @@ class MECEnv():
                 if visualize:
                     writer.add_scalars(
                         f"detail/engy_{i}",
-                        {f"ep_{e_id}_local": task.local_comp_engy + task.tran_engy},
+                        {f"ep_{e_id}_local": local_engy},
                         t_id
                     )
 

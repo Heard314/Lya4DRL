@@ -20,7 +20,7 @@ class Rollout:
         self.evaluate = gen_params.evaluate
         self.train_mode = gen_params.train_mode
         self.eval_mode = gen_params.eval_mode
-        self.resume_episode = 1 # the episode number to be held
+        self.resume_episode = 0
         self.device_type_num = gen_params.device_type_num
         # task generation cycle
         self.gen_task_cycle = gen_params.gen_task_cycle
@@ -64,9 +64,14 @@ class Rollout:
             if self.evaluate and self.eval_mode == "random_comp":
                 self.device_agents.append(RandomComputingDeviceAgent(i, gen_params))
 
-        self.action_dim = alg_params.action_dim
-        self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
-        self.lstm_hidden_dim = alg_params.p_hid_dims[1]
+        if not self.evaluate or (self.evaluate and self.eval_mode[0] == "m"):
+            self.action_dim = alg_params.action_dim
+            self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
+            self.lstm_hidden_dim = alg_params.p_hid_dims[1]
+        else:
+            self.action_dim = -1
+            self.edge_queue_obs_dim = -1
+            self.lstm_hidden_dim = -1
 
         # training
         if not self.evaluate:
@@ -284,7 +289,7 @@ class Rollout:
                 for i in range(self.device_num):
                     task_num = self.mec_env.device_envs[i].task_num
                     device_type = self.device_types[i]
-                    assert not (task_num >= 1 ^ (t_id % gen_task_cycle == start_t_id))
+                    assert ((task_num >= 1) == (t_id % self.gen_task_cycle == self.start_slot))
                     if task_num >= 1:
                         act = self.device_agents[i].choose_action()
                         device_acts[i] = act

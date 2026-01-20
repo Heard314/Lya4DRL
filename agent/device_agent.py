@@ -215,7 +215,12 @@ class LocalComputingDeviceAgent(StaticDeviceAgent):
         super().__init__(agent_id, gen_params)
         
     def choose_action(self):
-        act = [0 for i in range(self.max_task_num + 1)]
+        # config 
+        act_dim = 3
+        act = [0 for i in range(act_dim)]
+        act[0] = 0
+        act[1] = 1
+        act[2] = 1
         return act
 
 class EdgeComputingDeviceAgent(StaticDeviceAgent):
@@ -223,8 +228,11 @@ class EdgeComputingDeviceAgent(StaticDeviceAgent):
         super().__init__(agent_id, gen_params)
         
     def choose_action(self):
-        act = [1 for i in range(self.max_task_num + 1)]
-        
+        act_dim = 3
+        act = [0 for i in range(act_dim)]
+        act[0] = 1
+        act[1] = 1
+        act[2] = 1
         return act
 
 class RandomComputingDeviceAgent(StaticDeviceAgent):
@@ -232,6 +240,9 @@ class RandomComputingDeviceAgent(StaticDeviceAgent):
         super().__init__(agent_id, gen_params)
         
     def choose_action(self):
-        act = [np.random.uniform(0, 1) for i in range(self.max_task_num + 1)]
-        
+        act_dim = 3
+        act = [0 for i in range(act_dim)]
+        act[0] = np.random.uniform(0, 1)
+        act[1] = np.random.uniform(0.6, 1)
+        act[2] = np.random.uniform(0.6, 1)
         return act
