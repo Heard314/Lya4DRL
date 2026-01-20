@@ -59,7 +59,6 @@ class Controller:
             run_dir = run_path + "/"
             resume_episode = 0
         else:
-            gp.settings.weight_dir = root_path + gen_params.weights_dir + run_dir
             # fix random seed
             self.seed = gen_params.evaluate and gen_params.eval_seed or gen_params.train_seed
             # runtime storage path
@@ -76,6 +75,7 @@ class Controller:
                     + gen_params.run_desc
             )
             run_dir = run_path + "/"
+            gp.settings.weight_dir = root_path + gen_params.weights_dir + run_dir
             resume_episode = 0
         
         gp.settings.run_dir = run_dir
@@ -131,6 +131,7 @@ class Controller:
             device_esum_engys, device_overtime_nums = self.rollout.run(e_id, visualize=visualize)
             
             if e_id % self.eval_freq == 0:
+                print("------------------evaluation after episode: " + str(e_id) + "------------------")
                 gp.settings.is_evaluate = True
                 self.rollout.run(e_id, visualize=visualize)
             else:
