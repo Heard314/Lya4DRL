@@ -86,7 +86,6 @@ class MappoDeviceAgent():
 
         if not active:
             return [0.0] * self.action_dim, 0.0, next_lstm_hidden_h, next_lstm_hidden_c
-        std = torch.clamp(std, min=1e-6)
 
         # dim0 -> [0,10]: scale=5, loc=5
         # dim1 -> [6,10]: scale=2, loc=8
@@ -105,14 +104,17 @@ class MappoDeviceAgent():
                 # OU exploration:
                 eps = self._ou_eps(device=mean.device, batch_size=batch_size, dim=mean.size(-1))
             else:
-                eps = torch.randn_like(mean)
+                eps = torch.randn_like(mean).clamp(-2.0, 2.0)
 
             # reparameterized sample in eps-space
             u = mean + std * eps
-
+            # print(f"[DEBUG] mean: {mean}, std: {std}, eps: {eps}, u: {u}")
             a = torch.tanh(u)
+            # print(f"[DEBUG] train_a: {a}")
+            # print(f"[DEBUG] eval_a: {torch.tanh(mean)}")
             action = a * scale + loc
-
+            # print(f"[DEBUG] train_action: {action}")
+            # print(f"[DEBUG] eval_action: {torch.tanh(mean) * scale + loc}")
             dist = Normal(mean, std)
             normal_logp = dist.log_prob(u).sum(-1)
             squash = torch.log(1 - a.pow(2) + 1e-6).sum(-1)
@@ -121,6 +123,7 @@ class MappoDeviceAgent():
 
             act = action.squeeze(0).tolist()
             act_logprob = float(logp)
+            # act_logprob = None
 
         return act, act_logprob, next_lstm_hidden_h, next_lstm_hidden_c
 
