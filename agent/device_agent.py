@@ -94,7 +94,7 @@ class MappoDeviceAgent():
         scale = self.p_net.act_scale.expand_as(mean)
         loc   = self.p_net.act_bias.expand_as(mean)
 
-        if self.evaluate:
+        if self.evaluate or gp.settings.is_evaluate:
             u = mean
             a = torch.tanh(u)
             action = a * scale + loc
@@ -178,7 +178,7 @@ class MaddpgDeviceAgent():
         
         with torch.no_grad():
             act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
-        if not self.evaluate:
+        if not (self.evaluate or gp.settings.is_evaluate):
             act = np.clip((act + self.action_noise.sample()), -1, 1).tolist()
     
         # dim0 -> [0,10]: scale=1, loc=1

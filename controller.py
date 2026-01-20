@@ -41,11 +41,8 @@ class Controller:
         elif gen_params.evaluate and gen_params.load_weights:
             self.weights_dir = root_path + gen_params.weights_dir
             gp.settings.weight_dir = self.weights_dir
-            train_info_path  = self.weights_dir + f"train_info_{gen_params.resume_episode}.pkl"
-            with open(train_info_path, "rb") as f:
-                train_info = pickle.load(f)
             # fix random seed
-            self.seed = gen_params.evaluate and gen_params.eval_seed or gen_params.train_seed
+            self.seed = gen_params.eval_seed
             # runtime storage path
             import datetime
             run_path =  (
@@ -62,6 +59,7 @@ class Controller:
             run_dir = run_path + "/"
             resume_episode = 0
         else:
+            gp.settings.weight_dir = root_path + gen_params.weights_dir + run_dir
             # fix random seed
             self.seed = gen_params.evaluate and gen_params.eval_seed or gen_params.train_seed
             # runtime storage path
@@ -78,7 +76,6 @@ class Controller:
                     + gen_params.run_desc
             )
             run_dir = run_path + "/"
-            gp.settings.weight_dir = root_path + gen_params.weights_dir + run_dir
             resume_episode = 0
         
         gp.settings.run_dir = run_dir
@@ -113,6 +110,7 @@ class Controller:
         # evaluation
         else:
             self.eval_episodes = gen_params.eval_episodes
+        self.eval_freq = gen_params.eval_freq
 
     def train(self):
         
@@ -132,6 +130,13 @@ class Controller:
             device_comp_dlys, device_csum_engys, \
             device_esum_engys, device_overtime_nums = self.rollout.run(e_id, visualize=visualize)
             
+            if e_id % self.eval_freq == 0:
+                gp.settings.is_evaluate = True
+                self.rollout.run(e_id, visualize=visualize)
+            else:
+                gp.settings.is_evaluate = False
+            
+
             # collection
             self.joint_rewards_col.append(joint_rewards)
             self.device_rewards_col.append(device_rewards)

@@ -129,27 +129,27 @@ class MECEnv():
                 comp_dly = max(task.l_comp_dly, task.e_comp_dly)
                 if visualize:
                     writer.add_scalars(
-                        f"detail/comp_dly_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/comp_dly_{i}",
                         {f"ep_{e_id}": comp_dly},
                         t_id
                     )
                     writer.add_scalars(
-                        f"detail/l_comp_dly_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/l_comp_dly_{i}",
                         {f"ep_{e_id}_total": task.l_comp_dly},
                         t_id
                     )
                     writer.add_scalars(
-                        f"detail/l_comp_dly_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/l_comp_dly_{i}",
                         {f"ep_{e_id}_queue": task.l_queue_dly},
                         t_id
                     )
                     writer.add_scalars(
-                        f"detail/l_comp_dly_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/l_comp_dly_{i}",
                         {f"ep_{e_id}_proc": task.l_proc_dly},
                         t_id
                     )
                     writer.add_scalars(
-                        f"detail/e_comp_dly_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/e_comp_dly_{i}",
                         {f"ep_{e_id}_total": task.e_comp_dly},
                         t_id
                     )
@@ -159,12 +159,12 @@ class MECEnv():
                     #     t_id
                     # )
                     writer.add_scalars(
-                        f"detail/e_comp_dly_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/e_comp_dly_{i}",
                         {f"ep_{e_id}_queue": task.e_queue_dly},
                         t_id
                     )
                     writer.add_scalars(
-                        f"detail/e_comp_dly_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/e_comp_dly_{i}",
                         {f"ep_{e_id}_proc": task.e_proc_dly},
                         t_id
                     )
@@ -176,7 +176,7 @@ class MECEnv():
                 if(enable_print): print(f"[DEBUG] the tran local_engy in device {i} is {task.tran_engy}")
                 if visualize:
                     writer.add_scalars(
-                        f"detail/engy_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/engy_{i}",
                         {f"ep_{e_id}_local": local_engy},
                         t_id
                     )
@@ -234,17 +234,17 @@ class MECEnv():
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_virtual_rewards is: ", device_queue_virtual_rewards[i])
                 if visualize:
                     writer.add_scalars(
-                        f"detail/dev_reward_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{i}",
                         {f"ep_{e_id}_act": device_queue_actual_rewards[i]},
                         t_id
                     )
                     writer.add_scalars(
-                        f"detail/dev_reward_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{i}",
                         {f"ep_{e_id}_vir": device_queue_virtual_rewards[i]},
                         t_id
                     )
                     writer.add_scalars(
-                        f"detail/dev_reward_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{i}",
                         {f"ep_{e_id}_navie": device_rewards[i]},
                         t_id
                     )
@@ -252,12 +252,12 @@ class MECEnv():
                 if(enable_print): print(f"[DEBUG] The device", i, "'s final reward is: ", device_rewards[i])
                 if visualize:
                     writer.add_scalars(
-                        f"detail/dev_reward_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{i}",
                         {f"ep_{e_id}_final": device_rewards[i]},
                         t_id
                     )
                     writer.add_scalars(
-                        f"detail/dev_timeout_num_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_timeout_num_{i}",
                         {f"ep_{e_id}": device_overtime_nums[i]},
                         t_id
                     )
@@ -296,12 +296,12 @@ class MECEnv():
                 if visualize:
                     for j in self.device_in_types[i]:
                         writer.add_scalars(
-                            f"detail/dev_reward_{j}",
+                            f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{j}",
                             {f"ep_{e_id}_edge_act": edge_queue_actual_rewards[i]},
                             t_id
                         )
                         writer.add_scalars(
-                            f"detail/dev_reward_{j}",
+                            f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{j}",
                             {f"ep_{e_id}_edge_vir": edge_queue_virtual_rewards[i]},
                             t_id
                         )
@@ -311,7 +311,7 @@ class MECEnv():
                     joint_rewards[i] += device_rewards[j]
                 if visualize:
                     writer.add_scalars(
-                        f"detail/joint_reward_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_reward_{i}",
                         {f"ep_{e_id}": joint_rewards[i]},
                         t_id
                     )
@@ -319,7 +319,7 @@ class MECEnv():
             
             if visualize:
                 writer.add_scalars(
-                    f"detail/joint_cost",
+                    f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_cost",
                     {f"ep_{e_id}": joint_cost},
                     t_id
                 )

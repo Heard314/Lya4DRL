@@ -34,13 +34,16 @@ def get_general_params():
     parser.add_argument("--train_seed", type = int, default = 7878,
                     help = "training random-seed")
 
+    parser.add_argument("--eval_freq", type = int, default = 100,
+                        help = "the evaluation frequency in the training process (unit: episodes)")
+
     # choices: mappo or maddpg or local_comp or edge_comp or random_comp
     parser.add_argument("--eval_mode", type = str, default = "mappo",
                         help = "evaluation mode")
     
     parser.add_argument("--eval_episodes", type = int, default = 800,
                         help = "the number of sample-episodes for evaluation")
-    
+
     parser.add_argument("--eval_time_slots", type = int, default = 3000,
                         help = "the number of time-slots for evaluation")
     

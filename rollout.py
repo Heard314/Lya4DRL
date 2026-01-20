@@ -105,7 +105,7 @@ class Rollout:
             # reward scaling
             if alg_params.use_reward_scaling:
                 self.reward_scaling = RewardScaling(alg_params.gamma, dim = self.device_type_num)
-                
+
             # initialize agents' policy networks
             if self.eval_mode[0] == "m":
                 for i in range(self.device_num):
@@ -248,7 +248,7 @@ class Rollout:
             if "Mappo" in type(self.device_agents[0]).__name__:
                 # store actions used for interacting with the MEC env 
                 device_acts_ = [[] for i in range(self.device_num)]
-                if not self.evaluate:
+                if not (self.evaluate or gp.settings.is_evaluate):
                     device_act_logprobs = [None for i in range(self.device_num)]
                 for i in range(self.device_num):
                     task_num = self.mec_env.device_envs[i].task_num
@@ -327,7 +327,7 @@ class Rollout:
                 next_edge_obs, next_device_obss = self.obs_scaling(next_edge_obs, next_device_obss)
 
             if t_id % gen_task_cycle == start_t_id:
-                if not self.evaluate and self.train_mode == "mappo":
+                if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "mappo":
                     # print(f"[DEBUG] edge_obs: {edge_obs}")
                     # print(f"[DEBUG] device_obss: {device_obss}")
                     # print(f"[DEBUG] lstm_hidden_hs: {lstm_hidden_hs}")
@@ -338,7 +338,7 @@ class Rollout:
                     self.replay_buffer.store(edge_obs, device_obss, lstm_hidden_hs, lstm_hidden_cs,
                                             device_acts, device_act_logprobs,
                                             joint_rewards, device_active)
-                if not self.evaluate and self.train_mode == "maddpg":
+                if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "maddpg":
                     # print(f"[DEBUG] edge_obs: {edge_obs}")
                     # print(f"[DEBUG] device_obss: {device_obss}")
                     # print(f"[DEBUG] device_acts: {device_acts}")
@@ -356,7 +356,7 @@ class Rollout:
                 lstm_hidden_hs = next_lstm_hidden_hs
                 lstm_hidden_cs = next_lstm_hidden_cs
 
-            if not self.evaluate and self.train_mode == "maddpg":
+            if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "maddpg":
                 total_time_slots = e_id * self.train_time_slots + t_id + 1
                 
                 # train networks
@@ -374,7 +374,7 @@ class Rollout:
                 if total_time_slots % self.save_freq == 0:
                     self.edge_agent.save_nets(total_time_slots)
                     
-        if not self.evaluate and self.train_mode == "mappo":
+        if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "mappo":
             # train networks
             if e_id % self.train_freq == 0:
                 self.edge_agent.train_nets(self.replay_buffer)
@@ -408,29 +408,29 @@ class Rollout:
 
         # tensorboard log
         for i in range(self.device_type_num):
-            writer.add_scalar("joint_reward_"+str(i), joint_rewards[i], e_id)
+            writer.add_scalar(f"joint_reward_{i}{'_eval' if gp.settings.is_evaluate else ''}", joint_rewards[i], e_id)
             print(f"joint_reward_{i}: {joint_rewards[i]}")
-        writer.add_scalar("joint_cost", joint_cost, e_id)
+        writer.add_scalar(f"joint_cost{'_eval' if gp.settings.is_evaluate else ''}", joint_cost, e_id)
         print(f"joint_cost: {joint_cost}")
         for i in range(self.device_type_num):
-            writer.add_scalar("edge_comp_ql_"+str(i), edge_comp_qls[i], e_id)
+            writer.add_scalar(f"edge_comp_ql_{i}{'_eval' if gp.settings.is_evaluate else ''}", edge_comp_qls[i], e_id)
             print(f"edge_comp_ql_{i}: {edge_comp_qls[i]}")
         for i in range(self.device_num):
-            writer.add_scalar("device_reward_"+str(i), device_rewards[i], e_id)
+            writer.add_scalar(f"device_reward_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_rewards[i], e_id)
             print(f"device_reward_{i}: {device_rewards[i]}")
-            writer.add_scalar("device_cost_"+str(i), device_costs[i], e_id)
+            writer.add_scalar(f"device_cost_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_costs[i], e_id)
             print(f"device_cost_{i}: {device_costs[i]}")
-            writer.add_scalar("device_comp_ql_"+str(i), device_comp_qls[i], e_id)
+            writer.add_scalar(f"device_comp_ql_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_comp_qls[i], e_id)
             print(f"device_comp_ql_{i}: {device_comp_qls[i]}")
-            writer.add_scalar("device_virtual_time_ql_"+str(i), self.mec_env.device_envs[i].virtual_time_ql, e_id)
+            writer.add_scalar(f"device_virtual_time_ql_{i}{'_eval' if gp.settings.is_evaluate else ''}", self.mec_env.device_envs[i].virtual_time_ql, e_id)
             print(f"device_virtual_time_ql_{i}: {self.mec_env.device_envs[i].virtual_time_ql}")
-            writer.add_scalar("comp_dlys_"+str(i), comp_dlys[i], e_id)
+            writer.add_scalar(f"comp_dlys_{i}{'_eval' if gp.settings.is_evaluate else ''}", comp_dlys[i], e_id)
             print(f"comp_dlys_{i}: {comp_dlys[i]}")
-            writer.add_scalar("device_csum_engys_"+str(i), device_csum_engys[i], e_id)
+            writer.add_scalar(f"device_csum_engys_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_csum_engys[i], e_id)
             print(f"device_csum_engys_{i}: {device_csum_engys[i]}")
             # writer.add_scalar("device_comp_expns_"+str(i), device_esum_engys[i], e_id)
             # print(f"device_comp_expns_{i}: {device_esum_engys[i]}")
-            writer.add_scalar("device_overtime_nums_"+str(i), device_overtime_nums[i], e_id)
+            writer.add_scalar(f"device_overtime_nums_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_overtime_nums[i], e_id)
             print(f"device_overtime_nums_{i}: {device_overtime_nums[i]}")
         
         if e_id % 50 == 0:

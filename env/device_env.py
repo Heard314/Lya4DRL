@@ -314,17 +314,17 @@ class DeviceEnv():
             device_comp_freq = self.device_comp_freq * device_comp_rto
             if visualize:
                 writer.add_scalars(
-                    f"detail/offl_rto_{self.env_id}",
+                    f"detail{'_eval' if gp.settings.is_evaluate else ''}/offl_rto_{self.env_id}",
                     {f"ep_{e_id}": offl_rto},
                     t_id
                 )
                 writer.add_scalars(
-                    f"detail/trpw_rto_{self.env_id}",
+                    f"detail{'_eval' if gp.settings.is_evaluate else ''}/trpw_rto_{self.env_id}",
                     {f"ep_{e_id}": trpw_rto},
                     t_id
                 )
                 writer.add_scalars(
-                    f"detail/comp_rto_{self.env_id}",
+                    f"detail{'_eval' if gp.settings.is_evaluate else ''}/comp_rto_{self.env_id}",
                     {f"ep_{e_id}": device_comp_rto},
                     t_id
                 )
@@ -454,27 +454,27 @@ class DeviceEnv():
 
         if visualize:
             writer.add_scalars(
-                f"detail/device_avg_local_time_{self.env_id}",
+                f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_avg_local_time_{self.env_id}",
                 {f"ep_{e_id}": self.avg_local_time},
                 t_id
             )
             writer.add_scalars(
-                f"detail/device_time_ql_{self.env_id}",
+                f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_act": self.time_ql},
                 t_id
             )
             writer.add_scalars(
-                f"detail/device_time_ql_{self.env_id}",
+                f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_act_chg": self.new_ql_change},
                 t_id
             )
             writer.add_scalars(
-                f"detail/device_time_ql_{self.env_id}",
+                f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_vir": self.virtual_time_ql},
                 t_id
             )
             writer.add_scalars(
-                f"detail/device_time_ql_{self.env_id}",
+                f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_vir_chg": self.new_vir_ql_change},
                 t_id
             )
