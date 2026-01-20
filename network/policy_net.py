@@ -34,7 +34,7 @@ class MappoPolicyNet(nn.Module):
         self.register_buffer("act_scale", (high - low) / 2.0)
         self.register_buffer("act_bias",  (high + low) / 2.0)
 
-        self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0
+        self.LOG_STD_MIN, self.LOG_STD_MAX = -5.0, 0
         self.EPS = 1e-6
 
     def forward(self, obs):
@@ -82,8 +82,7 @@ class MappoPolicyNetLSTM(nn.Module):
         self.register_buffer("act_scale", (high - low) / 2.0)
         self.register_buffer("act_bias",  (high + low) / 2.0)
 
-        # self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0
-        self.LOG_STD_MIN, self.LOG_STD_MAX = -20.0, 2.0
+        self.LOG_STD_MIN, self.LOG_STD_MAX = -5.0, 0
         self.EPS = 1e-6
 
     def forward(self, obs, h_in=None):
