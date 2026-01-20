@@ -134,7 +134,6 @@ class Controller:
                 print("------------------evaluation after episode: " + str(e_id) + "------------------")
                 gp.settings.is_evaluate = True
                 self.rollout.run(e_id, visualize=visualize)
-            else:
                 gp.settings.is_evaluate = False
             
 
