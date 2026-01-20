@@ -34,7 +34,7 @@ def get_general_params():
     parser.add_argument("--train_seed", type = int, default = 7878,
                     help = "training random-seed")
 
-    parser.add_argument("--eval_freq", type = int, default = 100,
+    parser.add_argument("--eval_freq", type = int, default = 400,
                         help = "the evaluation frequency in the training process (unit: episodes)")
 
     # choices: mappo or maddpg or local_comp or edge_comp or random_comp

@@ -376,13 +376,13 @@ class Rollout:
                     
         if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "mappo":
             # train networks
-            if e_id % self.train_freq == 0:
+            if (e_id + 1) % self.train_freq == 0:
                 self.edge_agent.train_nets(self.replay_buffer)
                 # update agents' policy networks
                 for i in range(self.device_num):
                     self.device_agents[i].update_net(self.edge_agent.p_nets[i].state_dict())
                     
-            if e_id % self.save_freq == 0:
+            if (e_id + 1) % self.save_freq == 0:
                 self.edge_agent.save_nets(e_id, self.seed)
 
         joint_rewards = copy.copy(self.joint_rewards)
