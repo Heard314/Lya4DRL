@@ -153,10 +153,25 @@ class MappoEdgeAgent():
                     c0 = None
                 mean, std, _ = self.p_nets[agent_id](p_in, (h0, c0))
                 dist = Normal(mean, std)
+
+                # Calcuate new act logprobs
+                # Reconstruct u from action (inverse tanh + rescale)
+                scale = self.p_nets[agent_id].act_scale
+                loc   = self.p_nets[agent_id].act_bias
+
+                # acts: env action -> [-1,1]
+                a = (acts[ids] - loc) / scale
+                a = torch.clamp(a, -1 + 1e-6, 1 - 1e-6)
+
+                # inverse tanh
+                u = 0.5 * (torch.log1p(a) - torch.log1p(-a))
+
+                normal_logp = dist.log_prob(u).sum(-1)
+                squash = torch.log(1 - a.pow(2) + 1e-6).sum(-1)
+                scale_logsum = torch.log(scale).sum(-1)
                 # [train_batch_size]
-                enty = dist.entropy().sum(-1)
-                # [train_batch_size]
-                new_act_logprobs = dist.log_prob(acts[ids]).sum(-1)
+                new_act_logprobs = normal_logp - squash - scale_logsum
+
                 # [train_batch_size]
                 old_act_logprobs = act_logprobs[ids].reshape([-1])
                 ratios = torch.exp(new_act_logprobs - old_act_logprobs)
@@ -178,6 +193,8 @@ class MappoEdgeAgent():
                 # 只用有效样本算平均值
                 denom = mask_b.sum().clamp_min(1.0)
                 policy_loss = -(torch.min(surr1, surr2) * mask_b).sum() / denom
+                # [train_batch_size]
+                enty = dist.entropy().sum(-1)
                 ent_loss    = -(enty * self.enty_coef * mask_b).sum() / denom
 
                 loss = policy_loss + ent_loss

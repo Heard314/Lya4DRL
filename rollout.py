@@ -234,6 +234,12 @@ class Rollout:
         end_t_id = time_slots + start_t_id + 1
 
         gen_t_id = -1 
+
+        # update current episode for std annealing
+        for i in range(self.device_num):
+            self.device_agents[i].p_net.set_episode(e_id + gp.settings.resume_episode)
+            self.edge_agent.p_nets[i].set_episode(e_id + gp.settings.resume_episode)
+
         for t_id in range(start_t_id, end_t_id):
             if t_id % gen_task_cycle == start_t_id:
                 gen_t_id += 1

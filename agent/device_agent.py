@@ -104,10 +104,11 @@ class MappoDeviceAgent():
                 # OU exploration:
                 eps = self._ou_eps(device=mean.device, batch_size=batch_size, dim=mean.size(-1))
             else:
-                eps = torch.randn_like(mean).clamp(-2.0, 2.0)
+                eps = torch.randn_like(mean).clamp(-3.0, 3.0)
 
+            noise_scale = torch.tensor([0.75, 1.0, 1.0], device=mean.device).view(1, -1)
             # reparameterized sample in eps-space
-            u = mean + std * eps
+            u = mean + (std * noise_scale) * eps
             # print(f"[DEBUG] mean: {mean}, std: {std}, eps: {eps}, u: {u}")
             a = torch.tanh(u)
             # print(f"[DEBUG] train_a: {a}")

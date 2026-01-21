@@ -34,15 +34,36 @@ class MappoPolicyNet(nn.Module):
         self.register_buffer("act_scale", (high - low) / 2.0)
         self.register_buffer("act_bias",  (high + low) / 2.0)
 
-        self.LOG_STD_MIN, self.LOG_STD_MAX = -5.0, 0
+        self.LOG_STD_MIN = -5.0
+
+        # Std annealing config
+        self.LOG_STD_MAX_INIT = 0.5     # initial max log_std
+        self.LOG_STD_MAX_FINAL = -1.5   # final max log_std
+
+        self.total_episodes = alg_params.train_episodes
+        self.std_anneal_tau = int((self.total_episodes) / 3)
+        self.cur_episode = 0
         self.EPS = 1e-6
 
+    def set_episode(self, episode_idx: int):
+        """
+        Call this once at the beginning of each episode
+        """
+        self.cur_episode = episode_idx
+
+    def _cur_log_std_max(self, device):
+        t = torch.tensor(float(self.cur_episode), device=device)
+        tau = torch.tensor(float(self.std_anneal_tau), device=device)
+        cur = self.LOG_STD_MAX_FINAL + (self.LOG_STD_MAX_INIT - self.LOG_STD_MAX_FINAL) * torch.exp(-t / tau)
+        return cur
+        
     def forward(self, obs):
         x = self.tanh(self.fc1(obs))
         x = self.tanh(self.fc2(x))
         # Generate the mean value
         mean = self.mu_head(x) # 暂不扩展到动作空间维度
-        log_std = torch.clamp(self.log_std, min=self.LOG_STD_MIN, max=self.LOG_STD_MAX)       
+        cur_log_std_max = self._cur_log_std_max(device=mean.device)
+        log_std = torch.clamp(self.log_std, min=self.LOG_STD_MIN, max=cur_log_std_max)       
         # Generate the variance
         std = torch.exp(log_std).expand_as(mean)
         return mean, std
@@ -82,8 +103,28 @@ class MappoPolicyNetLSTM(nn.Module):
         self.register_buffer("act_scale", (high - low) / 2.0)
         self.register_buffer("act_bias",  (high + low) / 2.0)
 
-        self.LOG_STD_MIN, self.LOG_STD_MAX = -5.0, 0
+        self.LOG_STD_MIN = -5.0
+
+        # Std annealing config
+        self.LOG_STD_MAX_INIT = 0.5     # initial max log_std
+        self.LOG_STD_MAX_FINAL = -1.5   # final max log_std
+        # One episode has about 600 env steps
+        self.total_episodes = alg_params.train_episodes
+        self.std_anneal_tau = int((self.total_episodes) / 3)
+        self.cur_episode = 0
         self.EPS = 1e-6
+
+    def set_episode(self, episode_idx: int):
+        """
+        Call this once at the beginning of each episode
+        """
+        self.cur_episode = episode_idx
+
+    def _cur_log_std_max(self, device):
+        t = torch.tensor(float(self.cur_episode), device=device)
+        tau = torch.tensor(float(self.std_anneal_tau), device=device)
+        cur = self.LOG_STD_MAX_FINAL + (self.LOG_STD_MAX_INIT - self.LOG_STD_MAX_FINAL) * torch.exp(-t / tau)
+        return cur
 
     def forward(self, obs, h_in=None):
         """
@@ -109,7 +150,8 @@ class MappoPolicyNetLSTM(nn.Module):
         mean_scale = 1.0
         mean = mean * mean_scale
         # Generate the variance
-        log_std = torch.clamp(self.log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
+        cur_log_std_max = self._cur_log_std_max(device=mean.device)
+        log_std = torch.clamp(self.log_std, self.LOG_STD_MIN, cur_log_std_max)
         std = log_std.exp().expand_as(mean)
         if single_step:
             mean = mean.squeeze(1)
