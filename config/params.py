@@ -243,11 +243,11 @@ def get_general_params():
                         help = "the b parameter for edge weight linear function")
 
     parser.add_argument("--device_dly_adj_fac", type = list, 
-                        default = [0.8]*edge_queue_num,
+                        default = [1.0]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     parser.add_argument("--edge_dly_adj_fac", type = list, 
-                        default = [0.6]*edge_queue_num,
+                        default = [0.8]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     # parser.add_argument("--vir_local_ql_growth_rate", type = float,
@@ -277,7 +277,7 @@ def get_general_params():
                         help = "The Lyapunov Drift-Plus-Penalty weight for local queues")
     
     parser.add_argument("--device_vir_queue_reward_weight", type = float,
-                        default = -8000,
+                        default = -2000,
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     parser.add_argument("--edge_queue_reward_bound_fac", type = float,
