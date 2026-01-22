@@ -285,8 +285,8 @@ def get_general_params():
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     parser.add_argument("--edge_queue_reward_bound_fac", type = float,
-                        default = 2.0,
-                        help = "The bound factor for edge queue reward")
+                        default = 0.85,
+                        help = "The bound multi factor for edge queue reward")
 
     # navie reward
     parser.add_argument("--base_reward_penalty", type = float, default = 10000,
@@ -302,7 +302,7 @@ def get_general_params():
     parser.add_argument("--device_act_queue_growth_rate", type = float, default = 1, 
                         help = "the growth rate of actual device queue reward")
 
-    parser.add_argument("--device_vir_queue_growth_rate", type = float, default = 0.1, 
+    parser.add_argument("--device_vir_queue_growth_rate", type = float, default = 1, 
                     help = "the growth rate of virtual device queue reward")
 
     # For average computation time
@@ -312,7 +312,7 @@ def get_general_params():
     # edge queue growth rate
     parser.add_argument("--edge_act_queue_growth_rate", type = float, default = 1,
                         help = "the growth rate of actual edge queue reward")
-    parser.add_argument("--edge_vir_queue_growth_rate", type = float, default = 0.1,
+    parser.add_argument("--edge_vir_queue_growth_rate", type = float, default = 1,
                         help = "the growth rate of virtual edge queue reward")
 
     # ou_noise settings

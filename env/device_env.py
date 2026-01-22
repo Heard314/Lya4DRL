@@ -302,6 +302,7 @@ class DeviceEnv():
         device_comp_freq = self.device_comp_freq
         if(enable_print): print(f"[DEBUG] The action of device {self.env_id} is {act}")
         if self.task_num>=1:
+            gap = gen_task_cycle * self.delta
             # offloading ratio
             offl_rto = act[0]
             offl_dz = self.sched_tasks[0].data_size * offl_rto
@@ -337,7 +338,7 @@ class DeviceEnv():
             trans_rate = self.bandwidth * math.log(1 + trans_power * self.channel_gain / 
                                                 self.noise_power, 2) * pow(10, -6)
             self.trans_rate = trans_rate
-            delta_trans_dz = self.trans_rate * self.delta
+            delta_trans_dz = self.trans_rate * gap
             total_offl_dz = 0
             total_offl_comp = 0
             total_trans_dz = self.trans_ql
@@ -390,8 +391,8 @@ class DeviceEnv():
                 task.local_comp_engy = self.engy_fac * pow(device_comp_freq,2) * local_comp
                 # if(enable_print): print(f"[DEBUG] The device freq pow2 is {pow(device_comp_freq,2)}")
                 old_time_ql_ = self.time_ql
-                self.time_ql = max(0, old_time_ql_ + device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta))
-                self.new_ql_change = device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta)
+                self.time_ql = max(0, old_time_ql_ + device_act_queue_growth_rate * (local_comp / device_comp_freq - gap))
+                self.new_ql_change = device_act_queue_growth_rate * (local_comp / device_comp_freq - gap)
                 self.act_backlog = local_comp / device_comp_freq
                     # print(f"[DEBUG] The device", self.env_id, "'s time_ql is: ", self.time_ql)
                     # print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)
@@ -408,31 +409,31 @@ class DeviceEnv():
                 if(enable_print): print(f"[DEBUG] the local comp_dly in device {self.env_id} is {task.l_comp_dly}")
 
             self.old_virtual_time_ql = self.virtual_time_ql
-            EPS = 1e-6
+            EPS = 1e-8
             device_vir_queue_growth_rate = self.device_vir_queue_growth_rate
             if self.avg_local_time > EPS:
                 old_vir_time_ql_ = self.virtual_time_ql
                 self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val))
                 self.new_vir_ql_change = device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val)
                 self.vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
-        else:
-            total_trans_dz = self.trans_ql
-            delta_trans_dz = self.trans_rate * self.delta
-            # Update the transmission queue length at every time slot, regardless of whether new tasks arrive
-            self.trans_ql = max(0, total_trans_dz - delta_trans_dz)
-            self.old_time_ql = self.time_ql
-            device_act_queue_growth_rate = self.device_act_queue_growth_rate
-            self.time_ql = max(0, self.time_ql - device_act_queue_growth_rate * self.delta)
-            self.new_ql_change = -device_act_queue_growth_rate * self.delta
-            self.act_backlog = 0.0
-            self.old_virtual_time_ql = self.virtual_time_ql
-            device_vir_queue_growth_rate = self.device_vir_queue_growth_rate
-            EPS = 1e-6
-            if self.avg_local_time > EPS:
-                old_vir_time_ql_ = self.virtual_time_ql
-                self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val))
-                self.new_vir_ql_change = device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val)
-                self.vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
+        # else:
+        #     total_trans_dz = self.trans_ql
+        #     delta_trans_dz = self.trans_rate * self.delta
+        #     # Update the transmission queue length at every time slot, regardless of whether new tasks arrive
+        #     self.trans_ql = max(0, total_trans_dz - delta_trans_dz)
+        #     self.old_time_ql = self.time_ql
+        #     device_act_queue_growth_rate = self.device_act_queue_growth_rate
+        #     self.time_ql = max(0, self.time_ql - device_act_queue_growth_rate * self.delta)
+        #     self.new_ql_change = -device_act_queue_growth_rate * self.delta
+        #     self.act_backlog = 0.0
+        #     self.old_virtual_time_ql = self.virtual_time_ql
+        #     device_vir_queue_growth_rate = self.device_vir_queue_growth_rate
+        #     EPS = 1e-6
+        #     if self.avg_local_time > EPS:
+        #         old_vir_time_ql_ = self.virtual_time_ql
+        #         self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val))
+        #         self.new_vir_ql_change = device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val)
+        #         self.vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
 
     
         # print(f"[DEBUG] The device", self.env_id, "'s avg_local_time is: ", self.avg_local_time)

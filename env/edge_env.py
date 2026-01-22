@@ -99,8 +99,9 @@ class EdgeEnv():
             self.old_edge_queue_time_ql[i] = self.edge_queue_time_ql[i]
             # if(enable_print): print(f"[DEBUG] Before compute, edge time_ql of device_type: {i} is {self.edge_queue_time_ql[i]}")
         alloc_edge_freq = self.alloc_edge_freq
-        total_comp_used_time_this_epi = [min(self.delta, self.edge_queue_time_ql[i]) for i in range(self.edge_queue_num)]
-        comp_dlys = [min(self.delta, self.edge_queue_time_ql[i]) for i in range(self.edge_queue_num)]
+        gap = self.gen_task_cycle * self.delta
+        total_comp_used_time_this_epi = [min(gap, self.edge_queue_time_ql[i]) for i in range(self.edge_queue_num)]
+        comp_dlys = [min(gap, self.edge_queue_time_ql[i]) for i in range(self.edge_queue_num)]
         self.delta_num += 1
         for device_type in range(self.edge_queue_num):
             if(enable_print): print(f"[DEBUG] We are processing the tasks of type {device_type}")
@@ -126,7 +127,7 @@ class EdgeEnv():
                     task.e_proc_dly = task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
                     task.e_comp_dly = max(task.e_queue_dly, task.trans_time) + task.e_proc_dly
                     total_comp_need_time_this_epi += task.e_proc_dly
-                    total_comp_used_time_this_epi[device_type] += min(task.offl_dz * task.comp_dens/alloc_edge_freq[device_type], max(0, self.delta-max(task.trans_time, comp_dlys[device_type])))
+                    total_comp_used_time_this_epi[device_type] += min(task.offl_dz * task.comp_dens/alloc_edge_freq[device_type], max(0, gap - max(task.trans_time, comp_dlys[device_type])))
                     if(enable_print): print(f"[DEBUG] the edge comp_dly in device {task.device_id} is {task.e_comp_dly}")
                     comp_dlys[device_type] = max(comp_dlys[device_type], task.trans_time) + task.e_proc_dly
                     self.total_comp_time[device_type] += task.e_proc_dly
@@ -145,7 +146,7 @@ class EdgeEnv():
             self.old_virtual_edge_queue_time_ql[device_type] = self.virtual_edge_queue_time_ql[device_type]
             edge_vir_queue_growth_rate = self.edge_vir_queue_growth_rate
             old_virtual_edge_queue_time_ql_ = self.virtual_edge_queue_time_ql[device_type]
-            EPS = 1e-6
+            EPS = 1e-8
             if self.avg_edge_time[device_type] > EPS:
                 self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle - self.edge_dly_adj_val[device_type]), 0)
                 self.new_vir_edge_ql_change[device_type] = edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle - self.edge_dly_adj_val[device_type])

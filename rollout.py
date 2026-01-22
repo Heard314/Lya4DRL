@@ -261,8 +261,8 @@ class Rollout:
                     device_active[i] = task_num >= 1
                     device_type = self.device_types[i]
                     # print(f"[DEBUG] device {i}, t_id {t_id}")
-                    # print(f"[DEBUG] task_num >= 1: {task_num >= 1}, t_id % gen_task_cycle == start_slot: {t_id % self.gen_task_cycle == self.start_slot}")
-                    assert ((task_num >= 1) == (t_id % self.gen_task_cycle == self.start_slot))
+                    # print(f"[DEBUG] task_num >= 1: {task_num >= 1}, t_id % gen_task_cycle == start_slot: {t_id % gen_task_cycle == start_t_id}")
+                    assert ((task_num >= 1) == (t_id % gen_task_cycle == start_t_id))
                     if task_num >= 1:
                         device_value_obs = concatenate(device_obss[i], edge_obs[device_type * self.edge_queue_obs_dim : (device_type + 1) * self.edge_queue_obs_dim]) 
                         act, act_logprob, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i], active=device_active[i])
@@ -280,7 +280,7 @@ class Rollout:
                 for i in range(self.device_num):
                     task_num = self.mec_env.device_envs[i].task_num
                     device_type = self.device_types[i]
-                    assert ((task_num >= 1) == (t_id % self.gen_task_cycle == self.start_slot))
+                    assert ((task_num >= 1) == (t_id % gen_task_cycle == start_t_id))
                     if task_num >= 1:
                         device_value_obs = concatenate(device_obss[i], edge_obs[device_type * self.edge_queue_obs_dim : (device_type + 1) * self.edge_queue_obs_dim])
                         act, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i])
@@ -297,7 +297,7 @@ class Rollout:
                 for i in range(self.device_num):
                     task_num = self.mec_env.device_envs[i].task_num
                     device_type = self.device_types[i]
-                    assert ((task_num >= 1) == (t_id % self.gen_task_cycle == self.start_slot))
+                    assert ((task_num >= 1) == (t_id % gen_task_cycle == start_t_id))
                     if task_num >= 1:
                         act = self.device_agents[i].choose_action()
                         device_acts[i] = act
@@ -319,7 +319,7 @@ class Rollout:
                                 comp_dlys, device_csum_engys,
                                 device_esum_engys, device_overtime_nums,
                                 device_task_is_available)
-            self.average_always(t_id, edge_comp_qls, device_comp_qls)
+            # self.average_always(t_id, edge_comp_qls, device_comp_qls)
             # update computing-queue lengths
             edge_comp_qls = [next_edge_obs[i * self.edge_queue_obs_dim] for i in range(self.device_type_num)]
             device_comp_qls = [obs[1] for obs in next_device_obss]
@@ -464,6 +464,9 @@ class Rollout:
         self.device_esum_engys += (device_esum_engys)
         self.device_overtime_nums += device_overtime_nums
 
+        self.edge_comp_qls += 1 / gen_t_id_ * (edge_comp_qls - self.edge_comp_qls)
+        self.device_comp_qls += 1 / gen_t_id_ * (device_comp_qls - self.device_comp_qls)
+
         for i in range(self.device_num):
             if device_task_is_available[i]:
                 self.device_task_avail_nums[i]+=1
@@ -474,8 +477,8 @@ class Rollout:
         #     self.device_csum_engys[i] /= self.device_task_avail_nums[i]
         #     self.device_esum_engys[i] /= self.device_task_avail_nums[i]
     
-    # Update queue information at every time slot
-    def average_always(self, t_id, edge_comp_qls, device_comp_qls):
-        t_id_ = t_id + 1
-        self.edge_comp_qls += 1 / t_id_ * (edge_comp_qls - self.edge_comp_qls)
-        self.device_comp_qls += 1 / t_id_ * (device_comp_qls - self.device_comp_qls)
+    # # Update queue information at every time slot
+    # def average_always(self, t_id, edge_comp_qls, device_comp_qls):
+    #     t_id_ = t_id + 1
+    #     self.edge_comp_qls += 1 / t_id_ * (edge_comp_qls - self.edge_comp_qls)
+    #     self.device_comp_qls += 1 / t_id_ * (device_comp_qls - self.device_comp_qls)
