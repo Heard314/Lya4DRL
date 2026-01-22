@@ -130,8 +130,8 @@ class Rollout:
         print(f"The log file path is {log_path}")
         
         # print hyperparameters info
-        print(f"[DEBUG] device_queue_reward_weight: {gen_params.device_queue_reward_weight}")
-        print(f"[DEBUG] edge_queue_reward_weight: {gen_params.edge_queue_reward_weight}")
+        print(f"[DEBUG] device_act_queue_reward_weight: {gen_params.device_act_queue_reward_weight}")
+        print(f"[DEBUG] device_vir_queue_reward_weight: {gen_params.device_vir_queue_reward_weight}")
         print(f"[DEBUG] device_act_queue_reward_max_bound: {gen_params.device_act_queue_reward_max_bound}")
         print(f"[DEBUG] device_act_queue_reward_min_bound: {gen_params.device_act_queue_reward_min_bound}")
         print(f"[DEBUG] device_vir_queue_reward_max_bound: {gen_params.device_vir_queue_reward_max_bound}")
@@ -318,7 +318,7 @@ class Rollout:
                                 joint_cost, device_costs,
                                 comp_dlys, device_csum_engys,
                                 device_esum_engys, device_overtime_nums,
-                                device_task_is_available)
+                                device_task_is_available, edge_comp_qls, device_comp_qls)
             # self.average_always(t_id, edge_comp_qls, device_comp_qls)
             # update computing-queue lengths
             edge_comp_qls = [next_edge_obs[i * self.edge_queue_obs_dim] for i in range(self.device_type_num)]
@@ -453,7 +453,7 @@ class Rollout:
                             joint_cost, device_costs, 
                             comp_dlys, device_csum_engys, 
                             device_esum_engys, device_overtime_nums,
-                            device_task_is_available):
+                            device_task_is_available, edge_comp_qls, device_comp_qls):
         gen_t_id_ = gen_t_id + 1
         self.joint_rewards += 1 / gen_t_id_ * (joint_rewards - self.joint_rewards)
         self.device_rewards += 1 / gen_t_id_ * (device_rewards - self.device_rewards)

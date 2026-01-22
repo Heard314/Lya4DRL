@@ -203,11 +203,7 @@ def get_general_params():
         default=[[2.2, 2.4], [2.5, 4], [0.8, 1]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
-    # #! 数值待修改
-    # parser.add_argument("--unit_comp_dly_thre", type = list, 
-    #                     default = [1, 4, 7, 10, 10], 
-    #                     help = "the timeout threshold of a unit(Mb) data for different task types (delta 0.1s)")
-
+    
     parser.add_argument("--comp_dly_thre", type = list, 
                         # default = [1, 5, 5, 10, 10], 
                         # default = [3, 5, 5, 10, 10],
@@ -264,24 +260,24 @@ def get_general_params():
 
     # Hyperparameter
     # queue reward
-    parser.add_argument("--device_act_queue_reward_max_bound", type = float, default = 400, 
+    parser.add_argument("--device_act_queue_reward_max_bound", type = float, default = 800, 
                         help = "the max bound of actual device queue reward")
 
-    parser.add_argument("--device_act_queue_reward_min_bound", type = float, default = -600,
+    parser.add_argument("--device_act_queue_reward_min_bound", type = float, default = -1000,
                         help = "the min bound of actual device queue reward")
 
-    parser.add_argument("--device_vir_queue_reward_max_bound", type = float, default = 800,
+    parser.add_argument("--device_vir_queue_reward_max_bound", type = float, default = 1600,
                         help = "the max bound of virtual device queue reward")
 
-    parser.add_argument("--device_vir_queue_reward_min_bound", type = float, default = -1200, 
+    parser.add_argument("--device_vir_queue_reward_min_bound", type = float, default = -2000, 
                         help = "the min bound of virtual device queue reward")
 
-    parser.add_argument("--device_queue_reward_weight", type = float,
-                        default = -600,
+    parser.add_argument("--device_act_queue_reward_weight", type = float,
+                        default = -1000,
                         help = "The Lyapunov Drift-Plus-Penalty weight for local queues")
     
-    parser.add_argument("--edge_queue_reward_weight", type = float,
-                        default = -1400,
+    parser.add_argument("--device_vir_queue_reward_weight", type = float,
+                        default = -8000,
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     parser.add_argument("--edge_queue_reward_bound_fac", type = float,

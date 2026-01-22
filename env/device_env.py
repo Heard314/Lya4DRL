@@ -164,10 +164,9 @@ class DeviceEnv():
         self.total_comp_time = 0.0
         self.total_tran_time = 0.0
 
-        # To balance reward_act and reward_vir, add a scaling factor to the growth rate (inversely proportional to task computation time)
-        self.device_act_reward_fac = 1.0
-        self.device_act_reward_fac /= 0.8 * (data_size_mean * comp_dens_mean) / self.device_comp_freq
-        self.device_act_reward_fac *= self.device_act_reward_fac
+        # To balance the comp_dly_thre role of different task type.
+        self.device_act_reward_fac = 1.0 / self.delta / gen_params.comp_dly_thre[self.device_type]
+
         print(f"[DEBUG] The device {self.env_id} 's device_act_reward_fac is {self.device_act_reward_fac}")
         self.device_act_queue_growth_rate = gen_params.device_act_queue_growth_rate
         self.device_vir_queue_growth_rate = gen_params.device_vir_queue_growth_rate
