@@ -85,6 +85,9 @@ class DeviceEnv():
 
         self.device_type = gen_params.device_types[env_id]
         self.device_type_num = gen_params.device_type_num
+
+        self.enable_virtual_queue_reward = gen_params.enable_virtual_queue_reward
+        self.enable_actual_queue_reward = gen_params.enable_actual_queue_reward
         # unit: s
         self.delta = gen_params.delta
         self.task_arrival_prob = gen_params.task_arrival_prob[self.device_type]
@@ -227,7 +230,10 @@ class DeviceEnv():
     def get_obs(self):
         max_trans_rate = self.max_trans_rate
         local_queue = self.time_ql
-        local_vir_queue = self.virtual_time_ql
+        if self.enable_virtual_queue_reward:
+            local_vir_queue = self.virtual_time_ql
+        else:
+            local_vir_queue = -1.0
         task_msgs = []
         for i in range(self.task_num):
             data_size = self.sched_tasks[i].data_size

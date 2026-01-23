@@ -9,6 +9,9 @@ class EdgeEnv():
         self.gen_task_cycle = general_params.gen_task_cycle
         self.start_slot = general_params.start_slot
 
+        self.enable_virtual_queue_reward = general_params.enable_virtual_queue_reward
+        self.enable_actual_queue_reward = general_params.enable_actual_queue_reward
+
         # unit: s
         self.delta = general_params.delta
         
@@ -73,11 +76,16 @@ class EdgeEnv():
     def get_obs(self):
 
         obs = []
+        if self.enable_virtual_queue_reward:
+            for i in range(self.edge_queue_num):
+                obs.append(self.edge_queue_time_ql[i])
+                obs.append(self.virtual_edge_queue_time_ql[i])
         # print(f"[DEBUG] the edge_queue_time_ql is {self.edge_queue_time_ql}")
         # print(f"[DEBUG] the virtual_edge_queue_time_ql is {self.virtual_edge_queue_time_ql}")
-        for i in range(self.edge_queue_num):
-            obs.append(self.edge_queue_time_ql[i])
-            obs.append(self.virtual_edge_queue_time_ql[i])
+        else:
+            for i in range(self.edge_queue_num):
+                obs.append(self.edge_queue_time_ql[i])
+                obs.append(-1.0)
         return obs
     
 
