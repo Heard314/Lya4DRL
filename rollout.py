@@ -313,6 +313,10 @@ class Rollout:
             device_esum_engys, device_overtime_nums, \
             next_edge_obs, next_device_obss, device_task_is_available = self.mec_env.step(device_acts_, e_id = e_id, t_id = t_id, visualize = visualize)
             
+            # update computing-queue lengths
+            edge_comp_qls = [next_edge_obs[i * self.edge_queue_obs_dim] for i in range(self.device_type_num)]
+            device_comp_qls = [obs[1] for obs in next_device_obss]
+
             if t_id % gen_task_cycle == start_t_id:
                 self.average(gen_t_id, joint_rewards, device_rewards,
                                 joint_cost, device_costs,
@@ -320,9 +324,6 @@ class Rollout:
                                 device_esum_engys, device_overtime_nums,
                                 device_task_is_available, edge_comp_qls, device_comp_qls)
             # self.average_always(t_id, edge_comp_qls, device_comp_qls)
-            # update computing-queue lengths
-            edge_comp_qls = [next_edge_obs[i * self.edge_queue_obs_dim] for i in range(self.device_type_num)]
-            device_comp_qls = [obs[1] for obs in next_device_obss]
             
             # reward scaling
             # if hasattr(self, "reward_scaling"):

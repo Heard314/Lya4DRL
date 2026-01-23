@@ -152,12 +152,15 @@ class EdgeEnv():
                 self.new_vir_edge_ql_change[device_type] = edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle - self.edge_dly_adj_val[device_type])
                 self.vir_backlog = self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]
 
-            if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s old_edge_queue_time_ql is: ", self.old_edge_queue_time_ql[device_type])
-            if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s old_virtual_edge_queue_time_ql is: ", self.old_virtual_edge_queue_time_ql[device_type])
-            if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s new_edge_ql_change is: ", self.new_edge_ql_change[device_type])
-            if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s new_vir_edge_ql_change is: ", self.new_vir_edge_ql_change[device_type])
-            if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s edge_queue_time_ql is: ", self.edge_queue_time_ql[device_type])
-            if(enable_print): print(f"[DEBUG] The edge_queue", device_type, "'s virtual_edge_queue_time_ql is: ", self.virtual_edge_queue_time_ql[device_type])
+            # print(f"[DEBUG] The edge_queue", device_type, "'s new_edge_ql_change is: ", self.new_edge_ql_change[device_type])
+            # print(f"[DEBUG] The edge_queue", device_type, "'s edge_queue_time_ql is: ", self.edge_queue_time_ql[device_type])
+
+            print(f"[DEBUG] The edge_queue", device_type, "'s edge_vir_queue_growth_rate: ", edge_vir_queue_growth_rate)
+            print(f"[DEBUG] The edge_queue", device_type, "'s edge_queue_time_ql: ", self.edge_queue_time_ql[device_type])
+            print(f"[DEBUG] The edge_queue", device_type, "'s avg_edge_time: ", self.avg_edge_time[device_type])
+            print(f"[DEBUG] The edge_queue", device_type, "'s edge_dly_adj_val: ", self.edge_dly_adj_val[device_type])
+            print(f"[DEBUG] The edge_queue", device_type, "'s new_vir_edge_ql_change is: ", self.new_vir_edge_ql_change[device_type])
+            print(f"[DEBUG] The edge_queue", device_type, "'s virtual_edge_queue_time_ql is: ", self.virtual_edge_queue_time_ql[device_type])
             
             if visualize:
                 writer.add_scalars(
