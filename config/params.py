@@ -192,7 +192,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.4, 1.6], [0.6, 0.8], [2.5, 3.0]],
+        default=[[1.4, 1.6], [0.6, 0.8], [2.6, 2.8]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -200,7 +200,7 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[2.2, 2.4], [2.5, 4], [0.8, 1]],
+        default=[[1.8, 2.0], [4.0, 4.2], [1.0, 1.2]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     parser.add_argument("--comp_dly_thre", type = list, 
@@ -524,6 +524,9 @@ def get_maddpg_params():
     parser.add_argument("--gamma", type = float, default = 0.99,
                         help = "the discount factor of rewards")
     
+    parser.add_argument("--tau", type = float, default = 0.005,
+                        help = "the soft update factor of target networks")
+
     parser.add_argument("--v_lr", type = float, default = 1e-5,           
                         help = "the learning-rate of value network")
     
@@ -551,7 +554,7 @@ def get_maddpg_params():
     parser.add_argument("--use_reward_scaling", type = bool, default = True, 
                         help = "whether to use reward scaling")
     
-    parser.add_argument("--use_action_noise", type = bool, default = True,  
+    parser.add_argument("--use_action_noise", type = bool, default = True,
                         help = "whether to add noise in agents' actions")
     
     parser.add_argument("--use_grad_clip", type = bool, default = True, 

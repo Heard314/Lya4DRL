@@ -275,7 +275,7 @@ class MaddpgEdgeAgent():
         self.min_p_lr = alg_params.min_p_lr
         self.decay_intl = alg_params.decay_intl
         self.decay_fac = alg_params.decay_fac
-        
+        self.tau = alg_params.tau
         self.v_nets = []
         self.target_v_nets = []
         self.v_optimizers = []
@@ -381,9 +381,8 @@ class MaddpgEdgeAgent():
             # [batch_size, 1]
             next_qs = self.target_v_nets[queue_id](batch_next_states, batch_next_joint_acts)
             target_qs = batch_joint_rewards + self.gamma * next_qs
-            # normalization
-            target_qs = (target_qs - target_qs.mean()) / (target_qs.std() + 1e-5)
-            
+            target_qs = target_qs.detach()
+
         for i in range(self.v_epochs):
             # [batch_size, 1]
             qs = self.v_nets[queue_id](batch_states, batch_joint_acts)
@@ -420,13 +419,20 @@ class MaddpgEdgeAgent():
                                                self.p_grad_clip)
             self.p_optimizers[agent_id].step()
             
+    @torch.no_grad()
+    def soft_update(self, target_net, online_net, tau):
+        # Polyak averaging: target = (1 - tau) * target + tau * online
+        for t_param, o_param in zip(target_net.parameters(), online_net.parameters()):
+            t_param.data.mul_(1.0 - tau)
+            t_param.data.add_(tau * o_param.data)
+
     def update_target_nets(self, total_time_slots):
         if total_time_slots >= self.warm_time_slots:
             for i in range(self.device_type_num):
-                self.target_v_nets[i].load_state_dict(self.v_nets[i].state_dict())
+                self.soft_update(self.target_v_nets[i], self.v_nets[i], self.tau)
             
             for i in range(self.device_num):
-                self.target_p_nets[i].load_state_dict(self.p_nets[i].state_dict())
+                self.soft_update(self.target_p_nets[i], self.p_nets[i], self.tau)
                 
     def decay_lr(self, total_time_slots):
         if total_time_slots % self.decay_intl == 0:

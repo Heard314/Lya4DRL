@@ -183,7 +183,7 @@ class MaddpgDeviceAgent():
         with torch.no_grad():
             act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
         if not (self.evaluate or gp.settings.is_evaluate):
-            act = np.clip((act + self.action_noise.sample()), -1, 1).tolist()
+            act = torch.clip((act + self.action_noise.sample()), -1, 1).tolist()
     
         # dim0 -> [0,10]: scale=1, loc=1
         # dim1 -> [6,10]: scale=0.4, loc=1.6
