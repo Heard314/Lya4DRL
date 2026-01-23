@@ -119,7 +119,7 @@ class MappoPolicyNetLSTM(nn.Module):
         Call this once at the beginning of each episode
         """
         self.cur_episode = episode_idx
-        print(f"[DEBUG] set_episode: {episode_idx}")
+        # print(f"[DEBUG] set_episode: {episode_idx}")
 
     def _cur_log_std_max(self, device):
         t = torch.tensor(float(self.cur_episode), device=device)

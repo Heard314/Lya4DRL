@@ -203,7 +203,6 @@ def get_general_params():
         default=[[2.2, 2.4], [2.5, 4], [0.8, 1]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
-    
     parser.add_argument("--comp_dly_thre", type = list, 
                         # default = [1, 5, 5, 10, 10], 
                         # default = [3, 5, 5, 10, 10],
