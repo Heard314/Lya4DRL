@@ -129,6 +129,7 @@ class EdgeEnv():
                     total_comp_need_time_this_epi += task.e_proc_dly
                     total_comp_used_time_this_epi[device_type] += min(task.offl_dz * task.comp_dens/alloc_edge_freq[device_type], max(0, gap - max(task.trans_time, comp_dlys[device_type])))
                     if(enable_print): print(f"[DEBUG] the edge comp_dly in device {task.device_id} is {task.e_comp_dly}")
+                    print(f"[DEBUG] the e_proc_dly in device {task.device_id} is {task.e_proc_dly}")
                     comp_dlys[device_type] = max(comp_dlys[device_type], task.trans_time) + task.e_proc_dly
                     self.total_comp_time[device_type] += task.e_proc_dly
                     self.total_comp_amount[device_type] += task.offl_dz * task.comp_dens
@@ -142,6 +143,11 @@ class EdgeEnv():
             old_edge_queue_time_ql_ = self.edge_queue_time_ql[device_type]
             self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type]), 0)
             self.new_edge_ql_change[device_type] = edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type])
+
+            print(f"[DEBUG] The edge_queue", device_type, "'s edge_queue_time_ql: ", self.edge_queue_time_ql[device_type])
+            print(f"[DEBUG] The edge_queue", device_type, "'s total_comp_need_time_this_epi: ", total_comp_need_time_this_epi)
+            print(f"[DEBUG] The edge_queue", device_type, "'s total_comp_used_time_this_epi: ", total_comp_used_time_this_epi[device_type])
+
             self.act_backlog = total_comp_need_time_this_epi
             self.old_virtual_edge_queue_time_ql[device_type] = self.virtual_edge_queue_time_ql[device_type]
             edge_vir_queue_growth_rate = self.edge_vir_queue_growth_rate
@@ -156,7 +162,6 @@ class EdgeEnv():
             # print(f"[DEBUG] The edge_queue", device_type, "'s edge_queue_time_ql is: ", self.edge_queue_time_ql[device_type])
 
             print(f"[DEBUG] The edge_queue", device_type, "'s edge_vir_queue_growth_rate: ", edge_vir_queue_growth_rate)
-            print(f"[DEBUG] The edge_queue", device_type, "'s edge_queue_time_ql: ", self.edge_queue_time_ql[device_type])
             print(f"[DEBUG] The edge_queue", device_type, "'s avg_edge_time: ", self.avg_edge_time[device_type])
             print(f"[DEBUG] The edge_queue", device_type, "'s edge_dly_adj_val: ", self.edge_dly_adj_val[device_type])
             print(f"[DEBUG] The edge_queue", device_type, "'s new_vir_edge_ql_change is: ", self.new_vir_edge_ql_change[device_type])
