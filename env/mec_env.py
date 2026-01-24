@@ -209,6 +209,7 @@ class MECEnv():
                                                 #   + self.edge_energy_weights[device_type] * 
                                                 #   edge_comp_engy / norm_esum_engy
                                                   )
+                    
                 if(enable_print): print(f"[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
                 device_queue_actual_rewards[i] = 0.0
                 device_queue_virtual_rewards[i] = 0.0
