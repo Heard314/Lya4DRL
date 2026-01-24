@@ -13,10 +13,10 @@ def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
 
     parser.add_argument("--enable_actual_queue_reward", action="store_true",
-                        help = "whether to add actual queue punishment to reward")
+                        help = "enable when the algorithm used is the RT-MADDPG method")
 
     parser.add_argument("--enable_virtual_queue_reward", action="store_true",
-                        help = "whether to add virtual queue punishment to reward")
+                        help = "enabled when the algorithm used is paper's proposed method")
 
     parser.add_argument("--run_desc", type = str, default = "",
                     help = "the description of the running experiment")

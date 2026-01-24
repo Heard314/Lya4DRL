@@ -1,1 +1,1 @@
-python ../../../main.py --train_mode mappo --run_desc "all_queue_exp9" --enable_actual_queue_reward --enable_virtual_queue_reward
+python ../../../main.py --train_mode mappo --run_desc "my_exp9" --enable_virtual_queue_reward
