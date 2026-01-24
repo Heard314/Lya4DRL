@@ -290,7 +290,7 @@ def get_general_params():
     parser.add_argument("--timeout_reward_penalty", type = float, default = -4000,
                         help = "the reward if the task is timeout")
 
-    parser.add_argument("--target_reward_penalty", type = float, default = -1000,
+    parser.add_argument("--target_reward_penalty", type = float, default = -80,
                         help = "the reward if the task is completed within the threshold")
 
     # device queue growth rate

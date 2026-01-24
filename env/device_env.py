@@ -394,6 +394,14 @@ class DeviceEnv():
                     
                 self.total_comp_time += task.l_proc_dly
                 task.local_comp_engy = self.engy_fac * pow(device_comp_freq,2) * local_comp
+                # print(f"[DEBUG] The device", self.env_id, "'s offl_rto is: ", offl_rto)
+                # print(f"[DEBUG] The device", self.env_id, "'s engy_fac is: ", self.engy_fac)
+                # print(f"[DEBUG] The device", self.env_id, "'s local_comp is: ", local_comp)
+                # print(f"[DEBUG] The device", self.env_id, "'s data_size is: ", task.data_size)
+                # print(f"[DEBUG] The device", self.env_id, "'s comp_dens is: ", task.comp_dens)
+                # print(f"[DEBUG] The device", self.env_id, "'s local_comp_engy is: ", task.local_comp_engy)
+                # print(f"[DEBUG] The device", self.env_id, "'s tran_engy is: ", task.tran_engy)
+
                 # if(enable_print): print(f"[DEBUG] The device freq pow2 is {pow(device_comp_freq,2)}")
                 old_time_ql_ = self.time_ql
                 self.time_ql = max(0, old_time_ql_ + device_act_queue_growth_rate * (local_comp / device_comp_freq - gap))

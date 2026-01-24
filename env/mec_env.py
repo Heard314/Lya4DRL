@@ -205,11 +205,11 @@ class MECEnv():
                     norm_csum_engy = task.norm_csum_engy
                     norm_esum_engy = task.norm_esum_engy
                     device_rewards[i] += self.target_reward_penalty * (self.device_energy_weights[device_type] * 
-                                                  local_engy / norm_csum_engy
+                                                  local_engy
                                                 #   + self.edge_energy_weights[device_type] * 
                                                 #   edge_comp_engy / norm_esum_engy
                                                   )
-                    
+                # print(f"[DEBUG] the part of engy reward in device {i} is {self.target_reward_penalty * (self.device_energy_weights[device_type] * local_engy)}")
                 if(enable_print): print(f"[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
                 device_queue_actual_rewards[i] = 0.0
                 device_queue_virtual_rewards[i] = 0.0
