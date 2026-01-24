@@ -121,7 +121,7 @@ class Controller:
             visualize = False
             # if e_id == 1 or e_id == 2: #FOR DEBUG
             #     visualize = True
-            if e_id % 400 == 0:
+            if e_id % 800 == 0:
                 visualize = True
 
             joint_rewards, device_rewards, \

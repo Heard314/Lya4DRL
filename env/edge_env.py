@@ -185,28 +185,28 @@ class EdgeEnv():
                 # print(f"[DEBUG] The edge_queue", device_type, "'s virtual_edge_queue_time_ql is: ", self.virtual_edge_queue_time_ql[device_type])
             
             if visualize:
-                writer.add_scalars(
-                    f"detail{'_eval' if gp.settings.is_evaluate else ''}/avg_edge_time_{device_type}",
-                    {f"ep_{e_id}": self.avg_edge_time[device_type]},
-                    t_id
-                )
+                # writer.add_scalars(
+                #     f"detail{'_eval' if gp.settings.is_evaluate else ''}/avg_edge_time_{device_type}",
+                #     {f"ep_{e_id}": self.avg_edge_time[device_type]},
+                #     t_id
+                # )
                 writer.add_scalars(
                     f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_{device_type}",
                     {f"ep_{e_id}_act": self.edge_queue_time_ql[device_type]},
                     t_id
                 )
-                writer.add_scalars(
-                    f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_{device_type}",
-                    {f"ep_{e_id}_act_chg": self.new_edge_ql_change[device_type]},
-                    t_id
-                )
+                # writer.add_scalars(
+                #     f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_{device_type}",
+                #     {f"ep_{e_id}_act_chg": self.new_edge_ql_change[device_type]},
+                #     t_id
+                # )
                 writer.add_scalars(
                     f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_{device_type}",
                     {f"ep_{e_id}_vir": self.virtual_edge_queue_time_ql[device_type]},
                     t_id
                 )
-                writer.add_scalars(
-                    f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_{device_type}",
-                    {f"ep_{e_id}_vir_chg": self.new_vir_edge_ql_change[device_type]},
-                    t_id
-                )
+                # writer.add_scalars(
+                #     f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_{device_type}",
+                #     {f"ep_{e_id}_vir_chg": self.new_vir_edge_ql_change[device_type]},
+                #     t_id
+                # )

@@ -467,31 +467,31 @@ class DeviceEnv():
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s virtual_time_ql is: ", self.virtual_time_ql)
 
         if visualize:
-            writer.add_scalars(
-                f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_avg_local_time_{self.env_id}",
-                {f"ep_{e_id}": self.avg_local_time},
-                t_id
-            )
+            # writer.add_scalars(
+            #     f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_avg_local_time_{self.env_id}",
+            #     {f"ep_{e_id}": self.avg_local_time},
+            #     t_id
+            # )
             writer.add_scalars(
                 f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_act": self.time_ql},
                 t_id
             )
-            writer.add_scalars(
-                f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
-                {f"ep_{e_id}_act_chg": self.new_ql_change},
-                t_id
-            )
+            # writer.add_scalars(
+            #     f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
+            #     {f"ep_{e_id}_act_chg": self.new_ql_change},
+            #     t_id
+            # )
             writer.add_scalars(
                 f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_vir": self.virtual_time_ql},
                 t_id
             )
-            writer.add_scalars(
-                f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
-                {f"ep_{e_id}_vir_chg": self.new_vir_ql_change},
-                t_id
-            )
+            # writer.add_scalars(
+            #     f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
+            #     {f"ep_{e_id}_vir_chg": self.new_vir_ql_change},
+            #     t_id
+            # )
 
         # update scheduling tasks
         sched_tasks = copy.copy(self.sched_tasks)
