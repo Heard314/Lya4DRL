@@ -52,23 +52,28 @@ class ObsScaling():
 
                 
 class RewardScaling():
-    def __init__(self, gamma, dim=3):
+    def __init__(self, gen_params, alg_params, dim=3):
         # discount factor
-        self.gamma = gamma
+        self.gamma = alg_params.gamma
+        self.train_mode = gen_params.train_mode
         self.dim = dim
         self.R = [0.0 for _ in range(dim)]
         self.r_running_ms = [RunningMeanStd(1) for _ in range(dim)]
 
     def __call__(self, rewards):
-        for i in range(len(self.R)):
-            self.R[i] = self.gamma * self.R[i] + rewards[i]
-            self.r_running_ms[i].update(self.R[i])
-        rewards = [float(rewards[i] / (self.r_running_ms[i].std + 1e-8)) for i in range(len(rewards))]
+        if self.train_mode == "mappo":
+            for i in range(len(self.R)):
+                self.R[i] = self.gamma * self.R[i] + rewards[i]
+                self.r_running_ms[i].update(self.R[i])
+            rewards = [float(rewards[i] / (self.r_running_ms[i].std + 1e-8)) for i in range(len(rewards))]
+        elif self.train_mode == "maddpg":
+            reward_scale = 1e-4
+            rewards = [ri * reward_scale for ri in rewards]
         return rewards
         
     # reset 'R' when an episode is done
     def reset(self):
-        self.R = self.R = [0.0 for _ in range(self.dim)]
+        self.R  = [0.0 for _ in range(self.dim)]
         
 class GaussianNoise():
     def __init__(self, action_dim, mu = 0.25, sigma = 0.5):

@@ -88,7 +88,7 @@ class Rollout:
             
             # reward scaling
             if alg_params.use_reward_scaling:
-                self.reward_scaling = RewardScaling(alg_params.gamma, dim = self.device_type_num)
+                self.reward_scaling = RewardScaling(gen_params, alg_params, dim = self.device_type_num)
             
             # initialize agents' policy networks
             for i in range(self.device_num):
@@ -104,7 +104,7 @@ class Rollout:
 
             # reward scaling
             if alg_params.use_reward_scaling:
-                self.reward_scaling = RewardScaling(alg_params.gamma, dim = self.device_type_num)
+                self.reward_scaling = RewardScaling(gen_params, alg_params, dim = self.device_type_num)
 
             # initialize agents' policy networks
             if self.eval_mode[0] == "m":
@@ -327,9 +327,9 @@ class Rollout:
             # self.average_always(t_id, edge_comp_qls, device_comp_qls)
             
             # reward scaling
-            # if hasattr(self, "reward_scaling"):
-            #     joint_rewards = self.reward_scaling(joint_rewards)
-
+            if hasattr(self, "reward_scaling"):
+                joint_rewards = self.reward_scaling(joint_rewards)
+            # print(f"[DEBUG] joint_rewards: {joint_rewards}")
             # obs scaling
             if hasattr(self, "obs_scaling"):
                 next_edge_obs, next_device_obss = self.obs_scaling(next_edge_obs, next_device_obss)

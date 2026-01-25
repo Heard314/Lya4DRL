@@ -241,12 +241,14 @@ def get_general_params():
                         default = 0.1,
                         help = "the b parameter for edge weight linear function")
 
-    parser.add_argument("--device_dly_adj_fac", type = list, 
+    parser.add_argument("--device_dly_adj_fac", type = list,
                         default = [1.0]*edge_queue_num,
+                        # default = [0.8]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     parser.add_argument("--edge_dly_adj_fac", type = list, 
                         default = [0.8]*edge_queue_num,
+                        # default = [0.6]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
 
     # parser.add_argument("--vir_local_ql_growth_rate", type = float,
@@ -527,19 +529,19 @@ def get_maddpg_params():
     parser.add_argument("--tau", type = float, default = 0.005,
                         help = "the soft update factor of target networks")
 
-    parser.add_argument("--v_lr", type = float, default = 1e-5,           
+    parser.add_argument("--v_lr", type = float, default = 5e-5,           
                         help = "the learning-rate of value network")
     
-    parser.add_argument("--p_lr", type = float, default = 1e-5,          
+    parser.add_argument("--p_lr", type = float, default = 5e-5,          
                         help = "the learning-rate of policy networks")
     
     parser.add_argument("--use_lr_decay", type = bool, default = True,
                         help = "whether to use learning-rate decay")
     
-    parser.add_argument("--min_v_lr", type = float, default = 1e-7,       
+    parser.add_argument("--min_v_lr", type = float, default = 1e-6,       
                         help = "the minimal learning-rate of value network")
     
-    parser.add_argument("--min_p_lr", type = float, default = 1e-7,   
+    parser.add_argument("--min_p_lr", type = float, default = 1e-6,
                         help = "the minimal learning-rate of policy networks")
     
     parser.add_argument("--decay_intl", type = int, default = 300000,  
