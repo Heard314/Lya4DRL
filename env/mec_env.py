@@ -219,7 +219,7 @@ class MECEnv():
                 device_vir_queue_reward_max_bound = self.device_vir_queue_reward_max_bound #800
                 device_vir_queue_reward_min_bound = self.device_vir_queue_reward_min_bound #-1200
 
-                device_act_reward_fac = self.device_envs[i].device_act_reward_fac)                
+                device_act_reward_fac = self.device_envs[i].device_act_reward_fac                
 
                 if(self.enable_virtual_queue_reward):
                     device_queue_virtual_rewards[i] = self.device_vir_queue_reward_weight * \
