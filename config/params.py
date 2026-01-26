@@ -244,12 +244,12 @@ def get_general_params():
     parser.add_argument("--device_dly_adj_fac", type = list,
                         default = [1.0]*edge_queue_num,
                         # default = [0.8]*edge_queue_num,
-                        help = "the weights of tasks' edge computation expense")
+                        help = "the weights of tasks' device computation queue overtime threshold factor.")
 
     parser.add_argument("--edge_dly_adj_fac", type = list, 
                         default = [0.8]*edge_queue_num,
                         # default = [0.6]*edge_queue_num,
-                        help = "the weights of tasks' edge computation expense")
+                        help = "the weights of tasks' edge computation queue overtime threshold factor.")
 
     # parser.add_argument("--vir_local_ql_growth_rate", type = float,
     #                     default = 0.6,
