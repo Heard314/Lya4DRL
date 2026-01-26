@@ -74,17 +74,16 @@ class RewardScaling():
     # reset 'R' when an episode is done
     def reset(self):
         self.R  = [0.0 for _ in range(self.dim)]
-        
-class GaussianNoise():
-    def __init__(self, action_dim, mu = 0.25, sigma = 0.5):
+
+class GaussianNoise:
+    def __init__(self, action_dim, sigma=0.2, device="cpu"):
         self.action_dim = action_dim
-        self.mu = mu
         self.sigma = sigma
-        
-    def sample(self):
-        x = np.random.normal(self.mu, self.sigma, self.action_dim)
-                
-        return x
+        self.device = device
+
+    def sample(self, sigma=None):
+        s = self.sigma if sigma is None else sigma
+        return torch.randn(self.action_dim, device=self.device) * s
 
 def OrthogonalInit(layer, gain = 1.0):
     for name, params in layer.named_parameters():

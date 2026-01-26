@@ -9,6 +9,7 @@ general params
 """
 device_num = 10
 edge_queue_num = 3
+gen_task_cycle = 5
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
 
@@ -112,7 +113,7 @@ def get_general_params():
     parser.add_argument("--max_task_num", type = int, default = 1,
                         help = "the maximum number of tasks at each time slot")
 
-    parser.add_argument("--gen_task_cycle", type = int, default = 5,
+    parser.add_argument("--gen_task_cycle", type = int, default = gen_task_cycle,
                         help = "the cycle of generating tasks (unit: time slots)")
 
     parser.add_argument("--start_slot", type = int, default = 0,
@@ -286,7 +287,7 @@ def get_general_params():
                         help = "The bound multi factor for edge queue reward")
 
     # navie reward
-    parser.add_argument("--base_reward_penalty", type = float, default = 10000,
+    parser.add_argument("--base_reward_penalty", type = float, default = 0,
                         help = "the base reward penalty for each task")
 
     parser.add_argument("--timeout_reward_penalty", type = float, default = -4000,
@@ -461,6 +462,8 @@ value_input_obs_dims = [n * (device_obs_dim) + edge_queue_obs_dim for n in [2, 4
 value_input_act_dims = [n * action_dim for n in [2, 4, 4]] # 包含所有智能体的动作信息
 value_input_dims = [n * (device_obs_dim + action_dim) + edge_queue_obs_dim for n in [2, 4, 4]] # 包含整个集群的观测信息和所有智能体的动作信息
 policy_input_dim = device_obs_dim + edge_queue_obs_dim
+maddpg_train_episodes = 30000
+maddpg_time_slots = 3000
 def get_maddpg_params():
     parser = argparse.ArgumentParser(description = "maddpg params", add_help=False, allow_abbrev=False)
     
@@ -496,31 +499,31 @@ def get_maddpg_params():
                         help = "whether to use orthogonal-initialization")
     
     # training  
-    parser.add_argument("--train_episodes", type = int, default = 30000,
+    parser.add_argument("--train_episodes", type = int, default = maddpg_train_episodes,
                         help = "the number of training episodes")
     
-    parser.add_argument("--train_time_slots", type = int, default = 3000,
+    parser.add_argument("--train_time_slots", type = int, default = maddpg_time_slots,
                         help = "the number of training time-slots")
     
-    parser.add_argument("--warm_time_slots", type = int, default = 12000,
+    parser.add_argument("--warm_time_slots", type = int, default = maddpg_time_slots * 4,
                         help = "the number of warming time-slots")
     
-    parser.add_argument("--train_freq", type = int, default = 12000,
+    parser.add_argument("--train_freq", type = int, default = maddpg_time_slots,
                         help = "training frequency")
     
-    parser.add_argument("--target_update_freq", type = int, default = 24000,
+    parser.add_argument("--target_update_freq", type = int, default = maddpg_time_slots,
                         help = "the updating frequency of target networks")
     
-    parser.add_argument("--train_batch_size", type = int, default = 2400,
+    parser.add_argument("--train_batch_size", type = int, default = int(maddpg_time_slots / gen_task_cycle * 4),
                         help = "training batch-size")
     
-    parser.add_argument("--v_epochs", type = int, default = 4,
+    parser.add_argument("--v_epochs", type = int, default = 1,
                         help = "the number of training epochs of value network")
     
     parser.add_argument("--p_epochs", type = int, default = 1,
                         help = "the number of training epochs of policy networks")
     
-    parser.add_argument("--buffer_size", type = int, default = 24000, 
+    parser.add_argument("--buffer_size", type = int, default = maddpg_time_slots * 32, 
                         help = "the size of replay buffer")
     
     parser.add_argument("--gamma", type = float, default = 0.99,
@@ -529,7 +532,7 @@ def get_maddpg_params():
     parser.add_argument("--tau", type = float, default = 0.005,
                         help = "the soft update factor of target networks")
 
-    parser.add_argument("--v_lr", type = float, default = 5e-5,           
+    parser.add_argument("--v_lr", type = float, default = 1e-4,           
                         help = "the learning-rate of value network")
     
     parser.add_argument("--p_lr", type = float, default = 5e-5,          
@@ -538,12 +541,18 @@ def get_maddpg_params():
     parser.add_argument("--use_lr_decay", type = bool, default = True,
                         help = "whether to use learning-rate decay")
     
-    parser.add_argument("--min_v_lr", type = float, default = 1e-6,       
+    parser.add_argument("--min_v_lr", type = float, default = 5e-6,       
                         help = "the minimal learning-rate of value network")
     
-    parser.add_argument("--min_p_lr", type = float, default = 1e-6,
+    parser.add_argument("--min_p_lr", type = float, default = 5e-6,
                         help = "the minimal learning-rate of policy networks")
     
+    parser.add_argument("--critic_updates_round", type = int, default = 3,
+                        help = "the number of critic network updates per training")
+
+    parser.add_argument("--policy_delay_round", type = int, default = 2,
+                        help = "the number of policy network delays per training")
+
     parser.add_argument("--decay_intl", type = int, default = 300000,  
                         help = "the interval of learning-rate decay")
     
@@ -559,6 +568,16 @@ def get_maddpg_params():
     parser.add_argument("--use_action_noise", type = bool, default = True,
                         help = "whether to add noise in agents' actions")
     
+    parser.add_argument("--noise_sigma_start", type = float, default = 0.2,
+                        help = "noise sigma at the start of training")
+
+    parser.add_argument("--noise_sigma_end", type = float, default = 0.02,
+                        help = "noise sigma at the end of training")
+
+    # 总训练回合数/训练频率
+    parser.add_argument("--noise_decay_updates", type = float, default = maddpg_train_episodes,
+                        help = "the number of updates over which the noise sigma decays")
+
     parser.add_argument("--use_grad_clip", type = bool, default = True, 
                         help = "whether to use gradient clip")
     

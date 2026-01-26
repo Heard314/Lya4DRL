@@ -150,12 +150,26 @@ class MaddpgDeviceAgent():
 
         # action noise
         self.use_action_noise = alg_params.use_action_noise
+        # train noise
+        self.train_update_cnt = 0
+        self.noise_sigma_start = alg_params.noise_sigma_start
+        self.noise_sigma_end = alg_params.noise_sigma_end
+        self.noise_decay_updates = alg_params.noise_decay_updates
+
         if self.use_action_noise:
-            self.action_noise = GaussianNoise(alg_params.action_dim)
+            self.action_noise = GaussianNoise(alg_params.action_dim, sigma=self.noise_sigma_start, device=self.device)
             
         self.evaluate = gen_params.evaluate
         self.lstm_hidden_dim = alg_params.p_hid_dims[1]
-        
+
+    def increment_update_cnt(self):
+        self.train_update_cnt += 1
+        # print(f"[DEBUG] train_update_cnt: {self.train_update_cnt}")
+
+    def get_noise_sigma(self):
+        t = min(self.train_update_cnt / max(self.noise_decay_updates, 1), 1.0)
+        return self.noise_sigma_start + t * (self.noise_sigma_end - self.noise_sigma_start)
+
     def choose_action(self, obs, lstm_hidden_h, lstm_hidden_c):
         p_inputs = GetPolicyInputs(obs)
 
@@ -183,12 +197,14 @@ class MaddpgDeviceAgent():
         with torch.no_grad():
             act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
         if not (self.evaluate or gp.settings.is_evaluate):
-            act = torch.clip((act + self.action_noise.sample()), -1, 1).tolist()
+            sigma = self.get_noise_sigma()
+            noise = self.action_noise.sample(sigma).view_as(act)
+            act = torch.clamp(act + noise, -1.0, 1.0)
     
         # dim0 -> [0,10]: scale=1, loc=1
         # dim1 -> [6,10]: scale=0.4, loc=1.6
         # dim2 -> [6,10]: scale=0.4, loc=1.6
-        act = torch.tensor(act, dtype=torch.float32)
+        # act = torch.tensor(act, dtype=torch.float32)
         scale = self.p_net.act_scale
         loc   = self.p_net.act_bias
         # every action indicate with 10 dim

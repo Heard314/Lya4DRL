@@ -369,11 +369,13 @@ class Rollout:
                 
                 # train networks
                 if total_time_slots % self.train_freq == 0:
+                    for i in range(self.device_num):
+                        self.device_agents[i].increment_update_cnt()
                     self.edge_agent.train_nets(total_time_slots, self.replay_buffer)
                     # update agents' policy networks
                     for i in range(self.device_num):
                         self.device_agents[i].update_net(self.edge_agent.p_nets[i].state_dict())
-                
+
                 # update target networks
                 if total_time_slots % self.target_update_freq == 0:
                     self.edge_agent.update_target_nets(total_time_slots)

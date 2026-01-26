@@ -262,6 +262,11 @@ class MaddpgEdgeAgent():
         self.gamma = alg_params.gamma
         self.v_lr = alg_params.v_lr
         self.p_lr = alg_params.p_lr
+
+        self.train_update_cnt = 0
+        self.critic_updates_round = alg_params.critic_updates_round
+        self.policy_delay_round = alg_params.policy_delay_round
+
         # gradient clip
         self.use_grad_clip = alg_params.use_grad_clip
         self.v_grad_clip = alg_params.v_grad_clip
@@ -307,7 +312,8 @@ class MaddpgEdgeAgent():
             p_optimizer = torch.optim.Adam(p_net.parameters(),
                                             lr = self.p_lr)
             self.p_optimizers.append(p_optimizer)
-            
+    
+
         # load networks' weights
         if gen_params.load_weights:
             for i in range(self.device_type_num):
@@ -339,6 +345,7 @@ class MaddpgEdgeAgent():
             # batch_joint_rewards: [device_type_num, batch_size, device_type_num]
             # batch_next_states: [device_type_num, batch_size, state_dim]
             # batch_next_device_obss: [batch_size, device_num, obs_dim]
+            self.train_update_cnt += 1
             batch_states, batch_device_obss, \
             batch_joint_acts, batch_joint_rewards, \
             batch_next_states, batch_next_device_obss = replay_buffer.sample(batch_ids)
@@ -349,16 +356,19 @@ class MaddpgEdgeAgent():
             batch_joint_rewards = batch_joint_rewards
             batch_next_states = batch_next_states
             batch_next_device_obss = batch_next_device_obss
-
-            for i in range(self.device_type_num):
-                self.train_value_net(i, batch_states[i], batch_joint_acts[i], 
-                                    batch_joint_rewards[i],
-                                    batch_next_states[i], batch_next_device_obss)
-            
-            for i in range(self.device_type_num):
-                for j in self.device_in_types[i]:
-                    self.train_policy_net(j, i, batch_states[i], batch_device_obss[:, j], 
-                                          batch_joint_acts[i])
+            # print(f"[DEBUG] the train_update_cnt is: {self.train_update_cnt}")
+            for _ in range(self.critic_updates_round):
+                # print(f"[DEBUG] Training critic networks at update cnt: {self.train_update_cnt}")
+                for i in range(self.device_type_num):
+                    self.train_value_net(i, batch_states[i], batch_joint_acts[i], 
+                                        batch_joint_rewards[i],
+                                        batch_next_states[i], batch_next_device_obss)
+            if self.train_update_cnt % self.policy_delay_round == 0:
+                # print(f"[DEBUG] Training policy networks at update cnt: {self.train_update_cnt}")
+                for i in range(self.device_type_num):
+                    for j in self.device_in_types[i]:
+                        self.train_policy_net(j, i, batch_states[i], batch_device_obss[:, j], 
+                                            batch_joint_acts[i])
 
             if self.use_lr_decay:
                 self.decay_lr(total_time_slots)
@@ -397,28 +407,37 @@ class MaddpgEdgeAgent():
                                                self.v_grad_clip)
             self.v_optimizers[queue_id].step()
             
+    def set_requires_grad(self, net, flag):
+        for p in net.parameters():
+            p.requires_grad_(flag)
+
     def train_policy_net(self, agent_id, queue_id, batch_states, batch_device_obss, batch_joint_acts):
         batch_states = batch_states.to(self.device)
         batch_device_obss = batch_device_obss.to(self.device)
         batch_joint_acts = batch_joint_acts.to(self.device)
         agent_id_in_type = agent_id - self.device_in_types[queue_id][0]
+        self.set_requires_grad(self.v_nets[queue_id], False)
         for i in range(self.p_epochs):
             batch_joint_acts_ = batch_joint_acts.clone()
             batch_acts, _ = self.p_nets[agent_id](batch_device_obss)
             batch_acts = batch_acts.squeeze(1)
-            batch_joint_acts_[:, agent_id_in_type * self.action_dim:
-                                (agent_id_in_type + 1) * self.action_dim] = batch_acts
+
+            s = agent_id_in_type * self.action_dim
+            e = (agent_id_in_type + 1) * self.action_dim
+            batch_joint_acts_[:, s:e] = batch_acts
 
             p_loss = (-self.v_nets[queue_id](batch_states, batch_joint_acts_)).mean()
 
             self.p_optimizers[agent_id].zero_grad()
             p_loss.backward()
+
             # gradient clip
             if self.use_grad_clip:
                 torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(), 
                                                self.p_grad_clip)
             self.p_optimizers[agent_id].step()
-            
+        self.set_requires_grad(self.v_nets[queue_id], True)
+
     @torch.no_grad()
     def soft_update(self, target_net, online_net, tau):
         # Polyak averaging: target = (1 - tau) * target + tau * online
