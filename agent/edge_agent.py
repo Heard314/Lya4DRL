@@ -416,7 +416,7 @@ class MaddpgEdgeAgent():
         batch_device_obss = batch_device_obss.to(self.device)
         batch_joint_acts = batch_joint_acts.to(self.device)
         agent_id_in_type = agent_id - self.device_in_types[queue_id][0]
-        self.set_requires_grad(self.v_nets[queue_id], False)
+        # self.set_requires_grad(self.v_nets[queue_id], False)
         for i in range(self.p_epochs):
             batch_joint_acts_ = batch_joint_acts.clone()
             batch_acts, _ = self.p_nets[agent_id](batch_device_obss)
@@ -436,7 +436,7 @@ class MaddpgEdgeAgent():
                 torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(), 
                                                self.p_grad_clip)
             self.p_optimizers[agent_id].step()
-        self.set_requires_grad(self.v_nets[queue_id], True)
+        # self.set_requires_grad(self.v_nets[queue_id], True)
 
     @torch.no_grad()
     def soft_update(self, target_net, online_net, tau):
@@ -457,12 +457,14 @@ class MaddpgEdgeAgent():
         if total_time_slots % self.decay_intl == 0:
             if self.v_lr > self.min_v_lr:
                 self.v_lr -= self.decay_fac
+                self.v_lr = max(self.v_lr, self.min_v_lr)
                 for i in range(self.device_type_num):
                     for params in self.v_optimizers[i].param_groups:
                         params['lr'] = self.v_lr
             
             if self.p_lr > self.min_p_lr:
                 self.p_lr -= self.decay_fac
+                self.p_lr = max(self.p_lr, self.min_p_lr)
                 for i in range(self.device_num):
                     for params in self.p_optimizers[i].param_groups:
                         params['lr'] = self.p_lr

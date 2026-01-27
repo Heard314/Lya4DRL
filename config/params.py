@@ -287,7 +287,7 @@ def get_general_params():
                         help = "The bound multi factor for edge queue reward")
 
     # navie reward
-    parser.add_argument("--base_reward_penalty", type = float, default = 0,
+    parser.add_argument("--base_reward_penalty", type = float, default = 10000,
                         help = "the base reward penalty for each task")
 
     parser.add_argument("--timeout_reward_penalty", type = float, default = -4000,
@@ -525,7 +525,7 @@ def get_maddpg_params():
     parser.add_argument("--p_epochs", type = int, default = 1,
                         help = "the number of training epochs of policy networks")
     
-    parser.add_argument("--buffer_size", type = int, default = maddpg_time_slots * 32, 
+    parser.add_argument("--buffer_size", type = int, default = maddpg_time_slots * 8, 
                         help = "the size of replay buffer")
     
     parser.add_argument("--gamma", type = float, default = 0.99,
@@ -534,7 +534,7 @@ def get_maddpg_params():
     parser.add_argument("--tau", type = float, default = 0.005,
                         help = "the soft update factor of target networks")
 
-    parser.add_argument("--v_lr", type = float, default = 5e-5,           
+    parser.add_argument("--v_lr", type = float, default = 1e-4,           
                         help = "the learning-rate of value network")
     
     parser.add_argument("--p_lr", type = float, default = 5e-5,          
@@ -577,7 +577,7 @@ def get_maddpg_params():
                         help = "noise sigma at the end of training")
 
     # 总训练回合数/训练频率
-    parser.add_argument("--noise_decay_updates", type = float, default = maddpg_train_episodes / maddpg_train_freq,
+    parser.add_argument("--noise_decay_num", type = float, default = maddpg_train_episodes / maddpg_train_freq,
                         help = "the number of updates over which the noise sigma decays")
 
     parser.add_argument("--use_grad_clip", type = bool, default = True, 
