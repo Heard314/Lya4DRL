@@ -279,7 +279,8 @@ class MaddpgEdgeAgent():
         self.min_v_lr = alg_params.min_v_lr
         self.min_p_lr = alg_params.min_p_lr
         self.decay_intl = alg_params.decay_intl
-        self.decay_fac = alg_params.decay_fac
+        self.p_decay_fac = alg_params.p_decay_fac
+        self.v_decay_fac = alg_params.v_decay_fac
         self.tau = alg_params.tau
         self.v_nets = []
         self.target_v_nets = []
@@ -456,14 +457,14 @@ class MaddpgEdgeAgent():
     def decay_lr(self, total_time_slots):
         if total_time_slots % self.decay_intl == 0:
             if self.v_lr > self.min_v_lr:
-                self.v_lr -= self.decay_fac
+                self.v_lr -= self.v_decay_fac
                 self.v_lr = max(self.v_lr, self.min_v_lr)
                 for i in range(self.device_type_num):
                     for params in self.v_optimizers[i].param_groups:
                         params['lr'] = self.v_lr
             
             if self.p_lr > self.min_p_lr:
-                self.p_lr -= self.decay_fac
+                self.p_lr -= self.p_decay_fac
                 self.p_lr = max(self.p_lr, self.min_p_lr)
                 for i in range(self.device_num):
                     for params in self.p_optimizers[i].param_groups:

@@ -466,6 +466,11 @@ maddpg_train_episodes = 30000
 maddpg_time_slots = 3000
 maddpg_train_freq = 4
 maddpg_update_freq = 8
+maddpg_lr_decay_freq = 100
+maddpg_p_lr = 5e-5
+maddpg_v_lr = 1e-4
+maddpg_p_min_lr = 1e-6
+maddpg_v_min_lr = 1e-6
 def get_maddpg_params():
     parser = argparse.ArgumentParser(description = "maddpg params", add_help=False, allow_abbrev=False)
     
@@ -534,19 +539,19 @@ def get_maddpg_params():
     parser.add_argument("--tau", type = float, default = 0.005,
                         help = "the soft update factor of target networks")
 
-    parser.add_argument("--v_lr", type = float, default = 1e-4,           
+    parser.add_argument("--v_lr", type = float, default = maddpg_v_lr,           
                         help = "the learning-rate of value network")
     
-    parser.add_argument("--p_lr", type = float, default = 5e-5,          
+    parser.add_argument("--p_lr", type = float, default = maddpg_p_lr,          
                         help = "the learning-rate of policy networks")
     
     parser.add_argument("--use_lr_decay", type = bool, default = True,
                         help = "whether to use learning-rate decay")
     
-    parser.add_argument("--min_v_lr", type = float, default = 1e-6,       
+    parser.add_argument("--min_v_lr", type = float, default = maddpg_v_min_lr,       
                         help = "the minimal learning-rate of value network")
     
-    parser.add_argument("--min_p_lr", type = float, default = 1e-6,
+    parser.add_argument("--min_p_lr", type = float, default = maddpg_p_min_lr,
                         help = "the minimal learning-rate of policy networks")
     
     parser.add_argument("--critic_updates_round", type = int, default = 1,
@@ -558,8 +563,12 @@ def get_maddpg_params():
     parser.add_argument("--decay_intl", type = int, default = 300000,  
                         help = "the interval of learning-rate decay")
     
-    parser.add_argument("--decay_fac", type = float, default = 4.95e-06,
-                        help = "the parameter about learning-rate decay")
+    # 训练到一半学习率达到最小值
+    parser.add_argument("--p_decay_fac", type = float, default = (maddpg_p_lr - maddpg_p_min_lr) / (maddpg_train_episodes / maddpg_lr_decay_freq / 2),
+                        help = "the parameter about policy networklearning-rate decay")
+
+    parser.add_argument("--v_decay_fac", type = float, default = (maddpg_v_lr - maddpg_v_min_lr) / (maddpg_train_episodes / maddpg_lr_decay_freq / 2),
+                        help = "the parameter about value network learning-rate decay")
     
     parser.add_argument("--use_obs_scaling", type = bool, default = True, 
                         help = "whether to use observation scaling")
