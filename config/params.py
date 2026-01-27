@@ -201,7 +201,7 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[1.8, 2.0], [4.0, 4.2], [1.0, 1.2]],
+        default=[[2.3, 2.5], [5.0, 5.2], [1.0, 1.2]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     parser.add_argument("--comp_dly_thre", type = list, 
@@ -467,10 +467,10 @@ maddpg_time_slots = 3000
 maddpg_train_freq = 4
 maddpg_update_freq = 8
 maddpg_lr_decay_freq = 100
-maddpg_p_lr = 5e-5
-maddpg_v_lr = 1e-4
-maddpg_p_min_lr = 1e-6
-maddpg_v_min_lr = 1e-6
+maddpg_p_lr = 1e-5
+maddpg_v_lr = 1e-5
+maddpg_p_min_lr = 1e-7
+maddpg_v_min_lr = 1e-7
 def get_maddpg_params():
     parser = argparse.ArgumentParser(description = "maddpg params", add_help=False, allow_abbrev=False)
     
