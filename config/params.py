@@ -275,11 +275,11 @@ def get_general_params():
                         help = "the min bound of virtual device queue reward")
 
     parser.add_argument("--device_act_queue_reward_weight", type = float,
-                        default = -40,
+                        default = -1000,
                         help = "The Lyapunov Drift-Plus-Penalty weight for local queues")
     
     parser.add_argument("--device_vir_queue_reward_weight", type = float,
-                        default = -80,
+                        default = -2000,
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     parser.add_argument("--edge_queue_reward_bound_fac", type = float,
@@ -467,14 +467,14 @@ maddpg_time_slots = 3000
 maddpg_train_freq = 4
 maddpg_update_freq = 8
 maddpg_lr_decay_freq = 100
-# maddpg_p_lr = 5e-5
-# maddpg_v_lr = 1e-4
-# maddpg_p_min_lr = 1e-6
-# maddpg_v_min_lr = 1e-6
-maddpg_p_lr = 1e-5
-maddpg_v_lr = 1e-5
-maddpg_p_min_lr = 1e-7
-maddpg_v_min_lr = 1e-7
+maddpg_p_lr = 5e-5
+maddpg_v_lr = 1e-4
+maddpg_p_min_lr = 1e-6
+maddpg_v_min_lr = 1e-6
+# maddpg_p_lr = 1e-5
+# maddpg_v_lr = 1e-5
+# maddpg_p_min_lr = 1e-7
+# maddpg_v_min_lr = 1e-7
 def get_maddpg_params():
     parser = argparse.ArgumentParser(description = "maddpg params", add_help=False, allow_abbrev=False)
     
