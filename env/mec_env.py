@@ -228,6 +228,8 @@ class MECEnv():
                     if (task.l_comp_dly > task.dly_cons):
                         device_queue_actual_rewards[i] = device_act_reward_fac * self.device_act_queue_reward_weight * \
                                 self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
+                        if device_queue_actual_rewards[i] < 0:
+                            device_queue_actual_rewards[i]  = min(-400, device_queue_actual_rewards[i])
                         device_queue_actual_rewards[i] = min(max(device_act_queue_reward_min_bound, device_queue_actual_rewards[i]), device_act_queue_reward_max_bound)
                 if(self.enable_actual_queue_reward):
                     device_queue_actual_rewards[i] = device_act_reward_fac * self.device_act_queue_reward_weight * 3 * \
@@ -280,12 +282,14 @@ class MECEnv():
                 edge_vir_queue_reward_weight = 0.85 * self.device_vir_queue_reward_weight * self.device_num_per_type[i]
 
                 if(self.enable_virtual_queue_reward):
-                    edge_queue_virtual_rewards[i] = edge_act_queue_reward_weight * \
+                    edge_queue_virtual_rewards[i] = edge_vir_queue_reward_weight * \
                         self.edge_env.virtual_edge_queue_time_ql[i] * (self.edge_env.new_vir_edge_ql_change[i])
                     edge_queue_virtual_rewards[i] = min(max(virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), virtual_queue_type_scale_posfac)
                     if task_type_in_edge_is_overtime[i]:
                         edge_queue_actual_rewards[i] = edge_act_queue_reward_weight * \
                             self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
+                        if edge_queue_actual_rewards[i] < 0:
+                            edge_queue_actual_rewards[i] = min(-400 * self.device_num_per_type[i], edge_queue_actual_rewards[i])
                         edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
 
                 if(self.enable_actual_queue_reward):
@@ -310,12 +314,19 @@ class MECEnv():
                         )
                 edge_queue_rewards[i] = edge_queue_actual_rewards[i] + edge_queue_virtual_rewards[i]
                 joint_rewards[i] = edge_queue_rewards[i]
+                joint_cost_per_type = 0.0
                 for j in self.device_in_types[i]:
                     joint_rewards[i] += device_rewards[j]
+                    joint_cost_per_type += device_costs[j]
                 if visualize:
                     writer.add_scalars(
                         f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_reward_{i}",
                         {f"ep_{e_id}": joint_rewards[i]},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_cost_{i}",
+                        {f"ep_{e_id}": joint_cost_per_type},
                         t_id
                     )
             joint_cost = sum(device_costs)
