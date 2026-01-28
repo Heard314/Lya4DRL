@@ -193,7 +193,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.4, 1.6], [0.6, 0.8], [2.8, 3.0]],
+        default=[[1.4, 1.6], [0.6, 0.8], [2.6, 2.8]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -201,7 +201,7 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[2.0, 2.2], [4.2, 4.4], [1.0, 1.2]],
+        default=[[1.8, 2.0], [4.0, 4.2], [1.0, 1.2]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     parser.add_argument("--comp_dly_thre", type = list, 
@@ -602,7 +602,7 @@ def get_maddpg_params():
     parser.add_argument("--p_grad_clip", type = float, default = 2,   
                         help = "the parameter about policy networks' gradient clip")
     
-    parser.add_argument("--save_freq", type = int, default = 600000,
+    parser.add_argument("--save_freq", type = int, default = 6000000,
                         help = "the saving frequency of networks")
     
     parser.add_argument("--weights_dir", type = str, default = "weight/", 
