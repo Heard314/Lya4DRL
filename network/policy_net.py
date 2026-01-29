@@ -208,7 +208,7 @@ class MaddpgPolicyNetLSTM(nn.Module):
             nn.init.zeros_(self.fc3.bias)
 
         # ---------- action range ----------
-        low  = torch.tensor([0., 1.2, 1.2])
+        low  = torch.tensor([1., 1.2, 1.2])
         high = torch.tensor([2., 2., 2.])
         self.register_buffer("act_low",  low)
         self.register_buffer("act_high", high)
