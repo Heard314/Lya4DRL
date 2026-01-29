@@ -57,9 +57,11 @@ class MECEnv():
         print(f"[DEBUG] device_vir_queue_reward_min_bound: {self.device_vir_queue_reward_min_bound}")
 
         self.timeout_reward_penalty = gen_params.timeout_reward_penalty
+        self.lya_timeout_reward_penalty = gen_params.lya_timeout_reward_penalty
         self.target_reward_penalty = gen_params.target_reward_penalty
 
         print(f"[DEBUG] timeout_reward_penalty: {self.timeout_reward_penalty}")
+        print(f"[DEBUG] lya_timeout_reward_penalty: {self.lya_timeout_reward_penalty}")
         print(f"[DEBUG] target_reward_penalty: {self.target_reward_penalty}")
 
         # device_env info print
@@ -201,6 +203,8 @@ class MECEnv():
                 # print(f"[DEBUG] the comp_dly is {comp_dly}, the task.dly_cons is {task.dly_cons}")
                 if comp_dly > task.dly_cons and not (self.enable_virtual_queue_reward or self.enable_actual_queue_reward):
                     device_rewards[i] += self.timeout_reward_penalty
+                elif comp_dly > task.dly_cons and self.enable_virtual_queue_reward:
+                    device_rewards[i] += self.lya_timeout_reward_penalty
                 else:
                     norm_csum_engy = task.norm_csum_engy
                     norm_esum_engy = task.norm_esum_engy
@@ -229,6 +233,8 @@ class MECEnv():
                         device_queue_actual_rewards[i] = device_act_reward_fac * self.device_act_queue_reward_weight * \
                                 self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
                         device_queue_actual_rewards[i] = min(max(device_act_queue_reward_min_bound, device_queue_actual_rewards[i]), device_act_queue_reward_max_bound)
+                    # if device_queue_actual_rewards[i] < 0:
+                    #     device_queue_actual_rewards[i]  = min(-400, device_queue_actual_rewards[i])
                 if(self.enable_actual_queue_reward):
                     device_queue_actual_rewards[i] = device_act_reward_fac * self.device_act_queue_reward_weight * 3 * \
                             self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
@@ -286,6 +292,8 @@ class MECEnv():
                     if task_type_in_edge_is_overtime[i]:
                         edge_queue_actual_rewards[i] = edge_act_queue_reward_weight * \
                             self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
+                        # if edge_queue_actual_rewards[i] < 0:
+                        #     edge_queue_actual_rewards[i] = min(-200 * self.device_num_per_type[i], edge_queue_actual_rewards[i])
                         edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
 
                 if(self.enable_actual_queue_reward):
@@ -310,12 +318,19 @@ class MECEnv():
                         )
                 edge_queue_rewards[i] = edge_queue_actual_rewards[i] + edge_queue_virtual_rewards[i]
                 joint_rewards[i] = edge_queue_rewards[i]
+                joint_cost_per_type = 0.0
                 for j in self.device_in_types[i]:
                     joint_rewards[i] += device_rewards[j]
+                    joint_cost_per_type += device_costs[j]
                 if visualize:
                     writer.add_scalars(
                         f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_reward_{i}",
                         {f"ep_{e_id}": joint_rewards[i]},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_cost_{i}",
+                        {f"ep_{e_id}": joint_cost_per_type},
                         t_id
                     )
             joint_cost = sum(device_costs)
