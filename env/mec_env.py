@@ -280,7 +280,7 @@ class MECEnv():
                 edge_vir_queue_reward_weight = 0.85 * self.device_vir_queue_reward_weight * self.device_num_per_type[i]
 
                 if(self.enable_virtual_queue_reward):
-                    edge_queue_virtual_rewards[i] = edge_act_queue_reward_weight * \
+                    edge_queue_virtual_rewards[i] = edge_vir_queue_reward_weight * \
                         self.edge_env.virtual_edge_queue_time_ql[i] * (self.edge_env.new_vir_edge_ql_change[i])
                     edge_queue_virtual_rewards[i] = min(max(virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), virtual_queue_type_scale_posfac)
                     if task_type_in_edge_is_overtime[i]:
