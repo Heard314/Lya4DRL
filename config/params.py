@@ -468,6 +468,12 @@ maddpg_lr_warm_episodes = maddpg_train_episodes * 0.15
 maddpg_train_freq = 4
 maddpg_update_freq = 8
 maddpg_lr_decay_freq = 100
+# 260129 14:35 提高样本利用效率
+# maddpg_train_freq = 1
+# maddpg_update_freq = 1
+# maddpg_buffer_episodes_num = 20
+# maddpg_policy_delay_round = 2
+# maddpg_critic_updates_round = 1
 maddpg_p_lr = 5e-5
 maddpg_v_lr = 1e-4
 maddpg_p_min_lr = 1e-6
@@ -534,7 +540,7 @@ def get_maddpg_params():
     parser.add_argument("--p_epochs", type = int, default = 1,
                         help = "the number of training epochs of policy networks")
     
-    parser.add_argument("--buffer_size", type = int, default = maddpg_time_slots * 8, 
+    parser.add_argument("--buffer_size", type = int, default = maddpg_time_slots * maddpg_buffer_episodes_num, 
                         help = "the size of replay buffer")
     
     parser.add_argument("--gamma", type = float, default = 0.99,
@@ -558,10 +564,10 @@ def get_maddpg_params():
     parser.add_argument("--min_p_lr", type = float, default = maddpg_p_min_lr,
                         help = "the minimal learning-rate of policy networks")
     
-    parser.add_argument("--critic_updates_round", type = int, default = 1,
+    parser.add_argument("--critic_updates_round", type = int, default = maddpg_critic_updates_round,
                         help = "the number of critic network updates per training")
 
-    parser.add_argument("--policy_delay_round", type = int, default = 1,
+    parser.add_argument("--policy_delay_round", type = int, default = maddpg_policy_delay_round,
                         help = "the number of policy network delays per training")
 
     parser.add_argument("--decay_intl", type = int, default = 300000,  
