@@ -1,6 +1,5 @@
 import copy
 import math
-import random
 import numpy as np
 import config.global_params as gp
 class Task():
@@ -57,8 +56,8 @@ class DeviceEnv():
     
     def gen_position(self, min_dis, max_dis):
         while True:
-            x = random.uniform(-max_dis, max_dis)
-            y = random.uniform(-max_dis, max_dis)
+            x = float(np.random.uniform(-max_dis, max_dis))
+            y = float(np.random.uniform(-max_dis, max_dis))
             distance = math.sqrt(x**2 + y**2)
             
             if min_dis <= distance <= max_dis:
@@ -74,11 +73,6 @@ class DeviceEnv():
         self.edge_env = edge_env
         # env id
         self.env_id = env_id
-
-        # create per-env random generators
-        base_seed = gp.settings.seed
-        self._rnd = random.Random(base_seed + env_id)
-        self._np_rnd = np.random.RandomState(base_seed + env_id)
 
         self.device_type = gen_params.device_types[env_id]
         self.device_type_num = gen_params.device_type_num
@@ -252,10 +246,10 @@ class DeviceEnv():
         enable_print = gp.settings.enable_print
 
         # sample acceleration size
-        a_size = random.uniform(self.accelerate_speed_min, self.accelerate_speed_max)
+        a_size = float(np.random.uniform(self.accelerate_speed_min, self.accelerate_speed_max))
 
         # sample acceleration direction in degrees
-        a_dir_deg = random.uniform(self.accelerate_direction_min, self.accelerate_direction_max)  # unit: degree
+        a_dir_deg = float(np.random.uniform(self.accelerate_direction_min, self.accelerate_direction_max))  # unit: degree
 
         # convert degree to radian for trig functions
         a_dir_rad = math.radians(a_dir_deg)
