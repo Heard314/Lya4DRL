@@ -464,6 +464,7 @@ value_input_dims = [n * (device_obs_dim + action_dim) + edge_queue_obs_dim for n
 policy_input_dim = device_obs_dim + edge_queue_obs_dim
 maddpg_train_episodes = 30000
 maddpg_time_slots = 3000
+maddpg_lr_warm_episodes = maddpg_train_episodes * 0.15
 maddpg_train_freq = 4
 maddpg_update_freq = 8
 maddpg_lr_decay_freq = 100
@@ -512,6 +513,9 @@ def get_maddpg_params():
     parser.add_argument("--train_time_slots", type = int, default = maddpg_time_slots,
                         help = "the number of training time-slots")
     
+    parser.add_argument("--lr_warm_time_slots", type = int, default = maddpg_lr_warm_episodes * maddpg_time_slots,
+                        help = "the number of warming time-slots")
+
     parser.add_argument("--warm_time_slots", type = int, default = maddpg_time_slots * 4,
                         help = "the number of warming time-slots")
     
@@ -539,10 +543,10 @@ def get_maddpg_params():
     parser.add_argument("--tau", type = float, default = 0.005,
                         help = "the soft update factor of target networks")
 
-    parser.add_argument("--v_lr", type = float, default = maddpg_v_lr,           
+    parser.add_argument("--peak_v_lr", type = float, default = maddpg_v_lr,           
                         help = "the learning-rate of value network")
     
-    parser.add_argument("--p_lr", type = float, default = maddpg_p_lr,          
+    parser.add_argument("--peak_p_lr", type = float, default = maddpg_p_lr,          
                         help = "the learning-rate of policy networks")
     
     parser.add_argument("--use_lr_decay", type = bool, default = True,

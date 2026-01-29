@@ -260,12 +260,18 @@ class MaddpgEdgeAgent():
         self.p_epochs = alg_params.p_epochs
         self.buffer_size = alg_params.buffer_size
         self.gamma = alg_params.gamma
-        self.v_lr = alg_params.v_lr
-        self.p_lr = alg_params.p_lr
+        self.peak_v_lr = alg_params.peak_v_lr
+        self.peak_p_lr = alg_params.peak_p_lr
+        self.min_v_lr = alg_params.min_v_lr
+        self.min_p_lr = alg_params.min_p_lr
 
         self.train_update_cnt = 0
         self.critic_updates_round = alg_params.critic_updates_round
         self.policy_delay_round = alg_params.policy_delay_round
+
+        self.lr_warm_time_slots = alg_params.lr_warm_time_slots
+        self.train_episodes = alg_params.train_episodes
+        self.train_time_slots = alg_params.train_time_slots
 
         # gradient clip
         self.use_grad_clip = alg_params.use_grad_clip
@@ -276,8 +282,6 @@ class MaddpgEdgeAgent():
         self.weights_dir = gp.settings.weight_dir
         # learning-rate decay
         self.use_lr_decay = alg_params.use_lr_decay
-        self.min_v_lr = alg_params.min_v_lr
-        self.min_p_lr = alg_params.min_p_lr
         self.decay_intl = alg_params.decay_intl
         self.p_decay_fac = alg_params.p_decay_fac
         self.v_decay_fac = alg_params.v_decay_fac
@@ -295,7 +299,7 @@ class MaddpgEdgeAgent():
             self.target_v_nets.append(target_v_net)
             # optimizer
             v_optimizer = torch.optim.Adam(v_net.parameters(),
-                                            lr = self.v_lr)
+                                            lr = self.min_v_lr)
             self.v_optimizers.append(v_optimizer)
 
         self.p_nets = []
@@ -311,7 +315,7 @@ class MaddpgEdgeAgent():
             self.target_p_nets.append(target_p_net)
             # optimizer
             p_optimizer = torch.optim.Adam(p_net.parameters(),
-                                            lr = self.p_lr)
+                                            lr = self.min_p_lr)
             self.p_optimizers.append(p_optimizer)
     
 
@@ -455,20 +459,39 @@ class MaddpgEdgeAgent():
                 self.soft_update(self.target_p_nets[i], self.p_nets[i], self.tau)
                 
     def decay_lr(self, total_time_slots):
-        if total_time_slots % self.decay_intl == 0:
-            if self.v_lr > self.min_v_lr:
-                self.v_lr -= self.v_decay_fac
-                self.v_lr = max(self.v_lr, self.min_v_lr)
-                for i in range(self.device_type_num):
-                    for params in self.v_optimizers[i].param_groups:
-                        params['lr'] = self.v_lr
+        # if total_time_slots % self.decay_intl == 0:
+        #     if self.v_lr > self.min_v_lr:
+        #         self.v_lr -= self.v_decay_fac
+        #         self.v_lr = max(self.v_lr, self.min_v_lr)
+        #         for i in range(self.device_type_num):
+        #             for params in self.v_optimizers[i].param_groups:
+        #                 params['lr'] = self.v_lr
             
-            if self.p_lr > self.min_p_lr:
-                self.p_lr -= self.p_decay_fac
-                self.p_lr = max(self.p_lr, self.min_p_lr)
-                for i in range(self.device_num):
-                    for params in self.p_optimizers[i].param_groups:
-                        params['lr'] = self.p_lr
+        #     if self.p_lr > self.min_p_lr:
+        #         self.p_lr -= self.p_decay_fac
+        #         self.p_lr = max(self.p_lr, self.min_p_lr)
+        #         for i in range(self.device_num):
+        #             for params in self.p_optimizers[i].param_groups:
+        #                 params['lr'] = self.p_lr
+        now = total_time_slots
+        warm = self.lr_warm_time_slots
+        tot = max(self.train_episodes * self.train_time_slots, warm + 1)
+        def update_lr(lr_peak, lr_min):
+            if now < warm:
+                return lr_min + (lr_peak - lr_min) * (now / warm)
+            t = (now - warm) / (tot - warm)
+            return lr_min + 0.5 * (lr_peak - lr_min) * (1.0 + np.cos(np.pi * t))
+
+        v_lr = update_lr(self.peak_v_lr, self.min_v_lr)
+        p_lr = update_lr(self.peak_p_lr, self.min_p_lr)
+        print(f"Updating learning rates: v_lr={v_lr}, p_lr={p_lr} at episode {now/self.train_time_slots}")
+        for i in range(self.device_type_num):
+            for params in self.v_optimizers[i].param_groups:
+                params['lr'] = v_lr
+
+        for i in range(self.device_num):
+            for params in self.p_optimizers[i].param_groups:
+                params['lr'] = p_lr
         
     def save_nets(self, total_time_slots):
         if not os.path.exists(self.weights_dir):
