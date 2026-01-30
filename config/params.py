@@ -480,8 +480,8 @@ maddpg_policy_delay_round = 2
 maddpg_critic_updates_round = 1
 maddpg_p_lr = 5e-5
 maddpg_v_lr = 1e-4
-maddpg_p_min_lr = 1e-6
-maddpg_v_min_lr = 1e-6
+maddpg_p_min_lr = 1e-7
+maddpg_v_min_lr = 1e-7
 def get_maddpg_params():
     parser = argparse.ArgumentParser(description = "maddpg params", add_help=False, allow_abbrev=False)
     
