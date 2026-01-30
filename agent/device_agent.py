@@ -145,8 +145,8 @@ class MaddpgDeviceAgent():
         self.agent_id = agent_id
 
         # policy network
-        # self.p_net = MaddpgPolicyNet(alg_params)
-        self.p_net = MaddpgPolicyNetLSTM(alg_params)
+        # self.p_net = MaddpgPolicyNetLSTM(alg_params)
+        self.p_net = MaddpgPolicyNet(alg_params)
 
         # action noise
         self.use_action_noise = alg_params.use_action_noise

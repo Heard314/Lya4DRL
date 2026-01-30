@@ -175,7 +175,7 @@ class MaddpgPolicyNet(nn.Module):
             OrthogonalInit(self.fc2)
             OrthogonalInit(self.fc3, gain = 0.01)
     
-    def forward(self, obs):
+    def forward(self, obs, h_in=None):
         x = self.tanh(self.fc1(obs))
         x = self.tanh(self.fc2(x))
         act = self.tanh(self.fc3(x)) + 1
