@@ -130,11 +130,11 @@ class Controller:
             device_comp_dlys, device_csum_engys, \
             device_esum_engys, device_overtime_nums = self.rollout.run(e_id, visualize=visualize)
             
-            if e_id % 800 == 0:
-                print("------------------evaluation after episode: " + str(e_id) + "------------------")
-                gp.settings.is_evaluate = True
-                self.rollout.run(e_id, visualize=visualize)
-                gp.settings.is_evaluate = False
+            # if e_id % 800 == 0:
+            #     print("------------------evaluation after episode: " + str(e_id) + "------------------")
+            #     gp.settings.is_evaluate = True
+            #     self.rollout.run(e_id, visualize=visualize)
+            #     gp.settings.is_evaluate = False
             
 
             # collection

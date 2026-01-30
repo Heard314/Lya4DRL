@@ -172,7 +172,7 @@ class EdgeEnv():
                 EPS = 1e-8
                 if self.avg_edge_time[device_type] > EPS:
                     self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle/self.device_num_per_type[device_type] - self.edge_dly_adj_val[device_type]), 0)
-                    self.new_vir_edge_ql_change[device_type] = edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle - self.edge_dly_adj_val[device_type])
+                    self.new_vir_edge_ql_change[device_type] = edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle/self.device_num_per_type[device_type] - self.edge_dly_adj_val[device_type])
                     self.vir_backlog = self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]
 
                 # print(f"[DEBUG] The edge_queue", device_type, "'s new_edge_ql_change is: ", self.new_edge_ql_change[device_type])

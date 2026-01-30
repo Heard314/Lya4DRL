@@ -324,12 +324,12 @@ class MECEnv():
                     joint_cost_per_type += device_costs[j]
                 if visualize:
                     writer.add_scalars(
-                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_reward_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_joint_reward_{i}",
                         {f"ep_{e_id}": joint_rewards[i]},
                         t_id
                     )
                     writer.add_scalars(
-                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_cost_{i}",
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_joint_cost_{i}",
                         {f"ep_{e_id}": joint_cost_per_type},
                         t_id
                     )
