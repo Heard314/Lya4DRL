@@ -236,9 +236,9 @@ class MECEnv():
                     # if device_queue_actual_rewards[i] < 0:
                     #     device_queue_actual_rewards[i]  = min(-400, device_queue_actual_rewards[i])
                 if(self.enable_actual_queue_reward):
-                    device_queue_actual_rewards[i] = device_act_reward_fac * self.device_act_queue_reward_weight * 3 * \
+                    device_queue_actual_rewards[i] = device_act_reward_fac * self.device_act_queue_reward_weight * 50 * \
                             self.device_envs[i].time_ql * (self.device_envs[i].new_ql_change)
-                    device_queue_actual_rewards[i] = min(max(device_act_queue_reward_min_bound * 3, device_queue_actual_rewards[i]), device_act_queue_reward_max_bound * 3)
+                    device_queue_actual_rewards[i] = min(max(device_act_queue_reward_min_bound * 50, device_queue_actual_rewards[i]), device_act_queue_reward_max_bound * 50)
 
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_actual_rewards is: ", device_queue_actual_rewards[i])
                 if(enable_print): print(f"[DEBUG] The device", i, "'s device_queue_virtual_rewards is: ", device_queue_virtual_rewards[i])
@@ -297,9 +297,9 @@ class MECEnv():
                         edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
 
                 if(self.enable_actual_queue_reward):
-                    edge_queue_actual_rewards[i] = edge_act_queue_reward_weight * 3 * \
+                    edge_queue_actual_rewards[i] = edge_act_queue_reward_weight * 50 * \
                         self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
-                    edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac * 3, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac * 3)
+                    edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac * 50, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac * 50)
     
 
                 if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
