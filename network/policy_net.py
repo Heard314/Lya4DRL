@@ -164,23 +164,33 @@ class MaddpgPolicyNet(nn.Module):
     def __init__(self, alg_params):
         super(MaddpgPolicyNet, self).__init__()
         
-        self.fc1 = nn.Linear(alg_params.obs_dim, alg_params.p_hid_dims[0])
+        self.fc1 = nn.Linear(alg_params.policy_input_dim, alg_params.p_hid_dims[0])
         self.fc2 = nn.Linear(alg_params.p_hid_dims[0], alg_params.p_hid_dims[1])
         self.fc3 = nn.Linear(alg_params.p_hid_dims[1], alg_params.action_dim)
         self.tanh = nn.Tanh()
         
         # orthogonal initialization
         if alg_params.use_orthogonal_init:
-            OrthogonalInit(self.fc1)
-            OrthogonalInit(self.fc2)
-            OrthogonalInit(self.fc3, gain = 0.01)
+            nn.init.orthogonal_(self.fc1.weight, gain=nn.init.calculate_gain('tanh'))
+            nn.init.zeros_(self.fc1.bias)
+            nn.init.orthogonal_(self.fc2.weight, gain=nn.init.calculate_gain('tanh'))
+            nn.init.zeros_(self.fc2.bias)
+            nn.init.orthogonal_(self.fc3.weight, gain=0.01)
+            nn.init.zeros_(self.fc3.bias)
     
+        low  = torch.tensor([1., 1.2, 1.2])
+        high = torch.tensor([2., 2., 2.])
+        self.register_buffer("act_low",  low)
+        self.register_buffer("act_high", high)
+        self.register_buffer("act_scale", (high - low) / 2.0)
+        self.register_buffer("act_bias",  (high + low) / 2.0)
+
     def forward(self, obs, h_in=None):
         x = self.tanh(self.fc1(obs))
         x = self.tanh(self.fc2(x))
-        act = self.tanh(self.fc3(x)) + 1
+        act = self.tanh(self.fc3(x))
         
-        return act
+        return act,(None, None)
 
 
 class MaddpgPolicyNetLSTM(nn.Module):

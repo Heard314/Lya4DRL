@@ -307,10 +307,12 @@ class MaddpgEdgeAgent():
         self.p_optimizers = []
         for i in range(self.device_num):
             # policy network
-            p_net = MaddpgPolicyNetLSTM(alg_params).to(self.device)
+            # p_net = MaddpgPolicyNetLSTM(alg_params).to(self.device)
+            p_net = MaddpgPolicyNet(alg_params).to(self.device)
             self.p_nets.append(p_net)
             # target policy network
-            target_p_net = MaddpgPolicyNetLSTM(alg_params).to(self.device)
+            # target_p_net = MaddpgPolicyNetLSTM(alg_params).to(self.device)
+            target_p_net = MaddpgPolicyNet(alg_params).to(self.device)
             target_p_net.load_state_dict(p_net.state_dict())
             self.target_p_nets.append(target_p_net)
             # optimizer

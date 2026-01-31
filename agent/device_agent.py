@@ -147,7 +147,7 @@ class MaddpgDeviceAgent():
         # policy network
         # self.p_net = MaddpgPolicyNetLSTM(alg_params)
         self.p_net = MaddpgPolicyNet(alg_params)
-
+        self.hid_dim = alg_params.p_hid_dims[1]
         # action noise
         self.use_action_noise = alg_params.use_action_noise
         # train noise
@@ -174,8 +174,7 @@ class MaddpgDeviceAgent():
     def choose_action(self, obs, lstm_hidden_h, lstm_hidden_c):
         p_inputs = GetPolicyInputs(obs)
 
-        # process the lstm hidden state
-        hid_dim = self.p_net.lstm.hidden_size
+        hid_dim = self.lstm_hidden_dim
         batch_size = p_inputs.size(0)  
         def to_hidden(h):
             # if None: initilize as 0
@@ -192,8 +191,11 @@ class MaddpgDeviceAgent():
                 h = h.unsqueeze(1)
             # if h == [1,B,hid_dim] -> no change
             return h
-        lstm_hidden_h = to_hidden(lstm_hidden_h)
-        lstm_hidden_c = to_hidden(lstm_hidden_c)
+        
+        if lstm_hidden_h is not None:
+            lstm_hidden_h = to_hidden(lstm_hidden_h)
+        if lstm_hidden_c is not None:
+            lstm_hidden_c = to_hidden(lstm_hidden_c)
         
         with torch.no_grad():
             act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
