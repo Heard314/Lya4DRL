@@ -193,7 +193,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.0, 2.0], [0.4, 1.0], [2.6, 3.2]],
+        default=[[1.0, 2.0], [0.6, 1.0], [2.8, 3.4]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -621,4 +621,3 @@ def get_maddpg_params():
     params, unknown = parser.parse_known_args()
     
     return params
-
