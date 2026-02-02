@@ -202,7 +202,10 @@ class MECEnv():
 
                 # print(f"[DEBUG] the comp_dly is {comp_dly}, the task.dly_cons is {task.dly_cons}")
                 if comp_dly > task.dly_cons and not (self.enable_virtual_queue_reward or self.enable_actual_queue_reward):
-                    device_rewards[i] += self.timeout_reward_penalty
+                    if task.e_comp_dly > task.dly_cons:
+                        device_rewards[i] += -2500
+                    if task.l_comp_dly > task.dly_cons:
+                        device_rewards[i] += -2000
                 elif comp_dly > task.dly_cons and self.enable_virtual_queue_reward:
                     device_rewards[i] += self.lya_timeout_reward_penalty
                 else:
