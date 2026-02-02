@@ -193,7 +193,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.4, 1.6], [0.6, 0.8], [2.8, 3.0]],
+        default=[[1.0, 2.0], [0.4, 1.0], [2.6, 3.2]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -593,7 +593,7 @@ def get_maddpg_params():
     parser.add_argument("--use_action_noise", type = bool, default = True,
                         help = "whether to add noise in agents' actions")
     
-    parser.add_argument("--noise_sigma_start", type = float, default = 0.2,
+    parser.add_argument("--noise_sigma_start", type = float, default = 0.4,
                         help = "noise sigma at the start of training")
 
     parser.add_argument("--noise_sigma_end", type = float, default = 0.02,
