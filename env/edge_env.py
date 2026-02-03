@@ -19,7 +19,7 @@ class EdgeEnv():
         self.device_types_ref = general_params.device_types
         # unit: Gcycles/s
         self.edge_comp_freq = general_params.edge_comp_freq
-        
+        print(f"[DEBUG] The edge's edge_comp_freq is {self.edge_comp_freq}")
         self.device_num = general_params.device_num
         self.device_num_per_type = general_params.device_num_per_type
 

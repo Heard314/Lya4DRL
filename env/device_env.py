@@ -98,6 +98,9 @@ class DeviceEnv():
         self.max_trans_rate = None
         # unit: Gcycles/s
         self.device_comp_freq = gen_params.device_comp_freqs[self.device_type]
+        if gen_params.low_device_comp_freq:
+            self.device_comp_freq = 2.0
+        print(f"[DEBUG] The device {self.env_id} 's device_comp_freq is {self.device_comp_freq}")
         # unit: Gcycles/s
         self.std_comp_freq = gen_params.std_comp_freq
         # unit: J/Gcycles

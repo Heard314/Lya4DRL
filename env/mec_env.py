@@ -27,7 +27,8 @@ class MECEnv():
         self.edge_env = EdgeEnv(gen_params, writer)
 
         self.device_freqs = gen_params.device_comp_freqs
-
+        if gen_params.low_device_comp_freq:
+            self.device_freqs = [2.0] * self.device_type_num
         # device envs
         self.device_envs = []
         for i in range(self.device_num):

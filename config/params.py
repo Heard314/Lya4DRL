@@ -177,6 +177,9 @@ def get_general_params():
                         default = 100,
                         help = "the min distance between end device and edge server. (m)")
     
+    parser.add_argument("--low_device_comp_freq", action="store_true",
+                        help = "whether to set lower computation frequencies for devices for experiences")
+
     parser.add_argument("--device_comp_freqs", type = list,
                         default = [2.5]*edge_queue_num,
                         help = "the computation frequencies of devices (Gcycles/s)")
@@ -193,8 +196,8 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.0, 2.0], [0.6, 1.0], [2.8, 3.4]],
-        # default=[[1.0, 2.0], [0.4, 1.0], [2.6, 3.2]],
+        # default=[[1.0, 2.0], [0.6, 1.0], [2.8, 3.4]],
+        default=[[1.0, 2.0], [0.4, 1.0], [2.6, 3.2]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
