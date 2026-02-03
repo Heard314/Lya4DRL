@@ -158,8 +158,8 @@ class DeviceEnv():
         self.avail_task_num = 0
         self.sched_tasks = []
 
-        self.total_comp_time = 0.0
-        self.total_tran_time = 0.0
+        self.old_comp_queue_delay = 0.0
+        self.old_tran_queue_delay = 0.0
 
         # To balance the comp_dly_thre role of different task type.
         self.device_act_reward_fac = 1.0 / self.delta / gen_params.comp_dly_thre[self.device_type]
@@ -180,8 +180,8 @@ class DeviceEnv():
         self.new_ql_change = 0
         self.new_vir_ql_change = 0
 
-        self.total_comp_time = 0.0
-        self.total_tran_time = 0.0
+        self.old_comp_queue_delay = 0.0
+        self.old_tran_queue_delay = 0.0
 
         self.act_backlog = 0.0
         self.vir_backlog = 0.0
@@ -341,11 +341,14 @@ class DeviceEnv():
             total_offl_dz = 0
             total_offl_comp = 0
             total_trans_dz = self.trans_ql
+            # compute the queue time of transfering data.
+            new_tran_queue_delay = 0
             '''offload computing part'''
             local_comps = []
             for task_id, offl_dz in enumerate(offl_dzs):
+                
                 total_offl_dz += offl_dz
-                tran_queue_delay = max(self.total_tran_time - t_id * self.delta,0)
+                tran_queue_delay = new_tran_queue_delay + self.old_tran_queue_delay
                 total_trans_dz += offl_dz
                 task = self.sched_tasks[task_id]
                 task.offl_dz = offl_dz
@@ -358,10 +361,11 @@ class DeviceEnv():
                     task.trans_time = tran_queue_delay + task.offl_dz / trans_rate
                     # print(f"[DEBUG] The device {self.env_id} 's offl_dz is {task.offl_dz}")
                     # print(f"[DEBUG] The device {self.env_id} 's trans_rate is {trans_rate}")
-                    # print(f"[DEBUG] The device {self.env_id} 's total_tran_time before is {self.total_tran_time}")
+                    # print(f"[DEBUG] The device {self.env_id} 's old_tran_queue_delay before is {self.old_tran_queue_delay}")
+                    # print(f"[DEBUG] The device {self.env_id} 's new_tran_queue_delay before is {new_tran_queue_delay}")
                     # print(f"[DEBUG] The device {self.env_id} 's tran_queue_delay is {tran_queue_delay}")
                     # print(f"[DEBUG] The device {self.env_id} 's trans_time is {task.trans_time}")
-                    self.total_tran_time += task.offl_dz / trans_rate
+                    new_tran_queue_delay += task.offl_dz / trans_rate
                     task.tran_engy = trans_power * pow(10, -3) * \
                                     task.offl_dz / trans_rate
                 local_comps.append((task.data_size - task.offl_dz) * \
@@ -369,11 +373,15 @@ class DeviceEnv():
 
                 if(enable_print): print(f"[DEBUG] the local_comp in device {self.env_id} is {(task.data_size - task.offl_dz) * task.comp_dens}")
                 if(enable_print): print(f"[DEBUG] the offl_comp in device {self.env_id} is {task.offl_dz * task.comp_dens}")
+
+            self.old_tran_queue_delay = max(self.old_tran_queue_delay + new_tran_queue_delay - gap, 0)
             # Update the transmission queue length at every time slot, regardless of whether new tasks arrive
             self.trans_ql = max(0, total_trans_dz - delta_trans_dz)
+
             '''local computing part'''
             self.old_time_ql = self.time_ql
             device_act_queue_growth_rate = self.device_act_queue_growth_rate
+            new_comp_queue_delay = 0
             for task_id, local_comp in enumerate(local_comps):
                 task = self.sched_tasks[task_id]
                 if local_comp == 0:
@@ -382,12 +390,16 @@ class DeviceEnv():
                     task.l_queue_dly = 0
                     task.local_comp_engy = 0
                 else:
-                    task.l_queue_dly = max(self.total_comp_time - t_id * self.delta, 0)
+                    task.l_queue_dly = self.old_comp_queue_delay + new_comp_queue_delay
                     task.l_proc_dly = local_comp / device_comp_freq
                     task.l_comp_dly = task.l_queue_dly + task.l_proc_dly
-                    
-                self.total_comp_time += task.l_proc_dly
+                    new_comp_queue_delay += task.l_proc_dly
+
                 task.local_comp_engy = self.engy_fac * pow(device_comp_freq,2) * local_comp
+
+                # print(f"[DEBUG] The device", self.env_id, "'s old_comp_queue_delay is: ", self.old_comp_queue_delay)
+                # print(f"[DEBUG] The device", self.env_id, "'s new_comp_queue_delay is: ", new_comp_queue_delay-task.l_proc_dly)
+                # print(f"[DEBUG] The device", self.env_id, "'s l_queue_dly is: ", task.l_queue_dly)
                 # print(f"[DEBUG] The device", self.env_id, "'s offl_rto is: ", offl_rto)
                 # print(f"[DEBUG] The device", self.env_id, "'s engy_fac is: ", self.engy_fac)
                 # print(f"[DEBUG] The device", self.env_id, "'s local_comp is: ", local_comp)
@@ -398,50 +410,33 @@ class DeviceEnv():
 
                 # if(enable_print): print(f"[DEBUG] The device freq pow2 is {pow(device_comp_freq,2)}")
                 old_time_ql_ = self.time_ql
-                self.time_ql = max(0, old_time_ql_ + device_act_queue_growth_rate * (local_comp / device_comp_freq - gap))
-                self.new_ql_change = device_act_queue_growth_rate * (local_comp / device_comp_freq - gap)
                 self.act_backlog = local_comp / device_comp_freq
-                    # print(f"[DEBUG] The device", self.env_id, "'s time_ql is: ", self.time_ql)
-                    # print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)
-                    # print(f"[DEBUG] The device", self.env_id, "'s new_ql_change is: ", self.new_ql_change)
-                    # print(f"[DEBUG] The device", self.env_id, "'s local_comp is: ", local_comp)
-                    # print(f"[DEBUG] The device", self.env_id, "'s device_comp_freq is: ", device_comp_freq)
-                    # print(f"[DEBUG] The device", self.env_id, "'s delta is: ", self.delta)
-                    # print(f"[DEBUG] The device", self.env_id, "'s fine_ql_change is: ", device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta))
+                self.new_ql_change = device_act_queue_growth_rate * (self.act_backlog - gap)
+                self.time_ql = max(0, old_time_ql_ + self.new_ql_change)
+
+                # print(f"[DEBUG] The device", self.env_id, "'s time_ql is: ", self.time_ql)
+                # print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)
+                # print(f"[DEBUG] The device", self.env_id, "'s new_ql_change is: ", self.new_ql_change)
+                # print(f"[DEBUG] The device", self.env_id, "'s local_comp is: ", local_comp)
+                # print(f"[DEBUG] The device", self.env_id, "'s device_comp_freq is: ", device_comp_freq)
+                # print(f"[DEBUG] The device", self.env_id, "'s delta is: ", self.delta)
+
                 self.avail_task_num += 1
                 # avg_local_time: use only the average computation time of the most recent time slots
                 self.old_comp_times.append(local_comp / device_comp_freq)
                 tail = self.old_comp_times[-self.statSlotNum:]
                 self.avg_local_time = sum(tail) / len(tail) if tail else 0
                 if(enable_print): print(f"[DEBUG] the local comp_dly in device {self.env_id} is {task.l_comp_dly}")
-
+            
+            self.old_comp_queue_delay = max(self.old_comp_queue_delay + new_comp_queue_delay - gap, 0)
             self.old_virtual_time_ql = self.virtual_time_ql
             EPS = 1e-8
             device_vir_queue_growth_rate = self.device_vir_queue_growth_rate
             if self.avg_local_time > EPS:
                 old_vir_time_ql_ = self.virtual_time_ql
-                self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val))
-                self.new_vir_ql_change = device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val)
-                self.vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
-        # else:
-        #     total_trans_dz = self.trans_ql
-        #     delta_trans_dz = self.trans_rate * self.delta
-        #     # Update the transmission queue length at every time slot, regardless of whether new tasks arrive
-        #     self.trans_ql = max(0, total_trans_dz - delta_trans_dz)
-        #     self.old_time_ql = self.time_ql
-        #     device_act_queue_growth_rate = self.device_act_queue_growth_rate
-        #     self.time_ql = max(0, self.time_ql - device_act_queue_growth_rate * self.delta)
-        #     self.new_ql_change = -device_act_queue_growth_rate * self.delta
-        #     self.act_backlog = 0.0
-        #     self.old_virtual_time_ql = self.virtual_time_ql
-        #     device_vir_queue_growth_rate = self.device_vir_queue_growth_rate
-        #     EPS = 1e-6
-        #     if self.avg_local_time > EPS:
-        #         old_vir_time_ql_ = self.virtual_time_ql
-        #         self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val))
-        #         self.new_vir_ql_change = device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val)
-        #         self.vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
-
+                self.vir_backlog = self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle
+                self.new_vir_ql_change = device_vir_queue_growth_rate*(self.vir_backlog - self.device_dly_adj_val)
+                self.virtual_time_ql = max(0, self.virtual_time_ql + self.new_vir_ql_change)
     
         # print(f"[DEBUG] The device", self.env_id, "'s avg_local_time is: ", self.avg_local_time)
         # print(f"[DEBUG] The device", self.env_id, "'s device_dly_adj_val is: ", self.device_dly_adj_val)

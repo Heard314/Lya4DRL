@@ -43,7 +43,7 @@ class EdgeEnv():
         self.statSlotNum = general_params.statSlotNum
         self.delta_num = 0 # elapsed slots in this episode
 
-        self.total_comp_time = [0 for _ in range(self.edge_queue_num)]
+        self.old_comp_queue_delay = [0 for _ in range(self.edge_queue_num)]
         self.total_comp_amount = [0 for _ in range(self.edge_queue_num)]
 
         self.edge_act_reward_fac = [1.0 for _ in range(self.edge_queue_num)]
@@ -60,7 +60,7 @@ class EdgeEnv():
     def reset(self):
         # reset computation-queue length
         self.alloc_edge_freq = [self.edge_comp_freq * self.device_num_per_type[i] / self.device_num for i in range(self.edge_queue_num)]
-        self.total_comp_time = [0 for _ in range(self.edge_queue_num)]
+        self.old_comp_queue_delay = [0 for _ in range(self.edge_queue_num)]
         self.total_comp_amount = [0 for _ in range(self.edge_queue_num)]
         # reset computation time queue length
         self.edge_queue_time_ql = [ 0 for _ in range(self.edge_queue_num)]
@@ -115,7 +115,7 @@ class EdgeEnv():
             if(enable_print): print(f"[DEBUG] We are processing the tasks of type {device_type}")
             # new_edge_comp = 0
             total_comp_need_time_this_epi = 0
-            
+            new_comp_queue_delay = 0
             for i,task in enumerate(device_type_sched_tasks[device_type]):
                 if task.trans_time == 0:
                     task.e_comp_dly = 0
@@ -131,49 +131,53 @@ class EdgeEnv():
                     # config: energy coef = 1 J/GFlops
                     task.edge_comp_engy = task.offl_dz * task.comp_dens * pow(alloc_edge_freq[device_type],2)
                     # if(enable_print): print(f"[DEBUG] The edge freq pow2 is {pow(alloc_edge_freq[device_type],2)}")
-                    task.e_queue_dly = max(self.total_comp_time[device_type] - t_id * self.delta, 0)
+                    task.e_queue_dly = self.old_comp_queue_delay[device_type] + new_comp_queue_delay
                     task.e_proc_dly = task.offl_dz * task.comp_dens / alloc_edge_freq[device_type]
                     # print(f"[DEBUG] the task.offl_dz in device {task.device_id} is {task.offl_dz}")
                     # print(f"[DEBUG] the task.comp_dens in device {task.device_id} is {task.comp_dens}")
                     # print(f"[DEBUG] the alloc_edge_freq in device {task.device_id} is {alloc_edge_freq[device_type]}")
                     task.e_comp_dly = max(task.e_queue_dly, task.trans_time) + task.e_proc_dly
                     total_comp_need_time_this_epi += task.e_proc_dly
-                    total_comp_used_time_this_epi[device_type] += min(task.offl_dz * task.comp_dens/alloc_edge_freq[device_type], max(0, gap - max(task.trans_time, comp_dlys[device_type])))
+                    total_comp_used_time_this_epi[device_type] += min(task.offl_dz * task.comp_dens / alloc_edge_freq[device_type], max(0, gap - max(task.trans_time, comp_dlys[device_type])))
                     if(enable_print): print(f"[DEBUG] the edge comp_dly in device {task.device_id} is {task.e_comp_dly}")
+                    
+                    # print(f"[DEBUG] the old_comp_queue_delay in device {task.device_id} is {self.old_comp_queue_delay[device_type]}")
+                    # print(f"[DEBUG] the new_comp_queue_delay in device {task.device_id} is {new_comp_queue_delay}")
                     # print(f"[DEBUG] the e_queue_dly in device {task.device_id} is {task.e_queue_dly}")
                     # print(f"[DEBUG] the trans_time in device {task.device_id} is {task.trans_time}")
                     # print(f"[DEBUG] the e_proc_dly in device {task.device_id} is {task.e_proc_dly}")
                     # print(f"[DEBUG] the edge comp_dly in device {task.device_id} is {task.e_comp_dly}")
                     comp_dlys[device_type] = max(comp_dlys[device_type], task.trans_time) + task.e_proc_dly
-                    self.total_comp_time[device_type] += task.e_proc_dly
+                    new_comp_queue_delay += task.e_proc_dly
                     self.total_comp_amount[device_type] += task.offl_dz * task.comp_dens
         
                 # avg_edge_time: mean over last statSlotNum slots
                 self.old_comp_times[device_type].append(task.e_proc_dly)
                 tail = self.old_comp_times[device_type][-self.statSlotNum:]
                 self.avg_edge_time[device_type] = sum(tail) / len(tail) if tail else 0
-            
+
             if t_id % self.gen_task_cycle == 0:
+                self.old_comp_queue_delay[device_type] = max(self.old_comp_queue_delay[device_type] + new_comp_queue_delay - gap, 0)
+
                 edge_act_queue_growth_rate = self.edge_act_queue_growth_rate
                 old_edge_queue_time_ql_ = self.edge_queue_time_ql[device_type]
-                self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type]), 0)
-                self.new_edge_ql_change[device_type] = edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type])
+                self.act_backlog = total_comp_need_time_this_epi
+                self.new_edge_ql_change[device_type] = edge_act_queue_growth_rate * (self.act_backlog - total_comp_used_time_this_epi[device_type])
+                self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + self.new_edge_ql_change[device_type], 0)
 
                 # print(f"[DEBUG] The edge_queue", device_type, "'s edge_queue_time_ql: ", self.edge_queue_time_ql[device_type])
                 # print(f"[DEBUG] The edge_queue", device_type, "'s edge_act_queue_growth_rate: ", edge_act_queue_growth_rate)
                 # print(f"[DEBUG] The edge_queue", device_type, "'s total_comp_need_time_this_epi: ", total_comp_need_time_this_epi)
                 # print(f"[DEBUG] The edge_queue", device_type, "'s total_comp_used_time_this_epi: ", total_comp_used_time_this_epi[device_type])
                 # print(f"[DEBUG] The edge_queue", device_type, "'s new_edge_ql_change: ", self.new_edge_ql_change[device_type])
-
-                self.act_backlog = total_comp_need_time_this_epi
+                
                 self.old_virtual_edge_queue_time_ql[device_type] = self.virtual_edge_queue_time_ql[device_type]
                 edge_vir_queue_growth_rate = self.edge_vir_queue_growth_rate
                 old_virtual_edge_queue_time_ql_ = self.virtual_edge_queue_time_ql[device_type]
                 EPS = 1e-8
                 if self.avg_edge_time[device_type] > EPS:
-                    self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle/self.device_num_per_type[device_type] - self.edge_dly_adj_val[device_type]), 0)
                     self.new_vir_edge_ql_change[device_type] = edge_vir_queue_growth_rate*(self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]*self.delta*self.gen_task_cycle/self.device_num_per_type[device_type] - self.edge_dly_adj_val[device_type])
-                    self.vir_backlog = self.edge_queue_time_ql[device_type]/self.avg_edge_time[device_type]
+                    self.virtual_edge_queue_time_ql[device_type] = max(self.virtual_edge_queue_time_ql[device_type] + self.new_vir_edge_ql_change[device_type], 0)
 
                 # print(f"[DEBUG] The edge_queue", device_type, "'s new_edge_ql_change is: ", self.new_edge_ql_change[device_type])
                 # print(f"[DEBUG] The edge_queue", device_type, "'s edge_queue_time_ql is: ", self.edge_queue_time_ql[device_type])

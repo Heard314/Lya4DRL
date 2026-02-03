@@ -194,6 +194,7 @@ def get_general_params():
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
         default=[[1.0, 2.0], [0.6, 1.0], [2.8, 3.4]],
+        # default=[[1.0, 2.0], [0.4, 1.0], [2.6, 3.2]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
