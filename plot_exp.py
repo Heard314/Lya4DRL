@@ -5,9 +5,10 @@ from typing import Dict, List, Tuple, Optional, Any
 
 import numpy as np
 import matplotlib.pyplot as plt
-
+import matplotlib.ticker as ticker
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
-
+ax = plt.gca()
+ax.xaxis.set_major_locator(ticker.MultipleLocator(1000))
 
 @dataclass
 class ScalarSeries:
@@ -85,9 +86,9 @@ def load_scalars_from_event_files(
 def _make_x_axis(series: ScalarSeries, x_axis: str) -> np.ndarray:
     """
     Build x-axis array consistent with TensorBoard common choices.
-    x_axis: "step" | "wall_time" | "relative_time"
+    x_axis: "step" | "episode" | "wall_time" | "relative_time"
     """
-    if x_axis == "step":
+    if x_axis in ["step", "episode"]:
         return series.steps
     if x_axis == "wall_time":
         return series.wall_time
@@ -221,45 +222,49 @@ def plot_sub_curve(
     x_axis: str = "step",
     smooth_weight: float = 0.0,
     stride: int = 1,
-) -> Tuple[np.ndarray, np.ndarray]:
+    value_divisor: float = 1.0,
+) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
     """
-    Load scalar curves from multiple paths, average them by device count, and return one sub-curve.
+    Load scalar curves from multiple paths, average them by step, and return raw and smoothed curves.
+    value_divisor: divide y values by this number.
+    """
+    if value_divisor == 0:
+        raise ValueError("value_divisor must be non-zero.")
 
-    paths:
-        A list of logdirs (or event files). Each path is one device-count folder you want to average.
-    tag:
-        Scalar tag name to load.
-    x_axis:
-        "step" | "wall_time" | "relative_time"
-    smooth_weight:
-        EMA smoothing weight.
-    stride:
-        Downsample stride for plotting.
-    """
     series_list: List[ScalarSeries] = []
 
     for i in range(len(paths)):
         p = paths[i]
-        tag = tags[i]
-        scalars = load_scalars_from_event_files(p, tags=[tag])
-        if tag not in scalars:
-            print(f"[Warn] tag '{tag}' not found in: {p}")
+        tag_i = tags[i]
+        scalars = load_scalars_from_event_files(p, tags=[tag_i])
+        if tag_i not in scalars:
+            print(f"[Warn] tag '{tag_i}' not found in: {p}")
             continue
-        series_list.append(scalars[tag])
+        series_list.append(scalars[tag_i])
 
     if not series_list:
-        raise ValueError(f"No valid series found for tag '{tag}' in given paths.")
+        raise ValueError(f"No valid series found in given paths/tags: {list(zip(paths, tags))}")
 
     mean_series = _aggregate_mean_by_step(series_list)
 
     x = _make_x_axis(mean_series, x_axis)
-    y = mean_series.values
+    y_raw = mean_series.values.astype(np.float64)
 
+    # Scale values
+    if value_divisor != 1.0:
+        y_raw = y_raw / float(value_divisor)
+
+    y_smooth = None
     if smooth_weight > 0:
-        y = ema_smooth(y, smooth_weight)
+        y_smooth = ema_smooth(y_raw, smooth_weight)
 
-    x, y = _downsample_xy(x, y, stride)
-    return x, y
+    if stride > 1:
+        x = x[::stride]
+        y_raw = y_raw[::stride]
+        if y_smooth is not None:
+            y_smooth = y_smooth[::stride]
+
+    return x, y_raw, y_smooth
 
 
 def plot_exp_plot(
@@ -272,48 +277,63 @@ def plot_exp_plot(
     stride: int = 1,
     figsize: Tuple[int, int] = (10, 6),
     grid: bool = True,
+    show_raw: bool = True,
+    raw_alpha: float = 0.25,
+    raw_in_legend: bool = False,
+    smooth_linewidth: float = 2.0,
+    x_major_tick: Optional[float] = 1000.0,
+    value_divisor: float = 1.0,
+    color_map: str = "tab10",
+    colors: Optional[List[Any]] = None,
 ):
     """
     Plot multiple sub-curves on one figure.
-
-    curves:
-        A list of curve configs. Each config should contain:
-        - "label": curve name in legend
-        - "paths": list of logdirs or event files
-        - "tags": scalar tag name
-    x_axis:
-        "step" | "wall_time" | "relative_time"
-    xlabel:
-        If None, use default label based on x_axis.
-    ylabel:
-        Y-axis label.
-    title:
-        Figure title.
-    smooth_weight:
-        EMA smoothing weight.
-    stride:
-        Downsample stride.
+    color_map: matplotlib colormap name, e.g., "tab10", "tab20", "Set1"
+    colors: optional list of colors, override color_map if provided
     """
-    plt.figure(figsize=figsize)
+    if value_divisor == 0:
+        raise ValueError("value_divisor must be non-zero.")
 
-    for cfg in curves:
+    plt.figure(figsize=figsize)
+    ax = plt.gca()
+
+    cmap = plt.get_cmap(color_map)
+
+    for i, cfg in enumerate(curves):
         label = cfg["label"]
         paths = cfg["paths"]
         tags = cfg["tags"]
-        marker = cfg["marker"]
 
-        x, y = plot_sub_curve(
+        cfg_smooth = cfg.get("smooth_weight", smooth_weight)
+        cfg_divisor = cfg.get("value_divisor", value_divisor)
+
+        # Pick a distinct color for each curve
+        if "color" in cfg:
+            color = cfg["color"]
+        elif colors is not None and i < len(colors):
+            color = colors[i]
+        else:
+            color = cmap(i % getattr(cmap, "N", 10))
+
+        x, y_raw, y_smooth = plot_sub_curve(
             paths=paths,
             tags=tags,
             x_axis=x_axis,
-            smooth_weight=smooth_weight,
+            smooth_weight=cfg_smooth,
             stride=stride,
+            value_divisor=cfg_divisor,
         )
-        plt.plot(x, y, label=label, marker=marker, markersize = stride)
+
+        if show_raw:
+            raw_label = f"{label} (raw)" if (raw_in_legend and cfg_smooth > 0) else (label if raw_in_legend else "_nolegend_")
+            plt.plot(x, y_raw, alpha=raw_alpha, label=raw_label, color=color)
+
+        if y_smooth is not None:
+            plt.plot(x, y_smooth, linewidth=smooth_linewidth, label=label, color=color)
 
     if xlabel is None:
-        if x_axis == "step":
-            xlabel = "step"
+        if x_axis in ["step", "episode"]:
+            xlabel = x_axis
         elif x_axis == "wall_time":
             xlabel = "wall_time (unix seconds)"
         else:
@@ -326,9 +346,14 @@ def plot_exp_plot(
     if grid:
         plt.grid(True, alpha=0.3)
 
+    if x_axis in ["step", "episode"] and x_major_tick is not None:
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(x_major_tick))
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%d"))
+
     plt.legend()
     plt.tight_layout()
     plt.show()
+
 
 def plot_dly():
 
@@ -359,105 +384,207 @@ def plot_dly():
         },
     ]
 
-    plot_exp_plot(
-        curves=curves_cfg,
-        x_axis="step",
-        xlabel="time step",
-        ylabel="delay(s)",
-        title="Delay Average Comparison",
-        smooth_weight=0.0,
-        stride=10,
-    )
-
 def plot_timeout():
     plot_paths = [
-        r"./runs/evaluate/mappo_s_7878_t_2026-01-20-12-02-31-506743_d_all_queue_exp9",
-        r"./runs/evaluate/mappo_s_2345_t_2026-01-20-10-59-17-016009_d_all_queue_exp9",    
+        r"plot_data/target/maddpg_s_7878_t_2026-02-02-11-03-56-032697_d_my_exp9",
+        r"plot_data/target/maddpg_s_7878_t_2026-02-02-21-25-08-707599_d_rt_exp10",
+        r"plot_data/target/maddpg_s_7878_t_2026-02-03-00-02-45-332873_d_no_queue_exp11",
     ]
 
     curves_cfg = [
         {
-            "label": "mappo",
+            "label": "LyaHDDPG",
             "paths": [
-                os.path.join(plot_paths[0], "detail_dev_timeout_num_2_ep_20"),
-                os.path.join(plot_paths[0], "detail_dev_timeout_num_3_ep_20"),
-                os.path.join(plot_paths[0], "detail_dev_timeout_num_4_ep_20"),
-                os.path.join(plot_paths[0], "detail_dev_timeout_num_5_ep_20"),
+                plot_paths[0]
             ],
             "tags":  [
-                "detail/dev_timeout_num_2",
-                "detail/dev_timeout_num_3",
-                "detail/dev_timeout_num_4",
-                "detail/dev_timeout_num_5",
+                "device_overtime_nums_0",
             ],
             "marker": "o",
+            "color": "C0"
         },
 
         {
-            "label": "maddpg",
+            "label": "RT-DDPG",
             "paths": [
-                os.path.join(plot_paths[1], "detail_dev_timeout_num_2_ep_20"),
-                os.path.join(plot_paths[1], "detail_dev_timeout_num_3_ep_20"),
-                os.path.join(plot_paths[1], "detail_dev_timeout_num_4_ep_20"),
-                os.path.join(plot_paths[1], "detail_dev_timeout_num_5_ep_20"),
+                plot_paths[1]
             ],
             "tags":  [
-                "detail/dev_timeout_num_2",
-                "detail/dev_timeout_num_3",
-                "detail/dev_timeout_num_4",
-                "detail/dev_timeout_num_5",
+                "device_overtime_nums_0",
             ],
             "marker": "*",
+            "color": "C3"
+        },
+
+        {
+            "label": "Navie",
+            "paths": [
+                plot_paths[2]
+            ],
+            "tags":  [
+                "device_overtime_nums_0",
+            ],
+            "marker": "*",
+            "color": "C2"
         },
     ]
 
     plot_exp_plot(
         curves=curves_cfg,
-        x_axis="step",
-        xlabel="time step",
-        ylabel="timeout count",
-        title="Timeout Count Comparison",
-        smooth_weight=0.0,
-        stride=10,
+        x_axis="episode",
+        xlabel="Episodes",
+        ylabel="Timeout Rate(%)",
+        title="Timeout rate Comparison Of type-0 tasks",
+        smooth_weight=0.95,
+        stride=50,
+        show_raw=True,
+        raw_alpha=0.2,
+        x_major_tick=1000,
+        value_divisor=600.0,
+    )
+
+    curves_cfg = [
+        {
+            "label": "LyaHDDPG",
+            "paths": [
+                plot_paths[0]
+            ],
+            "tags":  [
+                "device_overtime_nums_1",
+            ],
+            "marker": "o",
+            "color": "C0"
+        },
+
+        {
+            "label": "RT-DDPG",
+            "paths": [
+                plot_paths[1]
+            ],
+            "tags":  [
+                "device_overtime_nums_1",
+            ],
+            "marker": "*",
+            "color": "C3"
+        },
+
+        {
+            "label": "Navie",
+            "paths": [
+                plot_paths[2]
+            ],
+            "tags":  [
+                "device_overtime_nums_1",
+            ],
+            "marker": "*",
+            "color": "C2"
+        },
+    ]
+
+    plot_exp_plot(
+        curves=curves_cfg,
+        x_axis="episode",
+        xlabel="Episodes",
+        ylabel="Timeout Rate(%)",
+        title="Timeout rate Comparison Of type-1 tasks",
+        smooth_weight=0.95,
+        stride=50,
+        show_raw=True,
+        raw_alpha=0.2,
+        x_major_tick=1000,
+        value_divisor=600.0,
+    )
+
+    curves_cfg = [
+        {
+            "label": "LyaHDDPG",
+            "paths": [
+                plot_paths[0]
+            ],
+            "tags":  [
+                "device_overtime_nums_2",
+            ],
+            "marker": "o",
+            "color": "C0"
+        },
+
+        {
+            "label": "RT-DDPG",
+            "paths": [
+                plot_paths[1]
+            ],
+            "tags":  [
+                "device_overtime_nums_2",
+            ],
+            "marker": "*",
+            "color": "C3"
+        },
+
+        {
+            "label": "Navie",
+            "paths": [
+                plot_paths[2]
+            ],
+            "tags":  [
+                "device_overtime_nums_2",
+            ],
+            "marker": "*",
+            "color": "C2"
+        },
+    ]
+
+    plot_exp_plot(
+        curves=curves_cfg,
+        x_axis="episode",
+        xlabel="Episodes",
+        ylabel="Timeout Rate(%)",
+        title="Timeout rate Comparison Of type-2 tasks",
+        smooth_weight=0.95,
+        stride=50,
+        show_raw=True,
+        raw_alpha=0.2,
+        x_major_tick=1000,
+        value_divisor=600.0,
     )
 
 def plot_engy():
+    
     plot_paths = [
-        r"./runs/evaluate/mappo_s_7878_t_2026-01-20-12-02-31-506743_d_all_queue_exp9",
-        r"./runs/evaluate/mappo_s_2345_t_2026-01-20-10-59-17-016009_d_all_queue_exp9",    
+        r"plot_data/target/maddpg_s_7878_t_2026-02-02-11-03-56-032697_d_my_exp9",
+        r"plot_data/target/maddpg_s_7878_t_2026-02-02-21-25-08-707599_d_rt_exp10",
+        r"plot_data/target/maddpg_s_7878_t_2026-02-03-00-02-45-332873_d_no_queue_exp11",
     ]
 
     curves_cfg = [
         {
-            "label": "mappo",
+            "label": "LyaHDDPG",
             "paths": [
-                os.path.join(plot_paths[0], "detail_engy_2_ep_20_local"),
-                os.path.join(plot_paths[0], "detail_engy_3_ep_20_local"),
-                os.path.join(plot_paths[0], "detail_engy_4_ep_20_local"),
-                os.path.join(plot_paths[0], "detail_engy_5_ep_20_local"),
+                plot_paths[0]
             ],
             "tags":  [
-                "detail/engy_2",
-                "detail/engy_3",
-                "detail/engy_4",
-                "detail/engy_5",
+                "device_cost_0",
             ],
             "marker": "o",
         },
 
         {
-            "label": "maddpg",
+            "label": "RT-DDPG",
             "paths": [
-                os.path.join(plot_paths[1], "detail_engy_2_ep_20_local"),
-                os.path.join(plot_paths[1], "detail_engy_3_ep_20_local"),
-                os.path.join(plot_paths[1], "detail_engy_4_ep_20_local"),
-                os.path.join(plot_paths[1], "detail_engy_5_ep_20_local"),
+                plot_paths[1]
             ],
             "tags":  [
-                "detail/engy_2",
-                "detail/engy_3",
-                "detail/engy_4",
-                "detail/engy_5",
+                "device_cost_0",
+            ],
+            "marker": "*",
+        },
+
+        {
+            "label": "Navie",
+            "paths": [
+                plot_paths[2]
+            ],
+            "tags":  [
+                "device_cost_0",
             ],
             "marker": "*",
         },
@@ -468,9 +595,111 @@ def plot_engy():
         x_axis="step",
         xlabel="time step",
         ylabel="energy consumption",
-        title="Energy Consumption Comparison",
+        title="Energy Consumption Comparison Of type-0 tasks",
         smooth_weight=0.0,
-        stride=10,
+        stride=50,
+    )
+
+    plot_paths = [
+        r"plot_data/target/maddpg_s_7878_t_2026-02-02-11-03-56-032697_d_my_exp9",
+        r"plot_data/target/maddpg_s_7878_t_2026-02-02-21-25-08-707599_d_rt_exp10",
+        r"plot_data/target/maddpg_s_7878_t_2026-02-03-00-02-45-332873_d_no_queue_exp11",
+    ]
+
+    curves_cfg = [
+        {
+            "label": "LyaHDDPG",
+            "paths": [
+                plot_paths[0]
+            ],
+            "tags":  [
+                "device_cost_1",
+            ],
+            "marker": "o",
+        },
+
+        {
+            "label": "RT-DDPG",
+            "paths": [
+                plot_paths[1]
+            ],
+            "tags":  [
+                "device_cost_1",
+            ],
+            "marker": "*",
+        },
+
+        {
+            "label": "Navie",
+            "paths": [
+                plot_paths[2]
+            ],
+            "tags":  [
+                "device_cost_1",
+            ],
+            "marker": "*",
+        },
+    ]
+
+    plot_exp_plot(
+        curves=curves_cfg,
+        x_axis="step",
+        xlabel="time step",
+        ylabel="energy consumption",
+        title="Energy Consumption Comparison Of type-1 tasks",
+        smooth_weight=0.0,
+        stride=50,
+    )
+
+    plot_paths = [
+        r"plot_data/target/maddpg_s_7878_t_2026-02-02-11-03-56-032697_d_my_exp9",
+        r"plot_data/target/maddpg_s_7878_t_2026-02-02-21-25-08-707599_d_rt_exp10",
+        r"plot_data/target/maddpg_s_7878_t_2026-02-03-00-02-45-332873_d_no_queue_exp11",
+    ]
+
+    curves_cfg = [
+        {
+            "label": "LyaHDDPG",
+            "paths": [
+                plot_paths[0]
+            ],
+            "tags":  [
+                "device_cost_2",
+            ],
+            "marker": "o",
+        },
+
+        {
+            "label": "RT-DDPG",
+            "paths": [
+                plot_paths[1]
+            ],
+            "tags":  [
+                "device_cost_2",
+            ],
+            "marker": "*",
+        },
+
+        {
+            "label": "Navie",
+            "paths": [
+                plot_paths[2]
+            ],
+            "tags":  [
+                "device_cost_2",
+            ],
+            "marker": "*",
+        },
+    ]
+
+    plot_exp_plot(
+        curves=curves_cfg,
+        x_axis="step",
+        xlabel="time step",
+        ylabel="energy consumption",
+        title="Energy Consumption Comparison Of type-2 tasks",
+        smooth_weight=0.0,
+        stride=50,
     )
 
 def plot_device_queue():
@@ -565,6 +794,7 @@ def plot_edge_queue():
         stride=10,
     )
 
+
 if __name__ == "__main__":
     
     # plot_paths = [
@@ -579,11 +809,11 @@ if __name__ == "__main__":
 
     # plot_dly()
 
-    # plot_timeout()
+    plot_timeout()
 
     # plot_engy()
 
     # plot_device_queue()
 
-    plot_edge_queue()
+    # plot_edge_queue()
 
