@@ -1,1 +1,1 @@
-python ../../../main.py --train_mode maddpg --run_desc "my_exp8_ql" --enable_virtual_queue_reward --device_dly_adj_fac 1.1
+python ../../../main.py --train_mode maddpg --run_desc "my_exp8_ql" --enable_virtual_queue_reward --device_dly_adj_fac 1.0

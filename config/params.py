@@ -196,8 +196,9 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
+        # default=[[1.0, 2.0], [0.4, 1.0], [2.6, 3.2]],
         # default=[[1.0, 2.0], [0.6, 1.0], [2.8, 3.4]],
-        default=[[1.0, 2.0], [0.4, 1.0], [2.6, 3.2]],
+        default=[[1.0, 2.0], [0.6, 1.0], [2.7, 3.3]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -205,7 +206,8 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[2.0, 2.2], [4.2, 4.4], [1.0, 1.2]],
+        # default=[[2.0, 2.2], [4.2, 4.4], [1.0, 1.2]],
+        default=[[2.0, 2.2], [3.8, 4.0], [1.0, 1.2]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     parser.add_argument("--comp_dly_thre", type = list, 
@@ -247,7 +249,7 @@ def get_general_params():
                         help = "the b parameter for edge weight linear function")
 
     parser.add_argument("--device_dly_adj_fac", type = float,
-                        default = 1.0,
+                        default = 0.9,
                         # default = [0.8]*edge_queue_num,
                         help = "the weight of tasks' device computation queue overtime threshold factor.")
 
@@ -266,16 +268,16 @@ def get_general_params():
 
     # Hyperparameter
     # queue reward
-    parser.add_argument("--device_act_queue_reward_max_bound", type = float, default = 800, 
+    parser.add_argument("--device_act_queue_reward_max_bound", type = float, default = 800*5, 
                         help = "the max bound of actual device queue reward")
 
-    parser.add_argument("--device_act_queue_reward_min_bound", type = float, default = -1000,
+    parser.add_argument("--device_act_queue_reward_min_bound", type = float, default = -1000*5,
                         help = "the min bound of actual device queue reward")
 
-    parser.add_argument("--device_vir_queue_reward_max_bound", type = float, default = 1600,
+    parser.add_argument("--device_vir_queue_reward_max_bound", type = float, default = 1600*5,
                         help = "the max bound of virtual device queue reward")
 
-    parser.add_argument("--device_vir_queue_reward_min_bound", type = float, default = -2000, 
+    parser.add_argument("--device_vir_queue_reward_min_bound", type = float, default = -2000*5, 
                         help = "the min bound of virtual device queue reward")
 
     parser.add_argument("--device_act_queue_reward_weight", type = float,
