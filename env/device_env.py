@@ -146,6 +146,7 @@ class DeviceEnv():
         self.virtual_time_ql = 0
         self.old_virtual_time_ql = 0
         self.device_dly_adj_fac = gen_params.device_dly_adj_fac
+        print(f"[DEBUG] The device {self.env_id} 's device_dly_adj_fac is {self.device_dly_adj_fac}")
         self.device_dly_adj_val = self.device_dly_adj_fac * gen_params.comp_dly_thre[self.device_type] * self.delta
         self.avg_local_time = 0
         self.old_comp_times = []

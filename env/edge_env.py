@@ -37,6 +37,7 @@ class EdgeEnv():
         self.new_edge_ql_change = [ 0 for _ in range(self.edge_queue_num)]
         self.new_vir_edge_ql_change = [ 0 for _ in range(self.edge_queue_num)]
         self.edge_dly_adj_fac = general_params.edge_dly_adj_fac
+        print(f"[DEBUG] The edge's edge_dly_adj_fac is {self.edge_dly_adj_fac}")
         self.edge_dly_adj_val = [self.edge_dly_adj_fac * general_params.comp_dly_thre[i] * self.delta for i in range(self.edge_queue_num)]
         self.avg_edge_time = [ 0 for _ in range(self.edge_queue_num)]
         self.old_comp_times =[ [] for _ in range(self.edge_queue_num)]
