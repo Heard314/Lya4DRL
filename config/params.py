@@ -246,15 +246,15 @@ def get_general_params():
                         default = 0.1,
                         help = "the b parameter for edge weight linear function")
 
-    parser.add_argument("--device_dly_adj_fac", type = list,
-                        default = [1.0]*edge_queue_num,
+    parser.add_argument("--device_dly_adj_fac", type = float,
+                        default = 1.0,
                         # default = [0.8]*edge_queue_num,
-                        help = "the weights of tasks' device computation queue overtime threshold factor.")
+                        help = "the weight of tasks' device computation queue overtime threshold factor.")
 
-    parser.add_argument("--edge_dly_adj_fac", type = list, 
-                        default = [0.8]*edge_queue_num,
+    parser.add_argument("--edge_dly_adj_fac", type = float, 
+                        default = 0.8,
                         # default = [0.6]*edge_queue_num,
-                        help = "the weights of tasks' edge computation queue overtime threshold factor.")
+                        help = "the weight of tasks' edge computation queue overtime threshold factor.")
 
     # parser.add_argument("--vir_local_ql_growth_rate", type = float,
     #                     default = 0.6,
