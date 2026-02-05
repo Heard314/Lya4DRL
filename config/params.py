@@ -10,6 +10,7 @@ general params
 device_num = 10
 edge_queue_num = 3
 gen_task_cycle = 5
+ql_punish_fac = 100.0
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
 
@@ -268,28 +269,28 @@ def get_general_params():
 
     # Hyperparameter
     # queue reward
-    parser.add_argument("--device_act_queue_reward_max_bound", type = float, default = 800*5, 
+    parser.add_argument("--device_act_queue_reward_max_bound", type = float, default = 800 * ql_punish_fac, 
                         help = "the max bound of actual device queue reward")
 
-    parser.add_argument("--device_act_queue_reward_min_bound", type = float, default = -1000*5,
+    parser.add_argument("--device_act_queue_reward_min_bound", type = float, default = -1000 * ql_punish_fac,
                         help = "the min bound of actual device queue reward")
 
-    parser.add_argument("--device_vir_queue_reward_max_bound", type = float, default = 1600*5,
+    parser.add_argument("--device_vir_queue_reward_max_bound", type = float, default = 1600 * ql_punish_fac,
                         help = "the max bound of virtual device queue reward")
 
-    parser.add_argument("--device_vir_queue_reward_min_bound", type = float, default = -2000*5, 
+    parser.add_argument("--device_vir_queue_reward_min_bound", type = float, default = -2000 * ql_punish_fac, 
                         help = "the min bound of virtual device queue reward")
 
     parser.add_argument("--device_act_queue_reward_weight", type = float,
-                        default = -1000,
+                        default = -1000 * ql_punish_fac,
                         help = "The Lyapunov Drift-Plus-Penalty weight for local queues")
     
     parser.add_argument("--device_vir_queue_reward_weight", type = float,
-                        default = -2000,
+                        default = -2000 * ql_punish_fac,
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     parser.add_argument("--edge_queue_reward_bound_fac", type = float,
-                        default = 0.85,
+                        default = 0.95,
                         help = "The bound multi factor for edge queue reward")
 
     # navie reward

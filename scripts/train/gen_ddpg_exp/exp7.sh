@@ -1,0 +1,1 @@
+python ../../../main.py --train_mode maddpg --run_desc "gen7_ql" --enable_virtual_queue_reward --device_dly_adj_fac 0.9
