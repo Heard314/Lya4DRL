@@ -1,1 +1,1 @@
-python ../../../main.py --train_mode maddpg --run_desc "gen16_qe" --enable_virtual_queue_reward --edge_dly_adj_fac 1.5
+python ../../../main.py --train_mode maddpg --run_desc "gen19_qe" --enable_virtual_queue_reward --edge_dly_adj_fac 1.5
