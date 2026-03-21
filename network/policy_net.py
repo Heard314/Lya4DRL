@@ -27,7 +27,7 @@ class MappoPolicyNet(nn.Module):
         # Dimension 0: range [0, 10]
         # Dimension 1: range [6, 10]
         # Dimension 2: range [6, 10]
-        low  = torch.tensor([0., 6., 6.])
+        low  = torch.tensor([5., 6., 6.])
         high = torch.tensor([10., 10., 10.])
         self.register_buffer("act_low",  low)
         self.register_buffer("act_high", high)
@@ -96,7 +96,7 @@ class MappoPolicyNetLSTM(nn.Module):
             nn.init.zeros_(self.mu_head.bias)
 
         # ---------- action range ----------
-        low  = torch.tensor([0., 6., 6.])
+        low  = torch.tensor([5., 6., 6.])
         high = torch.tensor([10., 10., 10.])
         self.register_buffer("act_low",  low)
         self.register_buffer("act_high", high)

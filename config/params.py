@@ -178,8 +178,12 @@ def get_general_params():
                         default = 100,
                         help = "the min distance between end device and edge server. (m)")
     
-    parser.add_argument("--low_device_comp_freq", action="store_true",
-                        help = "whether to set lower computation frequencies for devices for experiences")
+    parser.add_argument("--enable_device_comp_freq_chg", action="store_true",
+                        help = "Used at the env general experiments, whether to enable the change of devices' computation frequencies during training and evaluation")
+
+    parser.add_argument("--device_comp_freq", type = float, 
+                        default = 2.5,
+                        help = "the computation frequencies of single device, enabled when --enable_device_comp_freq_chg is True")
 
     parser.add_argument("--device_comp_freqs", type = list,
                         default = [2.5]*edge_queue_num,
@@ -236,7 +240,7 @@ def get_general_params():
     parser.add_argument("--max_data_size", type = float, 
                         default = 3.5,
                         help = "maximum data-size (Mb)")
-    
+
     parser.add_argument("--max_comp_dens", type = float,
                         default = 1.8,
                         help = "maximum computation density (Gcycles/Mb)")
