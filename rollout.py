@@ -2,6 +2,7 @@ import copy
 from operator import xor
 from operator import xor
 import pickle
+import random
 import numpy as np
 import torch
 from env.mec_env import MECEnv
@@ -13,8 +14,22 @@ from util.utils import ObsScaling, RewardScaling, concatenate
 from torch.utils.tensorboard import SummaryWriter
 import sys, atexit, os
 import config.global_params as gp
+
+
+def seed_rollout_runtime(seed: int):
+    """Seed all RNGs used in rollout/runtime before creating networks/envs."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 class Rollout:
     def __init__(self, gen_params, alg_params):
+        # Seed before constructing any modules so initial weights are reproducible.
+        self.seed = gp.settings.seed
+        seed_rollout_runtime(self.seed)
+
         self.device_num = gen_params.device_num
         self.task_arrival_prob = gen_params.task_arrival_prob
         self.evaluate = gen_params.evaluate
@@ -75,10 +90,6 @@ class Rollout:
 
         # training
         if not self.evaluate:
-            # seed 
-            self.seed = gp.settings.seed
-            torch.manual_seed(self.seed)
-            np.random.seed(self.seed)
             self.train_mode = gen_params.train_mode
             self.train_time_slots = alg_params.train_time_slots
             self.train_freq = alg_params.train_freq
@@ -95,10 +106,9 @@ class Rollout:
                 self.device_agents[i].update_net(self.edge_agent.p_nets[i].state_dict())
         # evaluation
         else:
-            # fix random seed
+            # Keep eval deterministic with global fixed seed.
             self.seed = gp.settings.seed
-            torch.manual_seed(gen_params.eval_seed)
-            np.random.seed(gen_params.eval_seed)
+            seed_rollout_runtime(self.seed)
             
             self.eval_time_slots = gen_params.eval_time_slots
 

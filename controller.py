@@ -2,9 +2,31 @@ import os
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
+import random
+import torch
 from config.params import get_mappo_params, get_maddpg_params
 from rollout import Rollout
 import config.global_params as gp
+
+
+def set_global_determinism(seed: int):
+    """Set all known RNG and backend knobs before creating models/envs."""
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    # Needed by CUDA matmul kernels for deterministic behavior.
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+    torch.use_deterministic_algorithms(True, warn_only=True)
 
 class Controller:
     def __init__(self, gen_params):
@@ -85,6 +107,9 @@ class Controller:
         gp.settings.plot_dir = plot_dir
         print(f"The plot file dir is {plot_dir}")
         gp.settings.seed = self.seed
+
+        # Must run before Rollout creates any neural network/module.
+        set_global_determinism(self.seed)
 
         # rollout
         self.rollout = Rollout(gen_params, alg_params)
