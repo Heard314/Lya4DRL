@@ -1,1 +1,4 @@
-python ../../../../main.py --train_mode mappo --run_desc "ppo_exp2_l" --enable_virtual_queue_reward --enable_device_comp_freq_chg --device_comp_freq 2.0
+python ../../../../main.py --train_mode mappo --run_desc "ppo_exp1_l2" --enable_actual_queue_reward --enable_device_comp_freq_chg --device_comp_freq 2
+python ../../../../main.py --train_mode mappo --run_desc "ppo_exp1_l2.25" --enable_actual_queue_reward --enable_device_comp_freq_chg --device_comp_freq 2.25
+python ../../../../main.py --train_mode mappo --run_desc "ppo_exp1_l2.75" --enable_actual_queue_reward --enable_device_comp_freq_chg --device_comp_freq 2.75
+python ../../../../main.py --train_mode mappo --run_desc "ppo_exp1_l3" --enable_actual_queue_reward --enable_device_comp_freq_chg --device_comp_freq 3

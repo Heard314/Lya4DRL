@@ -380,17 +380,17 @@ def get_mappo_params():
     parser.add_argument("--action_dim", type = int, default = 3,
                         help = "the dimension of agents' actions")
 
-    parser.add_argument("--v_hid_dims", type = list, default = [400, 400],
+    parser.add_argument("--v_hid_dims", type = list, default = [200, 200],
                         help = "the dimension of value network's hidden layers")
 
-    parser.add_argument("--p_hid_dims", type = list, default = [400, 400],
+    parser.add_argument("--p_hid_dims", type = list, default = [200, 200],
                         help = "the dimension of policy network's hidden layers")
 
     parser.add_argument("--use_orthogonal_init", type = bool, default = True,
                         help = "whether to use orthogonal-initialization")
     
     # training
-    parser.add_argument("--train_episodes", type = int, default = 30000,
+    parser.add_argument("--train_episodes", type = int, default = 15000,
                         help = "the number of training episodes")
 
     parser.add_argument("--train_time_slots", type = int, default = 3000,

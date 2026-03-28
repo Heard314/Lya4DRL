@@ -58,8 +58,8 @@ class MappoEdgeAgent():
         self.p_nets = []
         self.p_optimizers = []
         for i in range(self.device_num):
-            # p_net = MappoPolicyNet(alg_params)
-            p_net = MappoPolicyNetLSTM(alg_params).to(self.device)
+            p_net = MappoPolicyNet(alg_params)
+            # p_net = MappoPolicyNetLSTM(alg_params).to(self.device)
             self.p_nets.append(p_net)
 
             p_optimizer = torch.optim.Adam(p_net.parameters(),

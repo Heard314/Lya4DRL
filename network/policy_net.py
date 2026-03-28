@@ -57,7 +57,7 @@ class MappoPolicyNet(nn.Module):
         cur = self.LOG_STD_MAX_FINAL + (self.LOG_STD_MAX_INIT - self.LOG_STD_MAX_FINAL) * torch.exp(-t / tau)
         return cur
         
-    def forward(self, obs):
+    def forward(self, obs,h_in=None):
         x = self.tanh(self.fc1(obs))
         x = self.tanh(self.fc2(x))
         # Generate the mean value
@@ -66,7 +66,7 @@ class MappoPolicyNet(nn.Module):
         log_std = torch.clamp(self.log_std, min=self.LOG_STD_MIN, max=cur_log_std_max)       
         # Generate the variance
         std = torch.exp(log_std).expand_as(mean)
-        return mean, std
+        return mean, std,(None, None)
 
 class MappoPolicyNetLSTM(nn.Module): 
     def __init__(self, alg_params):

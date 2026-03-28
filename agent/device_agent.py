@@ -13,8 +13,8 @@ class MappoDeviceAgent():
         self.agent_id = agent_id
         
         # policy network
-        # self.p_net = MappoPolicyNet(alg_params)
-        self.p_net = MappoPolicyNetLSTM(alg_params)
+        self.p_net = MappoPolicyNet(alg_params)
+        # self.p_net = MappoPolicyNetLSTM(alg_params)
         
         self.evaluate = gen_params.evaluate
         self.action_dim = alg_params.action_dim
@@ -58,7 +58,7 @@ class MappoDeviceAgent():
         p_inputs = GetPolicyInputs(obs)
 
         # process the lstm hidden state
-        hid_dim = self.p_net.lstm.hidden_size
+        hid_dim = self.lstm_hidden_dim
         batch_size = p_inputs.size(0)
         def to_hidden(h):
             # if None: initilize as 0

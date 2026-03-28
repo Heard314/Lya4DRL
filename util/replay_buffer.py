@@ -148,8 +148,15 @@ class MappoReplayBuffer():
                     raw_h = self.lstm_hidden_hs[i][j][k]
                     raw_c = self.lstm_hidden_cs[i][j][k]
 
-                    h = torch.as_tensor(raw_h, dtype=torch.float32).view(-1)[:self.lstm_hidden_dim]
-                    c = torch.as_tensor(raw_c, dtype=torch.float32).view(-1)[:self.lstm_hidden_dim]
+                    if(raw_h is not None):
+                        h = torch.as_tensor(raw_h, dtype=torch.float32).view(-1)[:self.lstm_hidden_dim]
+                    else:
+                        h = torch.zeros(self.lstm_hidden_dim, dtype=torch.float32)
+
+                    if(raw_c is not None):
+                        c = torch.as_tensor(raw_c, dtype=torch.float32).view(-1)[:self.lstm_hidden_dim]
+                    else:
+                        c = torch.zeros(self.lstm_hidden_dim, dtype=torch.float32)
 
                     lstm_hidden_hs[i, j, k] = h
                     lstm_hidden_cs[i, j, k] = c
