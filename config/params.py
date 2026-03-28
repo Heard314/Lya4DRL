@@ -390,7 +390,7 @@ def get_mappo_params():
                         help = "whether to use orthogonal-initialization")
     
     # training
-    parser.add_argument("--train_episodes", type = int, default = 15000,
+    parser.add_argument("--train_episodes", type = int, default = 10000,
                         help = "the number of training episodes")
 
     parser.add_argument("--train_time_slots", type = int, default = 3000,
