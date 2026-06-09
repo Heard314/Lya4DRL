@@ -85,7 +85,7 @@ class MappoDeviceAgent():
         # if enable_print: print(f"[DEBUG] the p_net output: mean({mean}), std({std})")
 
         if not active:
-            return [0.0] * self.action_dim, 0.0, next_lstm_hidden_h, next_lstm_hidden_c
+            return [0.0] * self.action_dim, None, next_lstm_hidden_h, next_lstm_hidden_c
 
         # dim0 -> [0,10]: scale=5, loc=5
         # dim1 -> [6,10]: scale=2, loc=8
@@ -260,11 +260,13 @@ class EdgeComputingDeviceAgent(StaticDeviceAgent):
 class RandomComputingDeviceAgent(StaticDeviceAgent):
     def __init__(self, agent_id, gen_params):
         super().__init__(agent_id, gen_params)
-        
+        base_seed = gp.settings.seed
+        self._np_rnd = np.random.RandomState(base_seed + agent_id)
+
     def choose_action(self):
         act_dim = 3
         act = [0 for i in range(act_dim)]
-        act[0] = np.random.uniform(0, 1)
-        act[1] = np.random.uniform(0.6, 1)
-        act[2] = np.random.uniform(0.6, 1)
+        act[0] = self._np_rnd.uniform(0, 1)
+        act[1] = self._np_rnd.uniform(0.6, 1)
+        act[2] = self._np_rnd.uniform(0.6, 1)
         return act

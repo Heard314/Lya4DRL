@@ -333,8 +333,13 @@ class MaddpgEdgeAgent():
         if total_time_slots >= self.warm_time_slots:
             batch_slots = (total_time_slots + self.gen_task_cycle - 1)//self.gen_task_cycle
             if batch_slots < self.buffer_size:
-                batch_ids = np.random.choice(range(batch_slots),
-                                                self.train_batch_size, replace = False)
+                # Buffer not full yet — sample only from valid range
+                if batch_slots < self.train_batch_size:
+                    batch_ids = np.random.choice(range(batch_slots),
+                                                    self.train_batch_size, replace=True)
+                else:
+                    batch_ids = np.random.choice(range(batch_slots),
+                                                    self.train_batch_size, replace=False)
             else:
                 batch_ids = np.random.choice(range(self.buffer_size),
                                                 self.train_batch_size, replace = False)

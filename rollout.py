@@ -188,7 +188,12 @@ class Rollout:
     def reset(self):
         if hasattr(self, "reward_scaling"):
             self.reward_scaling.reset()
-        
+
+        # Reset OU noise state for each agent to avoid cross-episode drift
+        for agent in self.device_agents:
+            if hasattr(agent, "reset_ou"):
+                agent.reset_ou()
+
         self.joint_rewards = np.zeros([self.device_type_num], dtype = np.float32)
         self.device_rewards = np.zeros([self.device_num], dtype = np.float32)
         self.joint_cost = 0

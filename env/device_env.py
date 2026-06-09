@@ -57,10 +57,10 @@ class DeviceEnv():
     
     def gen_position(self, min_dis, max_dis):
         while True:
-            x = random.uniform(-max_dis, max_dis)
-            y = random.uniform(-max_dis, max_dis)
+            x = self._rnd.uniform(-max_dis, max_dis)
+            y = self._rnd.uniform(-max_dis, max_dis)
             distance = math.sqrt(x**2 + y**2)
-            
+
             if min_dis <= distance <= max_dis:
                 return x, y
 
@@ -212,17 +212,17 @@ class DeviceEnv():
         self.task_num = 1
         for i in range(self.task_num):
             # unit: Mb
-            data_size = np.random.uniform(self.data_size_inl[0],
-                                          self.data_size_inl[1])
+            data_size = self._np_rnd.uniform(self.data_size_inl[0],
+                                             self.data_size_inl[1])
             # unit: Gcycles/Mb
-            comp_dens = np.random.uniform(self.comp_dens_inl[0],
-                                          self.comp_dens_inl[1])
-            
+            comp_dens = self._np_rnd.uniform(self.comp_dens_inl[0],
+                                             self.comp_dens_inl[1])
+
             task = Task(data_size, comp_dens, self.env_id)
-            
+
             comp = data_size * comp_dens
             task.dly_cons = self.task_timeout_thre
-            task.norm_csum_engy = comp * self.engy_fac * 6.25
+            task.norm_csum_engy = comp * self.engy_fac * 9
             task.norm_esum_engy = comp * self.engy_fac * 1600
             self.sched_tasks.append(task)
 
@@ -252,10 +252,10 @@ class DeviceEnv():
         enable_print = gp.settings.enable_print
 
         # sample acceleration size
-        a_size = random.uniform(self.accelerate_speed_min, self.accelerate_speed_max)
+        a_size = self._rnd.uniform(self.accelerate_speed_min, self.accelerate_speed_max)
 
         # sample acceleration direction in degrees
-        a_dir_deg = random.uniform(self.accelerate_direction_min, self.accelerate_direction_max)  # unit: degree
+        a_dir_deg = self._rnd.uniform(self.accelerate_direction_min, self.accelerate_direction_max)  # unit: degree
 
         # convert degree to radian for trig functions
         a_dir_rad = math.radians(a_dir_deg)
@@ -500,10 +500,10 @@ class DeviceEnv():
             self.task_num = 1
             for i in range(self.task_num):
                 # unit: Mb
-                data_size = np.random.uniform(self.data_size_inl[0],
+                data_size = self._np_rnd.uniform(self.data_size_inl[0],
                                             self.data_size_inl[1])
                 # unit: Gcycles/Mb
-                comp_dens = np.random.uniform(self.comp_dens_inl[0],
+                comp_dens = self._np_rnd.uniform(self.comp_dens_inl[0],
                                             self.comp_dens_inl[1])
                 
                 task = Task(data_size, comp_dens, self.env_id)
