@@ -170,7 +170,7 @@ class MaddpgDeviceAgent():
             act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
         if not (self.evaluate or gp.settings.is_evaluate):
             sigma = self.get_noise_sigma()
-            noise = self.action_noise.sample(sigma).view_as(act)
+            noise = self.action_noise.sample(sigma).view_as(act).to(act.device)
             act = torch.clamp(act + noise, -1.0, 1.0)
             # act = torch.clip((act + self.action_noise.sample()), -1, 1).tolist()
     
