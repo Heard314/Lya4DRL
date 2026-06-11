@@ -153,7 +153,7 @@ class EdgeEnv():
                 tail = self.old_comp_times[device_type][-self.statSlotNum:]
                 self.avg_edge_time[device_type] = sum(tail) / len(tail) if tail else 0
             
-            if t_id % self.gen_task_cycle == 0:
+            if t_id % self.gen_task_cycle == self.start_slot:
                 edge_act_queue_growth_rate = self.edge_act_queue_growth_rate
                 old_edge_queue_time_ql_ = self.edge_queue_time_ql[device_type]
                 self.edge_queue_time_ql[device_type] = max(self.edge_queue_time_ql[device_type] + edge_act_queue_growth_rate * (total_comp_need_time_this_epi - total_comp_used_time_this_epi[device_type]), 0)

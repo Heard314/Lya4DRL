@@ -1,8 +1,5 @@
 import argparse
 from argparse import BooleanOptionalAction
-from multiprocessing.connection import deliver_challenge
-
-from torch import device
 
 """
 general params
@@ -226,14 +223,6 @@ def get_general_params():
                         default = [0.2]*edge_queue_num,
                         help = "the weights of tasks' edge computation expense")
     
-    parser.add_argument("--max_data_size", type = float, 
-                        default = 3.5,
-                        help = "maximum data-size (Mb)")
-    
-    parser.add_argument("--max_comp_dens", type = float,
-                        default = 1.8,
-                        help = "maximum computation density (Gcycles/Mb)")
-
     parser.add_argument("--edge_weight_w", type = float,
                         default = 1,
                         help = "the w parameter for edge weight linear function")

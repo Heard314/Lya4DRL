@@ -2,8 +2,8 @@ from abc import abstractmethod
 import numpy as np
 import torch
 from torch.distributions import Normal
-from network.policy_net import MaddpgPolicyNetLSTM, MappoPolicyNet, MaddpgPolicyNet, MappoPolicyNetLSTM
-from util.utils import GetPolicyInputs, GaussianNoise
+from network.policy_net import MaddpgPolicyNetLSTM, MappoPolicyNetLSTM
+from util.utils import GetPolicyInputs, GaussianNoise, to_lstm_hidden
 import math
 import config.global_params as gp
 
@@ -60,24 +60,9 @@ class MappoDeviceAgent():
         # process the lstm hidden state
         hid_dim = self.p_net.lstm.hidden_size
         batch_size = p_inputs.size(0)
-        def to_hidden(h):
-            # if None: initilize as 0
-            if h is None:
-                return torch.zeros(1, batch_size, hid_dim)
-            # if list: cast as tensor
-            if isinstance(h, list):
-                h = torch.tensor(h, dtype=torch.float32)
-            # if dim == 1: [hid_dim] -> [1,1,hid_dim]
-            if h.dim() == 1:
-                h = h.view(1, 1, -1)
-            # if dim == 2: [1,hid_dim] -> [1,1,hid_dim]
-            elif h.dim() == 2:
-                h = h.unsqueeze(1)
-            # if h == [1,B,hid_dim] -> no change
-            return h
 
-        lstm_hidden_h = to_hidden(lstm_hidden_h)
-        lstm_hidden_c = to_hidden(lstm_hidden_c)
+        lstm_hidden_h = to_lstm_hidden(lstm_hidden_h, batch_size, hid_dim)
+        lstm_hidden_c = to_lstm_hidden(lstm_hidden_c, batch_size, hid_dim)
 
         with torch.no_grad():
             mean, std, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
@@ -176,24 +161,10 @@ class MaddpgDeviceAgent():
 
         # process the lstm hidden state
         hid_dim = self.p_net.lstm.hidden_size
-        batch_size = p_inputs.size(0)  
-        def to_hidden(h):
-            # if None: initilize as 0
-            if h is None:
-                return torch.zeros(1, batch_size, hid_dim)
-            # if list: cast as tensor
-            if isinstance(h, list):
-                h = torch.tensor(h, dtype=torch.float32)
-            # if dim == 1: [hid_dim] -> [1,1,hid_dim]
-            if h.dim() == 1:
-                h = h.view(1, 1, -1)
-            # if dim == 2: [1,hid_dim] -> [1,1,hid_dim]
-            elif h.dim() == 2:
-                h = h.unsqueeze(1)
-            # if h == [1,B,hid_dim] -> no change
-            return h
-        lstm_hidden_h = to_hidden(lstm_hidden_h)
-        lstm_hidden_c = to_hidden(lstm_hidden_c)
+        batch_size = p_inputs.size(0)
+
+        lstm_hidden_h = to_lstm_hidden(lstm_hidden_h, batch_size, hid_dim)
+        lstm_hidden_c = to_lstm_hidden(lstm_hidden_c, batch_size, hid_dim)
         
         with torch.no_grad():
             act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))

@@ -1,17 +1,12 @@
-from env import device_env
 from env.device_env import DeviceEnv
 from env.edge_env import EdgeEnv
-import torch
-import math
 import config.global_params as gp
 
-from concurrent.futures import ThreadPoolExecutor
 class MECEnv():
-    def __init__(self, gen_params,time_slots, writer = None):
+    def __init__(self, gen_params, time_slots, writer=None):
         # Summary Writer
         self.writer = writer
         self.device_num = gen_params.device_num
-        self.edge_energy_weights = gen_params.edge_energy_weights
         self.device_energy_weights = gen_params.device_energy_weights
         self.time_slots = time_slots
         self.device_type_num = gen_params.device_type_num
@@ -70,10 +65,6 @@ class MECEnv():
         print(f"[DEBUG] edge_act_queue_growth_rate: {gen_params.edge_act_queue_growth_rate}")
         print(f"[DEBUG] edge_vir_queue_growth_rate: {gen_params.edge_vir_queue_growth_rate}")
 
-        # create thread pool for parallel device_env.compute
-        # each worker thread handles one DeviceEnv
-        self._device_executor = ThreadPoolExecutor(max_workers=self.device_num)
-
     def reset(self):
         self.edge_env.reset()
         
@@ -86,11 +77,6 @@ class MECEnv():
         start_slot = self.start_slot
 
         writer = self.writer
-        if e_id % 50 == 1:
-            # gp.settings.enable_print = True
-            gp.settings.enable_print = False
-        else:
-            gp.settings.enable_print = False
         enable_print = gp.settings.enable_print
         # First, each device makes an offloading decision for the pending task
         # Then, execute the local computation part and return the remote offloading part (sched_tasks in the code below)
@@ -189,8 +175,7 @@ class MECEnv():
                 device_csum_engys[i] += 1 / (j + 1) * (local_engy - device_csum_engys[i])
                 edge_comp_engy = task.edge_comp_engy
                 
-                device_costs[i] += self.device_energy_weights[device_type] * local_engy 
-                                #    + self.edge_energy_weights[device_type] * edge_comp_engy
+                device_costs[i] += self.device_energy_weights[device_type] * local_engy
                 
                 if comp_dly > task.dly_cons:
                     device_overtime_nums[i] += 1
@@ -204,11 +189,8 @@ class MECEnv():
                 else:
                     norm_csum_engy = task.norm_csum_engy
                     norm_esum_engy = task.norm_esum_engy
-                    device_rewards[i] += self.target_reward_penalty * (self.device_energy_weights[device_type] * 
-                                                  local_engy
-                                                #   + self.edge_energy_weights[device_type] * 
-                                                #   edge_comp_engy / norm_esum_engy
-                                                  )
+                    device_rewards[i] += self.target_reward_penalty * (self.device_energy_weights[device_type] *
+                                                  local_engy)
                 # print(f"[DEBUG] the part of engy reward in device {i} is {self.target_reward_penalty * (self.device_energy_weights[device_type] * local_engy)}")
                 if(enable_print): print(f"[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
                 device_queue_actual_rewards[i] = 0.0

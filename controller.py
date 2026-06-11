@@ -13,10 +13,10 @@ class Controller:
         # algorithm params
         alg_params = None
         if (not gen_params.evaluate and gen_params.train_mode == "mappo") or \
-           (gen_params.evaluate and gen_params.eval_mode) == "mappo":
+           (gen_params.evaluate and gen_params.eval_mode == "mappo"):
             alg_params = get_mappo_params()
         if (not gen_params.evaluate and gen_params.train_mode == "maddpg") or \
-           (gen_params.evaluate and gen_params.eval_mode) == "maddpg":
+           (gen_params.evaluate and gen_params.eval_mode == "maddpg"):
             alg_params = get_maddpg_params()
         
         print("The training mode is in controller: ", gen_params.train_mode)
@@ -60,7 +60,7 @@ class Controller:
             resume_episode = 0
         else:
             # fix random seed
-            self.seed = gen_params.evaluate and gen_params.eval_seed or gen_params.train_seed
+            self.seed = gen_params.eval_seed if gen_params.evaluate else gen_params.train_seed
             # runtime storage path
             import datetime
             run_path =  (
@@ -133,8 +133,10 @@ class Controller:
             if e_id % 800 == 0:
                 print("------------------evaluation after episode: " + str(e_id) + "------------------")
                 gp.settings.is_evaluate = True
-                self.rollout.run(e_id, visualize=visualize)
-                gp.settings.is_evaluate = False
+                try:
+                    self.rollout.run(e_id, visualize=visualize)
+                finally:
+                    gp.settings.is_evaluate = False
             
 
             # collection

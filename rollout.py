@@ -1,11 +1,10 @@
 import copy
 from operator import xor
-from operator import xor
 import pickle
 import numpy as np
 import torch
 from env.mec_env import MECEnv
-from agent.device_agent import MappoDeviceAgent, MaddpgDeviceAgent, \
+from agent.device_agent import MappoDeviceAgent, MaddpgDeviceAgent, StaticDeviceAgent, \
 LocalComputingDeviceAgent, EdgeComputingDeviceAgent, RandomComputingDeviceAgent
 from agent.edge_agent import MappoEdgeAgent, MaddpgEdgeAgent
 from util.replay_buffer import MappoReplayBuffer, MaddpgReplayBuffer
@@ -154,6 +153,8 @@ class Rollout:
 
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         log_txt_file = open(log_path, "a", encoding = "utf-8")
+        self._orig_stdout = sys.stdout
+        self._orig_stderr = sys.stderr
         sys.stdout = log_txt_file
         sys.stderr = log_txt_file
         atexit.register(log_txt_file.close)
@@ -174,16 +175,10 @@ class Rollout:
         self.device_comp_qls = None
         self.comp_dlys = None
         self.edge_comp_dlys = None
-        self.comp_dlys = None
         self.device_csum_engys = None
         self.device_esum_engys = None
         self.device_overtime_nums = None
         self.device_task_avail_nums = None
-    
-        # enable queue reward info
-        print(f"[DEBUG] enable_actual_queue_reward: {gen_params.enable_actual_queue_reward}")
-        print(f"[DEBUG] enable_virtual_queue_reward: {gen_params.enable_virtual_queue_reward}")
-
 
     def reset(self):
         if hasattr(self, "reward_scaling"):
@@ -201,8 +196,7 @@ class Rollout:
         self.edge_comp_qls = np.zeros([self.device_type_num], dtype = np.float32)
         self.device_comp_qls = np.zeros([self.device_num], dtype = np.float32)
         self.comp_dlys = np.zeros([self.device_num], dtype = np.float32)
-        self.comp_dlys = np.zeros([self.device_num], dtype = np.float32)
-        self.edge_comp_dlys = np.zeros([self.device_num], dtype = np.float32) #the edge computing delay for each task.
+        self.edge_comp_dlys = np.zeros([self.device_num], dtype = np.float32)  # the edge computing delay for each task
         self.device_csum_engys = np.zeros([self.device_num], dtype = np.float32)
         self.device_esum_engys = np.zeros([self.device_num], dtype = np.float32)
         self.device_overtime_nums = np.zeros([self.device_num], dtype = np.float32)
@@ -224,7 +218,6 @@ class Rollout:
         lstm_hidden_cs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
         next_lstm_hidden_hs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
         next_lstm_hidden_cs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
-        import numpy as np
         edge_comp_qls = [edge_obs[i * self.edge_queue_obs_dim] for i in range(self.device_type_num)]
         device_comp_qls = [obs[1] for obs in device_obss]
         # obs scaling
@@ -257,7 +250,7 @@ class Rollout:
             # choose action (use deterministic strategy during evaluation)
             device_acts = [None for i in range(self.device_num)]
             device_active = [None for i in range(self.device_num)]
-            if "Mappo" in type(self.device_agents[0]).__name__:
+            if isinstance(self.device_agents[0], MappoDeviceAgent):
                 # store actions used for interacting with the MEC env 
                 device_acts_ = [[] for i in range(self.device_num)]
                 if not (self.evaluate or gp.settings.is_evaluate):
@@ -280,7 +273,7 @@ class Rollout:
                         device_acts_[i] = [-1.0 for _ in range(self.action_dim)]
                     if not (act_logprob == None):
                         device_act_logprobs[i] = act_logprob
-            if "Maddpg" in type(self.device_agents[0]).__name__:
+            if isinstance(self.device_agents[0], MaddpgDeviceAgent):
                 # store actions used for interacting with the MEC env
                 device_acts_ = [[] for i in range(self.device_num)]
                 for i in range(self.device_num):
@@ -299,7 +292,7 @@ class Rollout:
                     else:
                         device_acts[i] = [-1.0 for _ in range(self.action_dim)]
                         device_acts_[i] = [-1.0 for _ in range(self.action_dim // 10)]
-            if "Computing" in type(self.device_agents[0]).__name__:
+            if isinstance(self.device_agents[0], StaticDeviceAgent):
                 for i in range(self.device_num):
                     task_num = self.mec_env.device_envs[i].task_num
                     device_type = self.device_types[i]

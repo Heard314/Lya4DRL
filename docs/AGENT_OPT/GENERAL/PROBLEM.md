@@ -383,3 +383,55 @@ Phase 3（加固设计）
 > **审查完成日期：** 2026-06-06
 > **审查范围：** 全项目 18 个 Python 源文件
 > **发现缺陷总数：** 9 个 Bug + 6 类冗余 + 4 个可复现性问题 + 5 个设计问题
+>
+> ---
+>
+> ## 七、 重构完成记录
+>
+> **重构日期：** 2026-06-09
+>
+> ### Phase 1 — 关键 Bug 修复 (全部完成)
+>
+> | # | 修复内容 | 文件 | 状态 |
+> |---|---------|------|------|
+> | 1 | 随机种子隔离：`gen_position()`、`move()`、`reset()`、`compute()` 改用 `self._rnd`/`self._np_rnd`；`RandomComputingDeviceAgent` 添加独立 RNG | `device_env.py`, `device_agent.py` | ✅ |
+> | 2 | 归一化常数统一：`reset()` 和 `compute()` 中 `norm_csum_engy` 均使用系数 9 | `device_env.py` | ✅ |
+> | 3 | 非活跃 log_prob：`active=False` 时返回 `None`（与 rollout 中的 `None` 检查一致） | `device_agent.py` | ✅ |
+> | 4 | OU 噪声重置：`Rollout.reset()` 中遍历 device_agents 调用 `reset_ou()` | `rollout.py` | ✅ |
+> | 5 | MADDPG 采样安全：`batch_slots < train_batch_size` 时使用 `replace=True` | `edge_agent.py` | ✅ |
+>
+> ### Phase 2 — 代码清理 (全部完成)
+>
+> | # | 修复内容 | 文件 | 状态 |
+> |---|---------|------|------|
+> | 6 | 移除冗余 import (`from operator import xor` 重复、`import numpy as np` 重复、`from env import device_env`、`deliver_challenge`、`from torch import device`) 和重复赋值 (`comp_dlys`、`device_type`/`device_type_num`) | `rollout.py`, `mec_env.py`, `params.py`, `device_env.py` | ✅ |
+> | 7 | 移除死代码：`ThreadPoolExecutor`、`enable_print=False` 硬编码块、`mec_env.py` 中未使用的 `torch`/`math` import、`utils.py` 中 no-op 赋值和注释掉的旧类/函数、`device_agent.py`/`edge_agent.py` 中未使用的 `MappoPolicyNet`/`MaddpgPolicyNet` import、`policy_net.py` 中 no-op `mean_scale` | 多个文件 | ✅ |
+> | 8 | 提取公共 `to_lstm_hidden()` 到 `util/utils.py`，消除 `MappoDeviceAgent` 和 `MaddpgDeviceAgent` 中的重复代码 | `utils.py`, `device_agent.py` | ✅ |
+> | 9 | 算法派发改为 `isinstance()` 检查（`MappoDeviceAgent`/`MaddpgDeviceAgent`/`StaticDeviceAgent`） | `rollout.py` | ✅ |
+> | 10 | 提取公共 `_append_flat()` 辅助函数，消除 replay buffer 中 4 处重复的 inner function | `replay_buffer.py` | ✅ |
+>
+> ### Phase 3 — 设计加固 (全部完成)
+>
+> | # | 修复内容 | 文件 | 状态 |
+> |---|---------|------|------|
+> | 11 | `is_evaluate` 异常安全：使用 `try/finally` 确保异常时恢复 | `controller.py` | ✅ |
+> | 12 | 修复 controller 条件表达式（显式 `==` 比较替代 `and/or` 短路求值）+ seed 使用三元表达式 | `controller.py` | ✅ |
+> | 13 | 动作值 clamp：`offl_rto` → `[0,1]`、`trpw_rto`/`device_comp_rto` → `[0.6,1]` | `device_env.py` | ✅ |
+> | 14 | 保存原始 `sys.stdout`/`sys.stderr` 到 `self._orig_stdout`/`self._orig_stderr` | `rollout.py` | ✅ |
+> | 15 | 修复 `edge_env` 时间步触发条件：`== 0` → `== self.start_slot` | `edge_env.py` | ✅ |
+> | 16 | 启用空闲时隙队列衰减逻辑（恢复被注释的 else 分支） | `device_env.py` | ✅ |
+> | 17 | 移除未使用的参数：`task_arrival_prob` refs、`max_data_size`、`max_comp_dens`、`edge_energy_weights` refs + 清理注释掉的代码 | `params.py`, `device_env.py`, `mec_env.py` | ✅ |
+> | 18 | 修复 `RunningMeanStd` n=1 时 std 应为 0 而非 x | `utils.py` | ✅ |
+>
+> ### 额外修复
+>
+> | # | 修复内容 | 文件 | 状态 |
+> |---|---------|------|------|
+> | 19 | 移除 `mec_env.py` 中注释掉的 `edge_energy_weights` 残留引用 | `mec_env.py` | ✅ |
+> | 20 | 移除 `device_env.py` 中未使用的局部变量 `data_size_mean`、`comp_dens_mean` | `device_env.py` | ✅ |
+>
+> ### 未处理的项目（低优先级，保留供未来迭代）
+>
+> - 非 LSTM 网络类 (`MappoPolicyNet`, `MaddpgPolicyNet`)：保留以供可能的架构对比实验
+> - `enable_print` 调试基础设施：保留变量定义和调试分支，仅移除了总是设为 False 的硬编码
+> - `edge_comp_dlys` 变量：保留了定义（尽管未被使用），因为可能是未来功能扩展的占位

@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 from torch.distributions import Normal
 from network.value_net import MappoValueNet, MaddpgValueNet
-from network.policy_net import MaddpgPolicyNetLSTM, MappoPolicyNet, MaddpgPolicyNet, MappoPolicyNetLSTM
+from network.policy_net import MaddpgPolicyNetLSTM, MappoPolicyNetLSTM
 import config.global_params as gp
 
 class MappoEdgeAgent():

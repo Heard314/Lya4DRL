@@ -16,7 +16,7 @@ class RunningMeanStd():
         self.n += 1
         if self.n == 1:
             self.mean = x
-            self.std = x
+            self.std = np.zeros_like(x)
         else:
             old_mean = self.mean.copy()
             self.mean = old_mean + (x - old_mean) / self.n
@@ -45,10 +45,8 @@ class ObsScaling():
             device_obss[i][0] /= 10
             device_obss[i][1] = np.log1p(np.clip(device_obss[i][1],  0.0, self.vq_clip))
             device_obss[i][2] = np.log1p(np.clip(device_obss[i][2], 0.0, self.vq_clip))
-        edge_obs_ = edge_obs
-        device_obss_ = device_obss
-        
-        return edge_obs_, device_obss_
+
+        return edge_obs, device_obss
 
                 
 class RewardScaling():
@@ -85,16 +83,6 @@ class GaussianNoise:
         s = self.sigma if sigma is None else sigma
         return torch.randn(self.action_dim, device=self.device) * s
 
-# class GaussianNoise():
-#     def __init__(self, action_dim, mu = 0.25, sigma = 0.5):
-#         self.action_dim = action_dim
-#         self.mu = mu
-#         self.sigma = sigma
-        
-#     def sample(self):
-#         x = np.random.normal(self.mu, self.sigma, self.action_dim)
-                
-#         return x
 
 def OrthogonalInit(layer, gain = 1.0):
     for name, params in layer.named_parameters():
@@ -103,9 +91,22 @@ def OrthogonalInit(layer, gain = 1.0):
         elif 'weight' in name:
             nn.init.orthogonal_(params, gain = gain)
             
+def to_lstm_hidden(h, batch_size, hid_dim):
+    """Normalize LSTM hidden state to shape [1, batch_size, hid_dim]."""
+    if h is None:
+        return torch.zeros(1, batch_size, hid_dim)
+    if isinstance(h, list):
+        h = torch.tensor(h, dtype=torch.float32)
+    if h.dim() == 1:
+        h = h.view(1, 1, -1)
+    elif h.dim() == 2:
+        h = h.unsqueeze(1)
+    return h
+
+
 def GetPolicyInputs(obs):
     inputs = torch.tensor(obs, dtype = torch.float).reshape([1, -1])
-    
+
     return inputs
 
 # concatenate 1D array for 'numpy array' or 'list'
@@ -122,16 +123,6 @@ def concatenate(a, b, dtype=np.float32):
     a = np.asarray(a, dtype=dtype).reshape(-1)
     b = np.asarray(b, dtype=dtype).reshape(-1)
     return np.concatenate([a, b], axis=0).tolist()
-
-# def GetValueInputs(edge_obs, device_obss):
-#     inputs = []
-    
-#     inputs += edge_obs
-#     for i in range(len(device_obss)):
-#         inputs += device_obss[i]
-#     inputs = torch.tensor(inputs, dtype = torch.float).reshape([1, -1])
-    
-#     return inputs
 
 import matplotlib
 matplotlib.use("Agg")  # use non-GUI backend

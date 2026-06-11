@@ -148,8 +148,6 @@ class MappoPolicyNetLSTM(nn.Module):
         x = self.tanh(out)
         # Generate the mean value
         mean = self.mu_head(x)                 # [B,T,act_dim]
-        mean_scale = 1.0
-        mean = mean * mean_scale
         # Generate the variance
         cur_log_std_max = self._cur_log_std_max(device=mean.device)
         log_std = torch.clamp(self.log_std, self.LOG_STD_MIN, cur_log_std_max)

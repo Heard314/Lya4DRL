@@ -2,6 +2,19 @@ import copy
 import torch
 import numpy as np
 
+
+def _append_flat(target_list, x):
+    """Append scalar/tensor/array elements into target_list in-place."""
+    if isinstance(x, torch.Tensor):
+        target_list.extend(x.detach().cpu().reshape(-1).tolist())
+    elif isinstance(x, np.ndarray):
+        target_list.extend(x.reshape(-1).tolist())
+    elif isinstance(x, (list, tuple)):
+        target_list.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
+    else:
+        target_list.append(float(x))
+
+
 # Store the transition data of devices that process a specific task type
 class MappoReplayBuffer():
     def __init__(self, gen_params, alg_params):
@@ -54,23 +67,13 @@ class MappoReplayBuffer():
     def package_value_inputs(self, train_episode, train_time_slot, queue_id):
         v_input = []
 
-        def add(x):
-            if isinstance(x, torch.Tensor):
-                v_input.extend(x.detach().cpu().reshape(-1).tolist())
-            elif isinstance(x, np.ndarray):
-                v_input.extend(x.reshape(-1).tolist())
-            elif isinstance(x, (list, tuple)):
-                v_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
-            else:
-                v_input.append(float(x))
-
         start = queue_id * self.edge_queue_obs_dim
         end = (queue_id + 1) * self.edge_queue_obs_dim
         for i in range(start, end):
-            add(self.edge_obs[train_episode][train_time_slot][i])
+            _append_flat(v_input, self.edge_obs[train_episode][train_time_slot][i])
 
         for dev_id in self.device_in_types[queue_id]:
-            add(self.device_obss[train_episode][train_time_slot][dev_id])
+            _append_flat(v_input, self.device_obss[train_episode][train_time_slot][dev_id])
 
         return torch.tensor(v_input, dtype=torch.float32).reshape(1, -1)
 
@@ -78,23 +81,13 @@ class MappoReplayBuffer():
     def package_policy_input(self, train_episode, train_time_slot, device_id):
         p_input = []
 
-        def add(x):
-            if isinstance(x, torch.Tensor):
-                p_input.extend(x.detach().cpu().reshape(-1).tolist())
-            elif isinstance(x, np.ndarray):
-                p_input.extend(x.reshape(-1).tolist())
-            elif isinstance(x, (list, tuple)):
-                p_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
-            else:
-                p_input.append(float(x))
-
         queue_id = self.device_types[device_id]
         start = queue_id * self.edge_queue_obs_dim
         end = (queue_id + 1) * self.edge_queue_obs_dim
         for i in range(start, end):
-            add(self.edge_obs[train_episode][train_time_slot][i])
+            _append_flat(p_input, self.edge_obs[train_episode][train_time_slot][i])
 
-        add(self.device_obss[train_episode][train_time_slot][device_id])
+        _append_flat(p_input, self.device_obss[train_episode][train_time_slot][device_id])
 
         return torch.tensor(p_input, dtype=torch.float32).reshape(1, -1)
 
@@ -260,35 +253,16 @@ class MaddpgReplayBuffer():
     def package_value_inputs(self, batch_id, queue_id):
         v_input = []
         next_v_input = []
-        def add(x):
-            if isinstance(x, torch.Tensor):
-                v_input.extend(x.detach().cpu().reshape(-1).tolist())
-            elif isinstance(x, np.ndarray):
-                v_input.extend(x.reshape(-1).tolist())
-            elif isinstance(x, (list, tuple)):
-                v_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
-            else:
-                v_input.append(float(x))
-
-        def add_next(x):
-            if isinstance(x, torch.Tensor):
-                next_v_input.extend(x.detach().cpu().reshape(-1).tolist())
-            elif isinstance(x, np.ndarray):
-                next_v_input.extend(x.reshape(-1).tolist())
-            elif isinstance(x, (list, tuple)):
-                next_v_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
-            else:
-                next_v_input.append(float(x))
 
         start = queue_id * self.edge_queue_obs_dim
         end = (queue_id + 1) * self.edge_queue_obs_dim
         for i in range(start, end):
-            add(self.edge_obss[batch_id][i])
-            add_next(self.next_edge_obss[batch_id][i])
+            _append_flat(v_input, self.edge_obss[batch_id][i])
+            _append_flat(next_v_input, self.next_edge_obss[batch_id][i])
 
         for dev_id in self.device_in_types[queue_id]:
-            add(self.device_obss[batch_id][dev_id])
-            add_next(self.next_device_obss[batch_id][dev_id])
+            _append_flat(v_input, self.device_obss[batch_id][dev_id])
+            _append_flat(next_v_input, self.next_device_obss[batch_id][dev_id])
 
         return torch.tensor(v_input, dtype=torch.float32).reshape(1, -1), torch.tensor(next_v_input, dtype=torch.float32).reshape(1, -1)
 
@@ -297,35 +271,15 @@ class MaddpgReplayBuffer():
         p_input = []
         next_p_input = []
 
-        def add(x):
-            if isinstance(x, torch.Tensor):
-                p_input.extend(x.detach().cpu().reshape(-1).tolist())
-            elif isinstance(x, np.ndarray):
-                p_input.extend(x.reshape(-1).tolist())
-            elif isinstance(x, (list, tuple)):
-                p_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
-            else:
-                p_input.append(float(x))
-
-        def add_next(x):
-            if isinstance(x, torch.Tensor):
-                next_p_input.extend(x.detach().cpu().reshape(-1).tolist())
-            elif isinstance(x, np.ndarray):
-                next_p_input.extend(x.reshape(-1).tolist())
-            elif isinstance(x, (list, tuple)):
-                next_p_input.extend(np.asarray(x, dtype=np.float32).reshape(-1).tolist())
-            else:
-                next_p_input.append(float(x))
-
         queue_id = self.device_types[device_id]
         start = queue_id * self.edge_queue_obs_dim
         end = (queue_id + 1) * self.edge_queue_obs_dim
         for i in range(start, end):
-            add(self.edge_obss[batch_id][i])
-            add_next(self.next_edge_obss[batch_id][i])
+            _append_flat(p_input, self.edge_obss[batch_id][i])
+            _append_flat(next_p_input, self.next_edge_obss[batch_id][i])
 
-        add(self.device_obss[batch_id][device_id])
-        add_next(self.next_device_obss[batch_id][device_id])
+        _append_flat(p_input, self.device_obss[batch_id][device_id])
+        _append_flat(next_p_input, self.next_device_obss[batch_id][device_id])
 
         return torch.tensor(p_input, dtype=torch.float32).reshape(1, -1), torch.tensor(next_p_input, dtype=torch.float32).reshape(1, -1)
 
