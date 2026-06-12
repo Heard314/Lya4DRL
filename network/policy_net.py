@@ -24,11 +24,11 @@ class MappoPolicyNet(nn.Module):
             nn.init.zeros_(self.mu_head.bias)
 
         # -------- per-dimension action range --------
-        # Dimension 0: range [0, 10]
-        # Dimension 1: range [6, 10]
-        # Dimension 2: range [6, 10]
-        low  = torch.tensor([0., 6., 6.])
-        high = torch.tensor([10., 10., 10.])
+        # S server logits in [-1,1] + 3*ae_dim continuous (offl, trpw, comp)
+        ae_dim = alg_params.action_encode_dim
+        S = alg_params.action_dim - 3 * ae_dim
+        low  = torch.tensor([-1.] * S + [0.6] * ae_dim + [0.6] * ae_dim + [0.6] * ae_dim)
+        high = torch.tensor([1.] * S + [1.0] * ae_dim + [1.0] * ae_dim + [1.0] * ae_dim)
         self.register_buffer("act_low",  low)
         self.register_buffer("act_high", high)
         self.register_buffer("act_scale", (high - low) / 2.0)
@@ -56,14 +56,14 @@ class MappoPolicyNet(nn.Module):
         tau = torch.tensor(float(self.std_anneal_tau), device=device)
         cur = self.LOG_STD_MAX_FINAL + (self.LOG_STD_MAX_INIT - self.LOG_STD_MAX_FINAL) * torch.exp(-t / tau)
         return cur
-        
+
     def forward(self, obs):
         x = self.tanh(self.fc1(obs))
         x = self.tanh(self.fc2(x))
         # Generate the mean value
-        mean = self.mu_head(x) # 暂不扩展到动作空间维度
+        mean = self.mu_head(x)
         cur_log_std_max = self._cur_log_std_max(device=mean.device)
-        log_std = torch.clamp(self.log_std, min=self.LOG_STD_MIN, max=cur_log_std_max)       
+        log_std = torch.clamp(self.log_std, min=self.LOG_STD_MIN, max=cur_log_std_max)
         # Generate the variance
         std = torch.exp(log_std).expand_as(mean)
         return mean, std
@@ -96,8 +96,11 @@ class MappoPolicyNetLSTM(nn.Module):
             nn.init.zeros_(self.mu_head.bias)
 
         # ---------- action range ----------
-        low  = torch.tensor([0., 6., 6.])
-        high = torch.tensor([10., 10., 10.])
+        # S server logits in [-1,1] + 3*ae_dim continuous (offl, trpw, comp)
+        ae_dim = alg_params.action_encode_dim
+        S = alg_params.action_dim - 3 * ae_dim
+        low  = torch.tensor([-1.] * S + [0.6] * ae_dim + [0.6] * ae_dim + [0.6] * ae_dim)
+        high = torch.tensor([1.] * S + [1.0] * ae_dim + [1.0] * ae_dim + [1.0] * ae_dim)
         self.register_buffer("act_low",  low)
         self.register_buffer("act_high", high)
         self.register_buffer("act_scale", (high - low) / 2.0)
@@ -206,13 +209,16 @@ class MaddpgPolicyNetLSTM(nn.Module):
             nn.init.zeros_(self.fc3.bias)
 
         # ---------- action range ----------
-        low  = torch.tensor([0., 1.2, 1.2])
-        high = torch.tensor([2., 2., 2.])
+        # S server logits in [-1,1] + 3*ae_dim continuous (offl, trpw, comp)
+        ae_dim = alg_params.action_encode_dim
+        S = alg_params.action_dim - 3 * ae_dim
+        low  = torch.tensor([-1.] * S + [0.6] * ae_dim + [0.6] * ae_dim + [0.6] * ae_dim)
+        high = torch.tensor([1.] * S + [1.0] * ae_dim + [1.0] * ae_dim + [1.0] * ae_dim)
         self.register_buffer("act_low",  low)
         self.register_buffer("act_high", high)
         self.register_buffer("act_scale", (high - low) / 2.0)
         self.register_buffer("act_bias",  (high + low) / 2.0)
-    
+
 
     def forward(self, obs, h_in=None):
 

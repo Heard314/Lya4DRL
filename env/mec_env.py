@@ -19,14 +19,15 @@ class MECEnv():
         self.start_slot = gen_params.start_slot
 
         # edge env
-        self.edge_env = EdgeEnv(gen_params, writer)
+        self.edge_server_num = gen_params.edge_server_num
+        self.edge_envs = [EdgeEnv(gen_params, writer) for _ in range(self.edge_server_num)]
 
         self.device_freqs = gen_params.device_comp_freqs
 
         # device envs
         self.device_envs = []
         for i in range(self.device_num):
-            self.device_envs.append(DeviceEnv(i, gen_params, self.edge_env, writer))
+            self.device_envs.append(DeviceEnv(i, gen_params, self.edge_envs[0], writer))
 
         # reward parameters
         self.device_act_queue_reward_weight = gen_params.device_act_queue_reward_weight
@@ -66,8 +67,9 @@ class MECEnv():
         print(f"[DEBUG] edge_vir_queue_growth_rate: {gen_params.edge_vir_queue_growth_rate}")
 
     def reset(self):
-        self.edge_env.reset()
-        
+        for edge_env in self.edge_envs:
+            edge_env.reset()
+
         for i in range(self.device_num):
             self.device_envs[i].reset()
 
@@ -87,8 +89,14 @@ class MECEnv():
             sched_tasks = self.device_envs[i].compute(device_acts[i], e_id = e_id, t_id = t_id, visualize = visualize)
             device_sched_tasks[i] = sched_tasks
 
-        # 边缘服务器执行任务的远程卸载部分
-        self.edge_env.compute(device_sched_tasks, e_id = e_id, t_id = t_id, visualize = visualize)
+        # Route tasks to servers (no r_e softmax in v3)
+        for s in range(self.edge_server_num):
+            server_tasks = []
+            for i in range(self.device_num):
+                tasks = device_sched_tasks[i]
+                if tasks:
+                    server_tasks.extend([t for t in tasks if t.target_server == s])
+            self.edge_envs[s].compute(server_tasks, e_id=e_id, t_id=t_id, visualize=visualize)
         
         # reward
         device_rewards = [self.base_reward_penalty for i in range(self.device_num)]
@@ -258,26 +266,27 @@ class MECEnv():
                 virtual_queue_type_scale_posfac = self.device_num_per_type[i]*device_vir_queue_reward_max_bound*self.edge_queue_reward_bound_fac
                 actual_queue_type_scale_negfac = self.device_num_per_type[i]*device_act_queue_reward_min_bound*self.edge_queue_reward_bound_fac
                 virtual_queue_type_scale_negfac = self.device_num_per_type[i]*device_vir_queue_reward_min_bound*self.edge_queue_reward_bound_fac
-                edge_act_reward_fac = self.edge_env.edge_act_reward_fac[i]
 
                 edge_act_queue_reward_weight = 0.85 * self.device_act_queue_reward_weight * self.device_num_per_type[i] * 1.0 / self.delta / self.comp_dly_thre[i]
                 edge_vir_queue_reward_weight = 0.85 * self.device_vir_queue_reward_weight * self.device_num_per_type[i]
 
-                if(self.enable_virtual_queue_reward):
-                    edge_queue_virtual_rewards[i] = edge_vir_queue_reward_weight * \
-                        self.edge_env.virtual_edge_queue_time_ql[i] * (self.edge_env.new_vir_edge_ql_change[i])
-                    edge_queue_virtual_rewards[i] = min(max(virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), virtual_queue_type_scale_posfac)
-                    if task_type_in_edge_is_overtime[i]:
-                        edge_queue_actual_rewards[i] = edge_act_queue_reward_weight * \
-                            self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
-                        # if edge_queue_actual_rewards[i] < 0:
-                        #     edge_queue_actual_rewards[i] = min(-400 * self.device_num_per_type[i], edge_queue_actual_rewards[i])
-                        edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
+                # Aggregate across all servers (scalar queues in v3)
+                for s in range(self.edge_server_num):
+                    edge_env = self.edge_envs[s]
 
-                if(self.enable_actual_queue_reward):
-                    edge_queue_actual_rewards[i] = edge_act_queue_reward_weight * 3 * \
-                        self.edge_env.edge_queue_time_ql[i] * (self.edge_env.new_edge_ql_change[i])
-                    edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac * 3, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac * 3)
+                    if(self.enable_virtual_queue_reward):
+                        edge_queue_virtual_rewards[i] += edge_vir_queue_reward_weight * \
+                            edge_env.virtual_edge_queue_time_ql * edge_env.new_vir_edge_ql_change
+                        if task_type_in_edge_is_overtime[i]:
+                            edge_queue_actual_rewards[i] += edge_act_queue_reward_weight * \
+                                edge_env.edge_queue_time_ql * edge_env.new_edge_ql_change
+
+                    if(self.enable_actual_queue_reward):
+                        edge_queue_actual_rewards[i] += edge_act_queue_reward_weight * 3 * \
+                            edge_env.edge_queue_time_ql * edge_env.new_edge_ql_change
+
+                edge_queue_virtual_rewards[i] = min(max(virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), virtual_queue_type_scale_posfac)
+                edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
     
 
                 if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
@@ -320,8 +329,10 @@ class MECEnv():
                     t_id
                 )
 
-        # next obs
-        next_edge_obs = self.edge_env.get_obs()
+        # next obs — by server (shared across all devices): [s0_act, s0_vir, s1_act, s1_vir, s2_act, s2_vir]
+        next_edge_obs = []
+        for edge_env in self.edge_envs:
+            next_edge_obs.extend(edge_env.get_obs())
         # print(f"next_edge_obs: {next_edge_obs}")
         next_device_obss = [None for i in range(self.device_num)]
         for i in range(self.device_num):

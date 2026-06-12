@@ -251,6 +251,8 @@ class MaddpgEdgeAgent():
 
         self.device_num = gen_params.device_num
         self.action_dim = alg_params.action_dim
+        self.action_encode_dim = alg_params.action_encode_dim
+        self.edge_server_num = gen_params.edge_server_num
         
         # training
         self.gen_task_cycle = gen_params.gen_task_cycle
@@ -422,15 +424,25 @@ class MaddpgEdgeAgent():
         batch_device_obss = batch_device_obss.to(self.device)
         batch_joint_acts = batch_joint_acts.to(self.device)
         agent_id_in_type = agent_id - self.device_in_types[queue_id][0]
+        S = self.edge_server_num
+        ae_dim = self.action_encode_dim
+        compressed_dim = S + 3  # per-device compressed action for Critic
         # self.set_requires_grad(self.v_nets[queue_id], False)
         for i in range(self.p_epochs):
             batch_joint_acts_ = batch_joint_acts.clone()
             batch_acts, _ = self.p_nets[agent_id](batch_device_obss)
-            batch_acts = batch_acts.squeeze(1)
+            batch_acts = batch_acts.squeeze(1)  # [B, S + 3*ae_dim]
 
-            s = agent_id_in_type * self.action_dim
-            e = (agent_id_in_type + 1) * self.action_dim
-            batch_joint_acts_[:, s:e] = batch_acts
+            # Compress policy output from S+3*ae_dim to S+3 for Critic
+            server_logits = batch_acts[:, :S]  # [B, S]
+            cont_all = batch_acts[:, S:S + 3 * ae_dim]  # [B, 3*ae_dim]
+            cont_blocks = cont_all.reshape(-1, 3, ae_dim)  # [B, 3, ae_dim]
+            cont_compressed = cont_blocks.mean(dim=-1)  # [B, 3]
+            compressed_act = torch.cat([server_logits, cont_compressed], dim=-1)  # [B, S+3]
+
+            s = agent_id_in_type * compressed_dim
+            e = (agent_id_in_type + 1) * compressed_dim
+            batch_joint_acts_[:, s:e] = compressed_act
 
             p_loss = (-self.v_nets[queue_id](batch_states, batch_joint_acts_)).mean()
 

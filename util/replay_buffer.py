@@ -27,6 +27,7 @@ class MappoReplayBuffer():
         self.policy_input_dim = alg_params.policy_input_dim
         self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
         self.action_dim = alg_params.action_dim
+        self.action_encode_dim = alg_params.action_encode_dim
         self.lstm_hidden_dim = alg_params.p_hid_dims[1]
         self.gamma = alg_params.gamma
         self.lamda = alg_params.lamda
@@ -66,14 +67,25 @@ class MappoReplayBuffer():
 
     def package_value_inputs(self, train_episode, train_time_slot, queue_id):
         v_input = []
-
-        start = queue_id * self.edge_queue_obs_dim
-        end = (queue_id + 1) * self.edge_queue_obs_dim
-        for i in range(start, end):
-            _append_flat(v_input, self.edge_obs[train_episode][train_time_slot][i])
+        ae_dim = self.action_encode_dim
+        S = self.action_dim - 3 * ae_dim  # server count
 
         for dev_id in self.device_in_types[queue_id]:
+            # Global edge_obs (shared across all devices)
+            for i in range(self.edge_queue_obs_dim):
+                _append_flat(v_input, self.edge_obs[train_episode][train_time_slot][i])
             _append_flat(v_input, self.device_obss[train_episode][train_time_slot][dev_id])
+
+        # Add compressed joint actions (S+3 per device)
+        for dev_id in self.device_in_types[queue_id]:
+            full_act = self.device_acts[train_episode][train_time_slot][dev_id]
+            # server logits: S dims
+            for i in range(S):
+                _append_flat(v_input, full_act[i])
+            # 3 continuous: average each ae_dim block
+            for c in range(3):
+                block_sum = sum(full_act[S + c * ae_dim : S + (c + 1) * ae_dim])
+                _append_flat(v_input, block_sum / ae_dim)
 
         return torch.tensor(v_input, dtype=torch.float32).reshape(1, -1)
 
@@ -81,10 +93,8 @@ class MappoReplayBuffer():
     def package_policy_input(self, train_episode, train_time_slot, device_id):
         p_input = []
 
-        queue_id = self.device_types[device_id]
-        start = queue_id * self.edge_queue_obs_dim
-        end = (queue_id + 1) * self.edge_queue_obs_dim
-        for i in range(start, end):
+        # Global edge_obs (shared across all devices)
+        for i in range(self.edge_queue_obs_dim):
             _append_flat(p_input, self.edge_obs[train_episode][train_time_slot][i])
 
         _append_flat(p_input, self.device_obss[train_episode][train_time_slot][device_id])
@@ -225,6 +235,8 @@ class MaddpgReplayBuffer():
         self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
         self.device_types = gen_params.device_types
         self.policy_input_dim = alg_params.policy_input_dim
+        self.action_dim = alg_params.action_dim
+        self.action_encode_dim = alg_params.action_encode_dim
         self.value_input_dims = alg_params.value_input_dims
         self.value_input_obs_dims = alg_params.value_input_obs_dims
         self.value_input_act_dims = alg_params.value_input_act_dims
@@ -254,13 +266,11 @@ class MaddpgReplayBuffer():
         v_input = []
         next_v_input = []
 
-        start = queue_id * self.edge_queue_obs_dim
-        end = (queue_id + 1) * self.edge_queue_obs_dim
-        for i in range(start, end):
-            _append_flat(v_input, self.edge_obss[batch_id][i])
-            _append_flat(next_v_input, self.next_edge_obss[batch_id][i])
-
         for dev_id in self.device_in_types[queue_id]:
+            # Global edge_obs (shared across all devices)
+            for i in range(self.edge_queue_obs_dim):
+                _append_flat(v_input, self.edge_obss[batch_id][i])
+                _append_flat(next_v_input, self.next_edge_obss[batch_id][i])
             _append_flat(v_input, self.device_obss[batch_id][dev_id])
             _append_flat(next_v_input, self.next_device_obss[batch_id][dev_id])
 
@@ -271,10 +281,8 @@ class MaddpgReplayBuffer():
         p_input = []
         next_p_input = []
 
-        queue_id = self.device_types[device_id]
-        start = queue_id * self.edge_queue_obs_dim
-        end = (queue_id + 1) * self.edge_queue_obs_dim
-        for i in range(start, end):
+        # Global edge_obs (shared across all devices)
+        for i in range(self.edge_queue_obs_dim):
             _append_flat(p_input, self.edge_obss[batch_id][i])
             _append_flat(next_p_input, self.next_edge_obss[batch_id][i])
 
@@ -330,7 +338,9 @@ class MaddpgReplayBuffer():
                 batch_next_device_obss[j][i] = next_device_obs
             j += 1
 
-        # joint actions
+        # joint actions — compressed from S+3*ae_dim to S+3 per device
+        S = self.edge_queue_obs_dim // 2
+        ae_dim = self.action_encode_dim
         batch_joint_acts = [
             torch.zeros((len(batch_ids), self.value_input_act_dims[i]), dtype=torch.float32)
             for i in range(self.device_type_num)
@@ -340,7 +350,13 @@ class MaddpgReplayBuffer():
             for k in range(self.device_type_num):
                 joint_act = []
                 for i in self.device_in_types[k]:
-                    joint_act += self.device_acts[id_][i]
+                    full_act = self.device_acts[id_][i]  # [S + 3*ae_dim]
+                    # server_logits: S dims
+                    server_logits = full_act[:S]
+                    # continuous: 3*ae_dim dims → average to 3 dims
+                    cont_all = full_act[S:S + 3 * ae_dim]
+                    cont_3 = [sum(cont_all[c * ae_dim : (c + 1) * ae_dim]) / ae_dim for c in range(3)]
+                    joint_act.extend(server_logits + cont_3)
                 joint_act = torch.tensor(joint_act, dtype=torch.float32).reshape(-1)
                 batch_joint_acts[k][j] = joint_act
             j += 1

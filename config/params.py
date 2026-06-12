@@ -1,4 +1,5 @@
 import argparse
+import math
 from argparse import BooleanOptionalAction
 
 """
@@ -7,6 +8,14 @@ general params
 device_num = 10
 edge_queue_num = 3
 gen_task_cycle = 5
+edge_server_num = 3
+edge_server_radius = 250.0
+_edge_server_angles = [i * 360.0 / edge_server_num for i in range(edge_server_num)]
+edge_server_positions = [
+    (edge_server_radius * math.cos(math.radians(a)),
+     edge_server_radius * math.sin(math.radians(a)))
+    for a in _edge_server_angles
+]
 def get_general_params():
     parser = argparse.ArgumentParser(description = "general params")
 
@@ -209,8 +218,14 @@ def get_general_params():
 
     parser.add_argument("--edge_comp_freq", type = float, default = 50,
                         help = "the computation frequency of MEC server (Gcycles/s)")
-    
-    # parser.add_argument("--service_price", type = float, default = 0.1, 
+
+    parser.add_argument("--edge_server_num", type = int, default = edge_server_num,
+                        help = "the number of edge servers")
+
+    parser.add_argument("--edge_server_radius", type = float, default = edge_server_radius,
+                        help = "the radius of edge servers from origin (m)")
+
+    # parser.add_argument("--service_price", type = float, default = 0.1,
     #                     help = "the service price of MEC server ($/Gcycles)")
     
     parser.add_argument("--device_energy_weights", type = list, 
@@ -325,15 +340,27 @@ def get_general_params():
                         help = "the directory for saving plot images")
 
     params = parser.parse_args()
-    
+
+    # compute server positions
+    S_ = params.edge_server_num
+    angles = [i * 360.0 / S_ for i in range(S_)]
+    params.edge_server_positions = [
+        (params.edge_server_radius * math.cos(math.radians(a)),
+         params.edge_server_radius * math.sin(math.radians(a)))
+        for a in angles
+    ]
+
     return params
 """
 mappo params
 """
-ppo_device_obs_dim = 6 # 3 + max_task_num * 3
-ppo_edge_queue_obs_dim = 2 # comp_ql_length + vir_comp_ql_length
-ppo_value_input_dims = [n * ppo_device_obs_dim + ppo_edge_queue_obs_dim for n in [2, 4, 4]]
+S = edge_server_num
+ppo_device_obs_dim = 5 + S  # one-hot服务器编号 + trans_rates + queue + vir_queue + 3 task fields
+ppo_edge_queue_obs_dim = 2 * S  # per-server actual + virtual queues per type
 ppo_policy_input_dim = ppo_device_obs_dim + ppo_edge_queue_obs_dim
+ppo_value_input_dims = [n * ppo_policy_input_dim + n * (S + 3) for n in [2, 4, 4]]
+action_encode_dim = 10  # encoding dims per continuous action variable
+ppo_action_dim = S + 3 * action_encode_dim  # S server logits + 3*ae_dim continuous
 def get_mappo_params():
     parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
 
@@ -351,8 +378,11 @@ def get_mappo_params():
     parser.add_argument("--policy_input_dim", type = int, default = ppo_policy_input_dim,
                         help = "the dimension of policy network input")
 
-    # 包含：任务远程卸载率、传输能耗利用率、本地计算频率利用率
-    parser.add_argument("--action_dim", type = int, default = 3,
+    # 包含：服务器选择logits + 任务远程卸载率、传输能耗利用率、本地计算频率利用率
+    parser.add_argument("--action_encode_dim", type = int, default = action_encode_dim,
+                        help = "encoding dimension per continuous action variable")
+
+    parser.add_argument("--action_dim", type = int, default = ppo_action_dim,
                         help = "the dimension of agents' actions")
 
     parser.add_argument("--v_hid_dims", type = list, default = [400, 400],
@@ -444,12 +474,12 @@ def get_mappo_params():
 """
 maddpg params
 """
-device_obs_dim = 6 # 3 + max_task_num * 3
-edge_queue_obs_dim = 2 # comp_ql_length + vir_comp_ql_length
-action_dim = 30 # 动作包含卸载率、传输功率利用率和本地计算频率利用率，每个值用10维表示
-value_input_obs_dims = [n * (device_obs_dim) + edge_queue_obs_dim for n in [2, 4, 4]] # 包含整个集群的观测信息
-value_input_act_dims = [n * action_dim for n in [2, 4, 4]] # 包含所有智能体的动作信息
-value_input_dims = [n * (device_obs_dim + action_dim) + edge_queue_obs_dim for n in [2, 4, 4]] # 包含整个集群的观测信息和所有智能体的动作信息
+device_obs_dim = 5 + S  # one-hot服务器编号 + trans_rates + queue + vir_queue + 3 task fields
+edge_queue_obs_dim = 2 * S  # per-server actual + virtual queues per type
+action_dim = S + 3 * action_encode_dim  # S server logits + 3*ae_dim continuous
+value_input_obs_dims = [n * (device_obs_dim + edge_queue_obs_dim) for n in [2, 4, 4]]
+value_input_act_dims = [n * (S + 3) for n in [2, 4, 4]]  # joint_act in S+3 compressed form
+value_input_dims = [obs + act for obs, act in zip(value_input_obs_dims, value_input_act_dims)]
 policy_input_dim = device_obs_dim + edge_queue_obs_dim
 maddpg_train_episodes = 15000
 maddpg_time_slots = 3000
@@ -486,9 +516,12 @@ def get_maddpg_params():
     parser.add_argument("--policy_input_dim", type = int, default = policy_input_dim,
                         help = "the dimension of policy network input")
 
+    parser.add_argument("--action_encode_dim", type = int, default = action_encode_dim,
+                        help = "encoding dimension per continuous action variable")
+
     parser.add_argument("--action_dim", type = int, default = action_dim,
                         help = "the dimension of agents' actions")
-    
+
     parser.add_argument("--v_hid_dims", type = list, default = [200, 200],
                         help = "the dimension of value network's hidden layers")
     

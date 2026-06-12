@@ -39,6 +39,7 @@ class Task():
         self.e_queue_dly = None
         self.l_proc_dly = None
         self.e_proc_dly = None
+        self.target_server = None  # which edge server the task is offloaded to
     def __str__(self):
         return "data_size: " + str(self.data_size) + \
                "\ncomp_dens: " + str(self.comp_dens) + \
@@ -82,6 +83,10 @@ class DeviceEnv():
 
         self.device_type = gen_params.device_types[env_id]
         self.device_type_num = gen_params.device_type_num
+
+        self.edge_server_num = gen_params.edge_server_num
+        self.server_positions = gen_params.edge_server_positions
+        self.max_trans_rates = [0.0] * self.edge_server_num
 
         self.enable_virtual_queue_reward = gen_params.enable_virtual_queue_reward
         self.enable_actual_queue_reward = gen_params.enable_actual_queue_reward
@@ -219,14 +224,14 @@ class DeviceEnv():
             task.norm_esum_engy = comp * self.engy_fac * 1600
             self.sched_tasks.append(task)
 
-    # Channel gain, local queue information, and task information
+    # Channel gains to all servers, local queue information, and task information
     def get_obs(self):
-        max_trans_rate = self.max_trans_rate
-        local_queue = self.time_ql
+        obs = list(self.max_trans_rates)
+        obs.append(self.time_ql)
         if self.enable_virtual_queue_reward:
-            local_vir_queue = self.virtual_time_ql
+            obs.append(self.virtual_time_ql)
         else:
-            local_vir_queue = -1.0
+            obs.append(-1.0)
         task_msgs = []
         for i in range(self.task_num):
             data_size = self.sched_tasks[i].data_size
@@ -234,11 +239,20 @@ class DeviceEnv():
             dly_cons = self.sched_tasks[i].dly_cons
             task_msgs += [data_size, comp_dens, dly_cons]
         if self.task_num == 0:
-            task_msgs = [0.0,0.0,0.0]
-        obs = []
-        obs += [max_trans_rate, local_queue, local_vir_queue] + task_msgs
+            task_msgs = [0.0, 0.0, 0.0]
+        obs += task_msgs
 
         return obs
+
+    def _update_trans_rates(self):
+        """Calculate max transmission rate to each edge server."""
+        for s in range(self.edge_server_num):
+            sx, sy = self.server_positions[s]
+            dist = math.sqrt((self.position_x - sx)**2 + (self.position_y - sy)**2 + self.position_z**2)
+            ch_gain = 0.1 * max(dist, 1.0) ** (-3.5)
+            self.max_trans_rates[s] = (
+                self.bandwidth * math.log(1 + self.trans_power * ch_gain / self.noise_power, 2) * 1e-6
+            )
 
     # the end device moves when a time slot ends
     def move(self):
@@ -285,31 +299,33 @@ class DeviceEnv():
             print(f"[DEBUG] The speed x of device {self.env_id} is {self.speed_x}")
             print(f"[DEBUG] The speed y of device {self.env_id} is {self.speed_y}")
 
-    # act: [offl_rto, trans_rto, local_comp_rto], all in [0, 1]
-    # t_id: the start t_id is 1
+        self._update_trans_rates()
+
+    # act: [server_id, offl_rto, trpw_rto, comp_rto]
     def compute(self, act, e_id, t_id, visualize=False):
         writer = self.writer
         enable_print = gp.settings.enable_print
         gen_task_cycle = self.gen_task_cycle
         start_slot = self.start_slot
-    
+
         '''offloading'''
-        # offloading data-size
         offl_dzs = []
         trans_power = self.trans_power
         device_comp_freq = self.device_comp_freq
         if(enable_print): print(f"[DEBUG] The action of device {self.env_id} is {act}")
         if self.task_num>=1:
             gap = gen_task_cycle * self.delta
+            # server selection
+            server_id = int(act[0])
             # offloading ratio (clamped to valid range)
-            offl_rto = np.clip(act[0], 0.0, 1.0)
+            offl_rto = np.clip(act[1], 0.6, 1.0)
             offl_dz = self.sched_tasks[0].data_size * offl_rto
             offl_dzs.append(offl_dz)
             # transmission-power ratio (clamped to valid range)
-            trpw_rto = np.clip(act[1], 0.6, 1.0)
+            trpw_rto = np.clip(act[2], 0.6, 1.0)
             trans_power = self.trans_power * trpw_rto
             # local compute ratio (clamped to valid range)
-            device_comp_rto = np.clip(act[2], 0.6, 1.0)
+            device_comp_rto = np.clip(act[3], 0.6, 1.0)
             device_comp_freq = self.device_comp_freq * device_comp_rto
             if visualize:
                 writer.add_scalars(
@@ -327,13 +343,19 @@ class DeviceEnv():
                     {f"ep_{e_id}": device_comp_rto},
                     t_id
                 )
+                writer.add_scalars(
+                    f"detail{'_eval' if gp.settings.is_evaluate else ''}/server_id_{self.env_id}",
+                    {f"ep_{e_id}": server_id},
+                    t_id
+                )
             # Config
-            self.distance_from_edge = math.sqrt(self.position_x**2 + self.position_y**2)
+            sx, sy = self.server_positions[server_id]
+            self.distance_from_edge = math.sqrt((self.position_x - sx)**2 + (self.position_y - sy)**2 + self.position_z**2)
             self.channel_gain = 0.1 * self.distance_from_edge ** (-3.5)
             # unit: Mb/s
-            self.max_trans_rate = self.bandwidth * math.log(1 + self.trans_power * self.channel_gain / 
+            self.max_trans_rate = self.bandwidth * math.log(1 + self.trans_power * self.channel_gain /
                                                 self.noise_power, 2) * pow(10, -6)
-            trans_rate = self.bandwidth * math.log(1 + trans_power * self.channel_gain / 
+            trans_rate = self.bandwidth * math.log(1 + trans_power * self.channel_gain /
                                                 self.noise_power, 2) * pow(10, -6)
             self.trans_rate = trans_rate
             delta_trans_dz = self.trans_rate * gap
@@ -348,6 +370,7 @@ class DeviceEnv():
                 total_trans_dz += offl_dz
                 task = self.sched_tasks[task_id]
                 task.offl_dz = offl_dz
+                task.target_server = server_id
                 total_offl_comp += offl_dz * task.comp_dens
                 if task.offl_dz == 0:
                     task.trans_time = 0

@@ -67,10 +67,12 @@ class Rollout:
             self.action_dim = alg_params.action_dim
             self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
             self.lstm_hidden_dim = alg_params.p_hid_dims[1]
+            self.env_act_dim = gen_params.edge_server_num + 1  # server_id + 3 cont
         else:
             self.action_dim = -1
             self.edge_queue_obs_dim = -1
             self.lstm_hidden_dim = -1
+            self.env_act_dim = -1
 
         # training
         if not self.evaluate:
@@ -209,7 +211,10 @@ class Rollout:
         self.reset()
         
         self.mec_env.reset()
-        edge_obs = self.mec_env.edge_env.get_obs()
+        edge_obs = []
+        # By server, shared across all devices: [s0_act, s0_vir, s1_act, s1_vir, s2_act, s2_vir]
+        for edge_env in self.mec_env.edge_envs:
+            edge_obs.extend(edge_env.get_obs())
         device_obss = [None for i in range(self.device_num)]
         for i in range(self.device_num):
             device_obss[i] = self.mec_env.device_envs[i].get_obs()
@@ -218,7 +223,7 @@ class Rollout:
         lstm_hidden_cs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
         next_lstm_hidden_hs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
         next_lstm_hidden_cs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
-        edge_comp_qls = [edge_obs[i * self.edge_queue_obs_dim] for i in range(self.device_type_num)]
+        edge_comp_qls = [edge_obs[i * 2] for i in range(self.device_type_num)]  # per-server actual queue
         device_comp_qls = [obs[1] for obs in device_obss]
         # obs scaling
         if hasattr(self, "obs_scaling"):
@@ -251,7 +256,6 @@ class Rollout:
             device_acts = [None for i in range(self.device_num)]
             device_active = [None for i in range(self.device_num)]
             if isinstance(self.device_agents[0], MappoDeviceAgent):
-                # store actions used for interacting with the MEC env 
                 device_acts_ = [[] for i in range(self.device_num)]
                 if not (self.evaluate or gp.settings.is_evaluate):
                     device_act_logprobs = [None for i in range(self.device_num)]
@@ -259,49 +263,40 @@ class Rollout:
                     task_num = self.mec_env.device_envs[i].task_num
                     device_active[i] = task_num >= 1
                     device_type = self.device_types[i]
-                    # print(f"[DEBUG] device {i}, t_id {t_id}")
-                    # print(f"[DEBUG] task_num >= 1: {task_num >= 1}, t_id % gen_task_cycle == start_slot: {t_id % gen_task_cycle == start_t_id}")
                     assert ((task_num >= 1) == (t_id % gen_task_cycle == start_t_id))
                     if task_num >= 1:
-                        device_value_obs = concatenate(device_obss[i], edge_obs[device_type * self.edge_queue_obs_dim : (device_type + 1) * self.edge_queue_obs_dim]) 
-                        act, act_logprob, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i], active=device_active[i])
-                        device_acts[i] = act
-                        for j in range(self.action_dim):
-                            device_acts_[i].append(act[j] / 10)
+                        device_value_obs = concatenate(device_obss[i], edge_obs)
+                        env_act, act_logprob, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i], active=device_active[i])
+                        device_acts_[i] = env_act
+                        device_acts[i] = self.device_agents[i].last_full_act
                     else:
                         device_acts[i] = [-1.0 for _ in range(self.action_dim)]
-                        device_acts_[i] = [-1.0 for _ in range(self.action_dim)]
+                        device_acts_[i] = [-1.0 for _ in range(self.env_act_dim)]
                     if not (act_logprob == None):
                         device_act_logprobs[i] = act_logprob
             if isinstance(self.device_agents[0], MaddpgDeviceAgent):
-                # store actions used for interacting with the MEC env
                 device_acts_ = [[] for i in range(self.device_num)]
                 for i in range(self.device_num):
                     task_num = self.mec_env.device_envs[i].task_num
                     device_type = self.device_types[i]
                     assert ((task_num >= 1) == (t_id % gen_task_cycle == start_t_id))
                     if task_num >= 1:
-                        device_value_obs = concatenate(device_obss[i], edge_obs[device_type * self.edge_queue_obs_dim : (device_type + 1) * self.edge_queue_obs_dim])
-                        act, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i])
-                        device_acts[i] = act
-                        for j in range(self.action_dim // 10):
-                            device_acts_[i].append((act[j * 10] + act[j * 10 + 1] + act[j * 10 + 2] + 
-                                                    act[j * 10 + 3] + act[j * 10 + 4] + act[j * 10 + 5] +
-                                                    act[j * 10 + 6] + act[j * 10 + 7] + act[j * 10 + 8] +
-                                                    act[j * 10 + 9]) / 20)
+                        device_value_obs = concatenate(device_obss[i], edge_obs)
+                        env_act, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i])
+                        device_acts_[i] = env_act
+                        device_acts[i] = self.device_agents[i].last_full_act
                     else:
                         device_acts[i] = [-1.0 for _ in range(self.action_dim)]
-                        device_acts_[i] = [-1.0 for _ in range(self.action_dim // 10)]
+                        device_acts_[i] = [-1.0 for _ in range(self.env_act_dim)]
             if isinstance(self.device_agents[0], StaticDeviceAgent):
                 for i in range(self.device_num):
                     task_num = self.mec_env.device_envs[i].task_num
-                    device_type = self.device_types[i]
                     assert ((task_num >= 1) == (t_id % gen_task_cycle == start_t_id))
                     if task_num >= 1:
                         act = self.device_agents[i].choose_action()
                         device_acts[i] = act
                     else:
-                        device_acts[i] = [-1.0 for _ in range(self.action_dim)]
+                        device_acts[i] = [-1.0 for _ in range(self.mec_env.device_envs[i].edge_server_num + 1)]
                 device_acts_ = device_acts
 
 
@@ -313,7 +308,7 @@ class Rollout:
             next_edge_obs, next_device_obss, device_task_is_available = self.mec_env.step(device_acts_, e_id = e_id, t_id = t_id, visualize = visualize)
             
             # update computing-queue lengths
-            edge_comp_qls = [next_edge_obs[i * self.edge_queue_obs_dim] for i in range(self.device_type_num)]
+            edge_comp_qls = [next_edge_obs[i * 2] for i in range(self.device_type_num)]  # per-server actual queue
             device_comp_qls = [obs[1] for obs in next_device_obss]
 
             if t_id % gen_task_cycle == start_t_id:

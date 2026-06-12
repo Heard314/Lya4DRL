@@ -31,20 +31,21 @@ class ObsScaling():
         self.device_obs_dim = alg_params.device_obs_dim
         self.device_type_num = gen_params.device_type_num
         self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
-        self.edge_rms = RunningMeanStd(self.edge_queue_obs_dim * self.device_type_num)
+        self.edge_rms = RunningMeanStd(self.edge_queue_obs_dim)
 
         self.clip_obs = clip_obs
         self.eps = eps
         self.vq_clip = vq_clip
 
-    # device_obss: max_trans_rate, local_queue, local_vir_queue, task_data_size, task_comp_dens, task_dly_cons
+    # device_obss: S x trans_rates, local_queue, local_vir_queue, task_data_size, task_comp_dens, task_dly_cons
     # edge_obs: edge_queue, vir_edge_queue for all queues
     def __call__(self, edge_obs, device_obss):
-
+        S = self.gen_params.edge_server_num
         for i in range(self.device_num):
-            device_obss[i][0] /= 10
-            device_obss[i][1] = np.log1p(np.clip(device_obss[i][1],  0.0, self.vq_clip))
-            device_obss[i][2] = np.log1p(np.clip(device_obss[i][2], 0.0, self.vq_clip))
+            for j in range(S):
+                device_obss[i][j] /= 10
+            device_obss[i][S] = np.log1p(np.clip(device_obss[i][S], 0.0, self.vq_clip))
+            device_obss[i][S + 1] = np.log1p(np.clip(device_obss[i][S + 1], 0.0, self.vq_clip))
 
         return edge_obs, device_obss
 

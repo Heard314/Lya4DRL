@@ -11,13 +11,15 @@ class MappoDeviceAgent():
     def __init__(self, agent_id, gen_params, alg_params):
         # agent id
         self.agent_id = agent_id
-        
+
         # policy network
         # self.p_net = MappoPolicyNet(alg_params)
         self.p_net = MappoPolicyNetLSTM(alg_params)
-        
+
         self.evaluate = gen_params.evaluate
         self.action_dim = alg_params.action_dim
+        self.action_encode_dim = alg_params.action_encode_dim
+        self.edge_server_num = gen_params.edge_server_num
         self.lstm_hidden_dim = alg_params.p_hid_dims[1]
 
         #OU exploration params
@@ -69,12 +71,13 @@ class MappoDeviceAgent():
         
         # if enable_print: print(f"[DEBUG] the p_net output: mean({mean}), std({std})")
 
+        S = self.edge_server_num
         if not active:
-            return [0.0] * self.action_dim, None, next_lstm_hidden_h, next_lstm_hidden_c
+            self.last_full_act = [-1.0] * self.action_dim
+            return [-1] * (S + 1), None, next_lstm_hidden_h, next_lstm_hidden_c
 
-        # dim0 -> [0,10]: scale=5, loc=5
-        # dim1 -> [6,10]: scale=2, loc=8
-        # dim2 -> [6,10]: scale=2, loc=8
+        # dim 0~S-1: server logits → argmax
+        # dim S~S+4*ae_dim-1: 4 continuous actions, each ae_dim dims
         scale = self.p_net.act_scale.expand_as(mean)
         loc   = self.p_net.act_bias.expand_as(mean)
 
@@ -86,32 +89,37 @@ class MappoDeviceAgent():
             act_logprob = None
         else:
             if self.use_ou_noise:
-                # OU exploration:
                 eps = self._ou_eps(device=mean.device, batch_size=batch_size, dim=mean.size(-1))
             else:
                 eps = torch.randn_like(mean).clamp(-3.0, 3.0)
 
-            noise_scale = torch.tensor([0.75, 1.0, 1.0], device=mean.device).view(1, -1)
-            # reparameterized sample in eps-space
+            ae_dim = self.action_encode_dim
+            noise_scale = torch.tensor(
+                [1.0] * S + [0.75] * ae_dim + [1.0] * ae_dim + [1.0] * ae_dim,
+                device=mean.device
+            ).view(1, -1)
             u = mean + (std * noise_scale) * eps
-            # print(f"[DEBUG] mean: {mean}, std: {std}, eps: {eps}, u: {u}")
             a = torch.tanh(u)
-            # print(f"[DEBUG] train_a: {a}")
-            # print(f"[DEBUG] eval_a: {torch.tanh(mean)}")
             action = a * scale + loc
-            # print(f"[DEBUG] train_action: {action}")
-            # print(f"[DEBUG] eval_action: {torch.tanh(mean) * scale + loc}")
+            act = action.squeeze(0).tolist()
             dist = Normal(mean, std)
             normal_logp = dist.log_prob(u).sum(-1)
             squash = torch.log(1 - a.pow(2) + 1e-6).sum(-1)
             scale_logsum = torch.log(scale).sum(-1)
             logp = normal_logp - squash - scale_logsum
-
-            act = action.squeeze(0).tolist()
             act_logprob = float(logp)
-            # act_logprob = None
 
-        return act, act_logprob, next_lstm_hidden_h, next_lstm_hidden_c
+        # extract server_id and build env action (average ae_dim blocks)
+        ae_dim = self.action_encode_dim
+        server_id = int(np.argmax(act[:S]))
+        cont_vals = []
+        for j in range(3):
+            block = act[S + j * ae_dim : S + (j + 1) * ae_dim]
+            cont_vals.append(sum(block) / ae_dim)
+        env_act = [float(server_id)] + cont_vals
+        self.last_full_act = act  # for replay buffer
+
+        return env_act, act_logprob, next_lstm_hidden_h, next_lstm_hidden_c
 
     def update_net(self, params):
         self.p_net.load_state_dict(params)
@@ -128,6 +136,8 @@ class MaddpgDeviceAgent():
 
         # agent id
         self.agent_id = agent_id
+
+        self.edge_server_num = gen_params.edge_server_num
 
         # policy network
         # self.p_net = MaddpgPolicyNet(alg_params)
@@ -146,6 +156,7 @@ class MaddpgDeviceAgent():
             self.action_noise = GaussianNoise(alg_params.action_dim, sigma=self.noise_sigma_start, device=self.device)
             
         self.evaluate = gen_params.evaluate
+        self.action_encode_dim = alg_params.action_encode_dim
         self.lstm_hidden_dim = alg_params.p_hid_dims[1]
 
     def increment_update_cnt(self):
@@ -165,27 +176,36 @@ class MaddpgDeviceAgent():
 
         lstm_hidden_h = to_lstm_hidden(lstm_hidden_h, batch_size, hid_dim)
         lstm_hidden_c = to_lstm_hidden(lstm_hidden_c, batch_size, hid_dim)
-        
+
         with torch.no_grad():
             act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
+        act = act.squeeze(1)  # remove time dim: [1, 1, act_dim] → [1, act_dim]
         if not (self.evaluate or gp.settings.is_evaluate):
             sigma = self.get_noise_sigma()
             noise = self.action_noise.sample(sigma).view_as(act).to(act.device)
             act = torch.clamp(act + noise, -1.0, 1.0)
-            # act = torch.clip((act + self.action_noise.sample()), -1, 1).tolist()
-    
-        # dim0 -> [0,10]: scale=1, loc=1
-        # dim1 -> [6,10]: scale=0.4, loc=1.6
-        # dim2 -> [6,10]: scale=0.4, loc=1.6
-        # act = torch.tensor(act, dtype=torch.float32)
-        scale = self.p_net.act_scale
-        loc   = self.p_net.act_bias
-        # every action indicate with 10 dim
-        scale = scale.repeat_interleave(10)
-        loc = loc.repeat_interleave(10)
-        action = act * scale + loc
-        act = action.view(-1).tolist()
-        return act, next_lstm_hidden_h, next_lstm_hidden_c
+
+        S = self.edge_server_num
+        ae_dim = self.action_encode_dim
+        # First S dims: server logits → argmax
+        server_logits = act[:, :S]
+        server_id = int(torch.argmax(server_logits, dim=-1).item())
+
+        # 3*ae_dim dims: continuous actions (ae_dim each)
+        cont_act = act[:, S:S + 3 * ae_dim]
+        scale = self.p_net.act_scale[S:S + 3 * ae_dim]
+        loc = self.p_net.act_bias[S:S + 3 * ae_dim]
+        action = cont_act * scale + loc
+        act_list = action.view(-1).tolist()
+
+        # Average per ae_dim to get 3 continuous values
+        env_cont = []
+        for j in range(3):
+            env_cont.append(sum(act_list[j * ae_dim : (j + 1) * ae_dim]) / ae_dim)
+
+        env_act = [float(server_id)] + env_cont
+        self.last_full_act = act.view(-1).tolist()
+        return env_act, next_lstm_hidden_h, next_lstm_hidden_c
         
     def update_net(self, params):
         self.p_net.load_state_dict(params)
@@ -206,38 +226,28 @@ class StaticDeviceAgent():
 class LocalComputingDeviceAgent(StaticDeviceAgent):
     def __init__(self, agent_id, gen_params):
         super().__init__(agent_id, gen_params)
-        
+
     def choose_action(self):
-        # config 
-        act_dim = 3
-        act = [0 for i in range(act_dim)]
-        act[0] = 0
-        act[1] = 1
-        act[2] = 1
-        return act
+        return [0, 0, 1.0, 1.0]
 
 class EdgeComputingDeviceAgent(StaticDeviceAgent):
     def __init__(self, agent_id, gen_params):
         super().__init__(agent_id, gen_params)
-        
+        self.edge_server_num = gen_params.edge_server_num
+
     def choose_action(self):
-        act_dim = 3
-        act = [0 for i in range(act_dim)]
-        act[0] = 1
-        act[1] = 1
-        act[2] = 1
-        return act
+        return [0, 1.0, 1.0, 1.0]
 
 class RandomComputingDeviceAgent(StaticDeviceAgent):
     def __init__(self, agent_id, gen_params):
         super().__init__(agent_id, gen_params)
+        self.edge_server_num = gen_params.edge_server_num
         base_seed = gp.settings.seed
         self._np_rnd = np.random.RandomState(base_seed + agent_id)
 
     def choose_action(self):
-        act_dim = 3
-        act = [0 for i in range(act_dim)]
-        act[0] = self._np_rnd.uniform(0, 1)
-        act[1] = self._np_rnd.uniform(0.6, 1)
-        act[2] = self._np_rnd.uniform(0.6, 1)
-        return act
+        server_id = self._np_rnd.randint(0, self.edge_server_num)
+        offl = self._np_rnd.uniform(0.6, 1)
+        trpw = self._np_rnd.uniform(0.6, 1)
+        comp = self._np_rnd.uniform(0.6, 1)
+        return [float(server_id), offl, trpw, comp]
