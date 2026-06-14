@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 from torch.distributions import Normal
 from network.value_net import MappoValueNet, MaddpgValueNet
-from network.policy_net import MaddpgPolicyNetLSTM, MappoPolicyNetLSTM
+from network.policy_net import MaddpgPolicyNet, MappoPolicyNet
 import config.global_params as gp
 
 class MappoEdgeAgent():
@@ -52,14 +52,11 @@ class MappoEdgeAgent():
             v_optimizer = torch.optim.Adam(v_net.parameters(),
                                             lr = self.v_lr)
             self.v_optimizers.append(v_optimizer)
-        # LSTM hidden dim
-        self.lstm_hidden_dim = alg_params.p_hid_dims[1]
         # policy networks
         self.p_nets = []
         self.p_optimizers = []
         for i in range(self.device_num):
-            # p_net = MappoPolicyNet(alg_params)
-            p_net = MappoPolicyNetLSTM(alg_params).to(self.device)
+            p_net = MappoPolicyNet(alg_params).to(self.device)
             self.p_nets.append(p_net)
 
             p_optimizer = torch.optim.Adam(p_net.parameters(),
@@ -88,16 +85,12 @@ class MappoEdgeAgent():
         # act_logprobs: [train_freq x buffer_train_time_slots, device_num, 1]
         # advs: [train_freq x buffer_train_time_slots, 1]
         # active_masks: [train_freq x buffer_train_time_slots, device_num, 1]
-        p_inputs, lstm_hidden_hs, lstm_hidden_cs, \
+        p_inputs, \
         acts, act_logprobs, active_masks = replay_buffers.get_policy_net_training_data()
         p_inputs       = p_inputs.to(self.device)
         acts           = acts.to(self.device)
         act_logprobs   = act_logprobs.to(self.device)
         active_masks   = active_masks.to(self.device)
-        if lstm_hidden_hs is not None:
-            lstm_hidden_hs = lstm_hidden_hs.to(self.device)
-        if lstm_hidden_cs is not None:
-            lstm_hidden_cs = lstm_hidden_cs.to(self.device)
         for k in range(self.device_type_num):
             v_inputs_, v_tags_, advs_ = replay_buffers.get_value_net_training_data(k, self.v_nets[k])
             v_inputs_       = v_inputs_.to(self.device)
@@ -107,7 +100,7 @@ class MappoEdgeAgent():
 
             for i in self.device_in_types[k]:
                 # 训练策略网络依然只用局部信息
-                self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs_, active_masks=active_masks[:, i],lstm_hidden_hs=lstm_hidden_hs[:, i], lstm_hidden_cs=lstm_hidden_cs[:, i])
+                self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs_, active_masks=active_masks[:, i])
             
         if self.use_lr_decay:
             self.decay_lr()
@@ -132,26 +125,13 @@ class MappoEdgeAgent():
                 self.v_optimizers[queue_id].step()
 
     def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs,
-                          active_masks,lstm_hidden_hs=None, lstm_hidden_cs=None):
+                          active_masks):
         total_size = self.train_freq * self.buffer_train_time_slots
         for e in range(self.p_epochs):
             for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
                                         self.train_batch_size, False):
-                # mean: [train_batch_size, p_out_dim]
-                # std: [train_batch_size, p_out_dim]
-                p_in = p_inputs[ids] 
-                if lstm_hidden_hs is not None:
-                    h0 = lstm_hidden_hs[ids]      # [B, hid_dim]
-                    h0 = h0.unsqueeze(0)          # [1, B, hid_dim]
-                else:
-                    h0 = None
-
-                if lstm_hidden_cs is not None:
-                    c0 = lstm_hidden_cs[ids]      # [B, hid_dim]
-                    c0 = c0.unsqueeze(0)          # [1, B, hid_dim]
-                else:
-                    c0 = None
-                mean, std, _ = self.p_nets[agent_id](p_in, (h0, c0))
+                p_in = p_inputs[ids]
+                mean, std = self.p_nets[agent_id](p_in)
                 dist = Normal(mean, std)
 
                 # Calcuate new act logprobs
@@ -305,10 +285,10 @@ class MaddpgEdgeAgent():
         self.p_optimizers = []
         for i in range(self.device_num):
             # policy network
-            p_net = MaddpgPolicyNetLSTM(alg_params).to(self.device)
+            p_net = MaddpgPolicyNet(alg_params).to(self.device)
             self.p_nets.append(p_net)
             # target policy network
-            target_p_net = MaddpgPolicyNetLSTM(alg_params).to(self.device)
+            target_p_net = MaddpgPolicyNet(alg_params).to(self.device)
             target_p_net.load_state_dict(p_net.state_dict())
             self.target_p_nets.append(target_p_net)
             # optimizer
@@ -390,12 +370,20 @@ class MaddpgEdgeAgent():
         batch_next_states = batch_next_states.to(self.device)
         batch_next_device_obss = batch_next_device_obss.to(self.device)
         with torch.no_grad():
+            S = self.edge_server_num
+            ae_dim = self.action_encode_dim
             batch_next_joint_acts = []
             for i in self.device_in_types[queue_id]:
-                batch_next_acts, _ = self.target_p_nets[i](batch_next_device_obss[:, i])
-                batch_next_joint_acts.append(batch_next_acts)
+                batch_next_acts = self.target_p_nets[i](batch_next_device_obss[:, i])
+                # Compress: S logits + 3 averaged continuous per device
+                server_logits = batch_next_acts[:, :S]
+                cont_all = batch_next_acts[:, S:S + 3 * ae_dim]
+                cont_blocks = cont_all.reshape(-1, 3, ae_dim)
+                cont_compressed = cont_blocks.mean(dim=-1)
+                compressed = torch.cat([server_logits, cont_compressed], dim=-1)  # [B, S+3]
+                batch_next_joint_acts.append(compressed)
             # [batch_size, joint_act_dim]
-            batch_next_joint_acts = torch.concat(batch_next_joint_acts, dim = -1).squeeze(1)
+            batch_next_joint_acts = torch.concat(batch_next_joint_acts, dim = -1)
             # [batch_size, 1]
             next_qs = self.target_v_nets[queue_id](batch_next_states, batch_next_joint_acts)
             target_qs = batch_joint_rewards + self.gamma * next_qs
@@ -430,8 +418,7 @@ class MaddpgEdgeAgent():
         # self.set_requires_grad(self.v_nets[queue_id], False)
         for i in range(self.p_epochs):
             batch_joint_acts_ = batch_joint_acts.clone()
-            batch_acts, _ = self.p_nets[agent_id](batch_device_obss)
-            batch_acts = batch_acts.squeeze(1)  # [B, S + 3*ae_dim]
+            batch_acts = self.p_nets[agent_id](batch_device_obss)
 
             # Compress policy output from S+3*ae_dim to S+3 for Critic
             server_logits = batch_acts[:, :S]  # [B, S]

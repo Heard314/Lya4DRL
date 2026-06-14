@@ -28,7 +28,6 @@ class MappoReplayBuffer():
         self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
         self.action_dim = alg_params.action_dim
         self.action_encode_dim = alg_params.action_encode_dim
-        self.lstm_hidden_dim = alg_params.p_hid_dims[1]
         self.gamma = alg_params.gamma
         self.lamda = alg_params.lamda
         
@@ -36,10 +35,6 @@ class MappoReplayBuffer():
         self.edge_obs = [[None for j in range(self.buffer_train_time_slots + 1)]
                                 for i in range(self.train_freq)]
         self.device_obss = [[None for j in range(self.buffer_train_time_slots + 1)]
-                                    for i in range(self.train_freq)]
-        self.lstm_hidden_hs = [[None for j in range(self.buffer_train_time_slots + 1)]
-                                    for i in range(self.train_freq)]
-        self.lstm_hidden_cs = [[None for j in range(self.buffer_train_time_slots + 1)]
                                     for i in range(self.train_freq)]
         self.device_acts = [[None for j in range(self.buffer_train_time_slots + 1)]
                                     for i in range(self.train_freq)]
@@ -50,11 +45,9 @@ class MappoReplayBuffer():
         self.device_active = [[None for j in range(self.buffer_train_time_slots + 1)]
                                     for i in range(self.train_freq)]
         
-    def store(self, edge_obs, device_obss, lstm_hidden_hs, lstm_hidden_cs, device_acts, device_act_logprobs, joint_rewards, device_active):
+    def store(self, edge_obs, device_obss, device_acts, device_act_logprobs, joint_rewards, device_active):
         self.edge_obs[self.ps[0]][self.ps[1]] = copy.copy(edge_obs)
         self.device_obss[self.ps[0]][self.ps[1]] = copy.copy(device_obss)
-        self.lstm_hidden_hs[self.ps[0]][self.ps[1]] = copy.copy(lstm_hidden_hs)
-        self.lstm_hidden_cs[self.ps[0]][self.ps[1]] = copy.copy(lstm_hidden_cs)
         self.device_acts[self.ps[0]][self.ps[1]] = copy.copy(device_acts)
         self.device_act_logprobs[self.ps[0]][self.ps[1]] = copy.copy(device_act_logprobs)
         self.joint_rewards[self.ps[0]][self.ps[1]] = copy.copy(joint_rewards)
@@ -119,19 +112,11 @@ class MappoReplayBuffer():
             [self.train_freq, self.buffer_train_time_slots, self.device_num, 1],
             dtype=torch.float32
         )
-        lstm_hidden_hs = torch.zeros(
-            [self.train_freq, self.buffer_train_time_slots, self.device_num, self.lstm_hidden_dim],
-            dtype=torch.float32
-        )
-        lstm_hidden_cs = torch.zeros(
-            [self.train_freq, self.buffer_train_time_slots, self.device_num, self.lstm_hidden_dim],
-            dtype=torch.float32
-        )
 
         for i in range(self.train_freq):
             for j in range(self.buffer_train_time_slots):
                 for k in range(self.device_num):
-                    
+
                     obs = copy.copy(self.device_obss[i][j][k])
                     inputs = self.package_policy_input(i,j,k)
                     if not torch.is_tensor(inputs):
@@ -148,24 +133,13 @@ class MappoReplayBuffer():
                         self.device_active[i][j][k], dtype=torch.float32
                     )
 
-                    raw_h = self.lstm_hidden_hs[i][j][k]
-                    raw_c = self.lstm_hidden_cs[i][j][k]
-
-                    h = torch.as_tensor(raw_h, dtype=torch.float32).view(-1)[:self.lstm_hidden_dim]
-                    c = torch.as_tensor(raw_c, dtype=torch.float32).view(-1)[:self.lstm_hidden_dim]
-
-                    lstm_hidden_hs[i, j, k] = h
-                    lstm_hidden_cs[i, j, k] = c
-
         # reshape to [train_freq * buffer_train_time_slots, ...]
         p_inputs = p_inputs.reshape([-1, self.device_num, self.policy_input_dim])
         acts = acts.reshape([-1, self.device_num, self.action_dim])
         act_logprobs = act_logprobs.reshape([-1, self.device_num, 1])
         device_active = device_active.reshape([-1, self.device_num, 1])
-        lstm_hidden_hs = lstm_hidden_hs.reshape([-1, self.device_num, self.lstm_hidden_dim])
-        lstm_hidden_cs = lstm_hidden_cs.reshape([-1, self.device_num, self.lstm_hidden_dim])
 
-        return p_inputs, lstm_hidden_hs, lstm_hidden_cs, \
+        return p_inputs, \
                acts, act_logprobs, device_active
 
     def get_value_net_training_data(self, queue_id, value_net):

@@ -2,8 +2,8 @@ from abc import abstractmethod
 import numpy as np
 import torch
 from torch.distributions import Normal
-from network.policy_net import MaddpgPolicyNetLSTM, MappoPolicyNetLSTM
-from util.utils import GetPolicyInputs, GaussianNoise, to_lstm_hidden
+from network.policy_net import MaddpgPolicyNet, MappoPolicyNet
+from util.utils import GetPolicyInputs, GaussianNoise
 import math
 import config.global_params as gp
 
@@ -13,14 +13,12 @@ class MappoDeviceAgent():
         self.agent_id = agent_id
 
         # policy network
-        # self.p_net = MappoPolicyNet(alg_params)
-        self.p_net = MappoPolicyNetLSTM(alg_params)
+        self.p_net = MappoPolicyNet(alg_params)
 
         self.evaluate = gen_params.evaluate
         self.action_dim = alg_params.action_dim
         self.action_encode_dim = alg_params.action_encode_dim
         self.edge_server_num = gen_params.edge_server_num
-        self.lstm_hidden_dim = alg_params.p_hid_dims[1]
 
         #OU exploration params
         self.use_ou_noise = gen_params.use_ou_noise
@@ -53,31 +51,22 @@ class MappoDeviceAgent():
         eps = (self._ou_state / (self._ou_stationary_std + 1e-8)) * self.ou_scale
         return eps
 
-    def choose_action(self, obs, lstm_hidden_h, lstm_hidden_c, active: bool = True):
+    def choose_action(self, obs, active: bool = True):
 
         enable_print = gp.settings.enable_print
 
         p_inputs = GetPolicyInputs(obs)
 
-        # process the lstm hidden state
-        hid_dim = self.p_net.lstm.hidden_size
-        batch_size = p_inputs.size(0)
-
-        lstm_hidden_h = to_lstm_hidden(lstm_hidden_h, batch_size, hid_dim)
-        lstm_hidden_c = to_lstm_hidden(lstm_hidden_c, batch_size, hid_dim)
-
         with torch.no_grad():
-            mean, std, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
-        
-        # if enable_print: print(f"[DEBUG] the p_net output: mean({mean}), std({std})")
+            mean, std = self.p_net(p_inputs)
 
         S = self.edge_server_num
         if not active:
             self.last_full_act = [-1.0] * self.action_dim
-            return [-1] * (S + 1), None, next_lstm_hidden_h, next_lstm_hidden_c
+            return [-1] * (S + 1), None
 
         # dim 0~S-1: server logits → argmax
-        # dim S~S+4*ae_dim-1: 4 continuous actions, each ae_dim dims
+        # dim S~S+3*ae_dim-1: 3 continuous actions (offl/trpw/comp), each ae_dim dims
         scale = self.p_net.act_scale.expand_as(mean)
         loc   = self.p_net.act_bias.expand_as(mean)
 
@@ -119,7 +108,7 @@ class MappoDeviceAgent():
         env_act = [float(server_id)] + cont_vals
         self.last_full_act = act  # for replay buffer
 
-        return env_act, act_logprob, next_lstm_hidden_h, next_lstm_hidden_c
+        return env_act, act_logprob
 
     def update_net(self, params):
         self.p_net.load_state_dict(params)
@@ -140,8 +129,7 @@ class MaddpgDeviceAgent():
         self.edge_server_num = gen_params.edge_server_num
 
         # policy network
-        # self.p_net = MaddpgPolicyNet(alg_params)
-        self.p_net = MaddpgPolicyNetLSTM(alg_params)
+        self.p_net = MaddpgPolicyNet(alg_params)
 
         # action noise
         self.use_action_noise = alg_params.use_action_noise
@@ -157,7 +145,6 @@ class MaddpgDeviceAgent():
             
         self.evaluate = gen_params.evaluate
         self.action_encode_dim = alg_params.action_encode_dim
-        self.lstm_hidden_dim = alg_params.p_hid_dims[1]
 
     def increment_update_cnt(self):
         self.train_update_cnt += 1
@@ -167,19 +154,11 @@ class MaddpgDeviceAgent():
         t = min(self.train_update_cnt / max(self.noise_decay_num, 1), 1.0)
         return self.noise_sigma_start + t * (self.noise_sigma_end - self.noise_sigma_start)
 
-    def choose_action(self, obs, lstm_hidden_h, lstm_hidden_c):
+    def choose_action(self, obs):
         p_inputs = GetPolicyInputs(obs)
 
-        # process the lstm hidden state
-        hid_dim = self.p_net.lstm.hidden_size
-        batch_size = p_inputs.size(0)
-
-        lstm_hidden_h = to_lstm_hidden(lstm_hidden_h, batch_size, hid_dim)
-        lstm_hidden_c = to_lstm_hidden(lstm_hidden_c, batch_size, hid_dim)
-
         with torch.no_grad():
-            act, (next_lstm_hidden_h, next_lstm_hidden_c) = self.p_net(p_inputs, (lstm_hidden_h, lstm_hidden_c))
-        act = act.squeeze(1)  # remove time dim: [1, 1, act_dim] → [1, act_dim]
+            act = self.p_net(p_inputs)
         if not (self.evaluate or gp.settings.is_evaluate):
             sigma = self.get_noise_sigma()
             noise = self.action_noise.sample(sigma).view_as(act).to(act.device)
@@ -205,7 +184,7 @@ class MaddpgDeviceAgent():
 
         env_act = [float(server_id)] + env_cont
         self.last_full_act = act.view(-1).tolist()
-        return env_act, next_lstm_hidden_h, next_lstm_hidden_c
+        return env_act
         
     def update_net(self, params):
         self.p_net.load_state_dict(params)

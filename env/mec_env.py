@@ -102,11 +102,11 @@ class MECEnv():
         device_rewards = [self.base_reward_penalty for i in range(self.device_num)]
         device_queue_actual_rewards = [0 for i in range(self.device_num)]
         device_queue_virtual_rewards = [0 for i in range(self.device_num)]
-        edge_queue_num = self.device_type_num
-        edge_queue_rewards = [0 for i in range(edge_queue_num)]
-        edge_queue_actual_rewards = [0 for i in range(edge_queue_num)]
-        edge_queue_virtual_rewards = [0 for i in range(edge_queue_num)]
-        joint_rewards = [0 for i in range(edge_queue_num)]
+        edge_queue_num = self.edge_server_num  # v3: per-server FIFO queues
+        edge_queue_rewards = [0.0 for _ in range(edge_queue_num)]
+        edge_queue_actual_rewards = [0.0 for _ in range(edge_queue_num)]
+        edge_queue_virtual_rewards = [0.0 for _ in range(edge_queue_num)]
+        joint_rewards = [0.0 for _ in range(self.device_type_num)]  # per-type for value nets
         joint_cost = 0
         device_costs = [0 for i in range(self.device_num)]
         device_comp_dlys = [0 for i in range(self.device_num)]
@@ -259,52 +259,60 @@ class MECEnv():
                     )
         
         if t_id % gen_task_cycle == start_slot:
-            for i in range(edge_queue_num):
-                edge_queue_actual_rewards[i] = 0.0
-                edge_queue_virtual_rewards[i] = 0.0
-                actual_queue_type_scale_posfac = self.device_num_per_type[i]*device_act_queue_reward_max_bound*self.edge_queue_reward_bound_fac
-                virtual_queue_type_scale_posfac = self.device_num_per_type[i]*device_vir_queue_reward_max_bound*self.edge_queue_reward_bound_fac
-                actual_queue_type_scale_negfac = self.device_num_per_type[i]*device_act_queue_reward_min_bound*self.edge_queue_reward_bound_fac
-                virtual_queue_type_scale_negfac = self.device_num_per_type[i]*device_vir_queue_reward_min_bound*self.edge_queue_reward_bound_fac
+            # v3: per-server edge rewards (1 FIFO queue per server)
+            tightest_dly = min(self.comp_dly_thre)
+            actual_scale_posfac = self.device_num * device_act_queue_reward_max_bound * self.edge_queue_reward_bound_fac
+            virtual_scale_posfac = self.device_num * device_vir_queue_reward_max_bound * self.edge_queue_reward_bound_fac
+            actual_scale_negfac = self.device_num * device_act_queue_reward_min_bound * self.edge_queue_reward_bound_fac
+            virtual_scale_negfac = self.device_num * device_vir_queue_reward_min_bound * self.edge_queue_reward_bound_fac
 
-                edge_act_queue_reward_weight = 0.85 * self.device_act_queue_reward_weight * self.device_num_per_type[i] * 1.0 / self.delta / self.comp_dly_thre[i]
-                edge_vir_queue_reward_weight = 0.85 * self.device_vir_queue_reward_weight * self.device_num_per_type[i]
+            edge_act_queue_reward_weight = 0.85 * self.device_act_queue_reward_weight * self.device_num * 1.0 / self.delta / tightest_dly
+            edge_vir_queue_reward_weight = 0.85 * self.device_vir_queue_reward_weight * self.device_num
 
-                # Aggregate across all servers (scalar queues in v3)
-                for s in range(self.edge_server_num):
-                    edge_env = self.edge_envs[s]
+            edge_queue_rewards = [0.0] * edge_queue_num
+            edge_queue_actual_rewards = [0.0] * edge_queue_num
+            edge_queue_virtual_rewards = [0.0] * edge_queue_num
 
-                    if(self.enable_virtual_queue_reward):
-                        edge_queue_virtual_rewards[i] += edge_vir_queue_reward_weight * \
-                            edge_env.virtual_edge_queue_time_ql * edge_env.new_vir_edge_ql_change
-                        if task_type_in_edge_is_overtime[i]:
-                            edge_queue_actual_rewards[i] += edge_act_queue_reward_weight * \
-                                edge_env.edge_queue_time_ql * edge_env.new_edge_ql_change
+            any_overtime = any(task_type_in_edge_is_overtime)
 
-                    if(self.enable_actual_queue_reward):
-                        edge_queue_actual_rewards[i] += edge_act_queue_reward_weight * 3 * \
+            for s in range(self.edge_server_num):
+                edge_env = self.edge_envs[s]
+
+                if self.enable_virtual_queue_reward:
+                    edge_queue_virtual_rewards[s] += edge_vir_queue_reward_weight * \
+                        edge_env.virtual_edge_queue_time_ql * edge_env.new_vir_edge_ql_change
+                    if any_overtime:
+                        edge_queue_actual_rewards[s] += edge_act_queue_reward_weight * \
                             edge_env.edge_queue_time_ql * edge_env.new_edge_ql_change
 
-                edge_queue_virtual_rewards[i] = min(max(virtual_queue_type_scale_negfac, edge_queue_virtual_rewards[i]), virtual_queue_type_scale_posfac)
-                edge_queue_actual_rewards[i] = min(max(actual_queue_type_scale_negfac, edge_queue_actual_rewards[i]), actual_queue_type_scale_posfac)
-    
+                if self.enable_actual_queue_reward:
+                    edge_queue_actual_rewards[s] += edge_act_queue_reward_weight * 3 * \
+                        edge_env.edge_queue_time_ql * edge_env.new_edge_ql_change
 
-                if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_actual_rewards is: ", edge_queue_actual_rewards[i])
-                if(enable_print): print(f"[DEBUG] The edge_queue", i, "'s edge_queue_virtual_rewards is: ", edge_queue_virtual_rewards[i])
+                edge_queue_virtual_rewards[s] = min(max(virtual_scale_negfac, edge_queue_virtual_rewards[s]), virtual_scale_posfac)
+                edge_queue_actual_rewards[s] = min(max(actual_scale_negfac, edge_queue_actual_rewards[s]), actual_scale_posfac)
+
+                edge_queue_rewards[s] = edge_queue_actual_rewards[s] + edge_queue_virtual_rewards[s]
+
+                if enable_print:
+                    print(f"[DEBUG] The edge server {s}'s edge_queue_actual_rewards is: {edge_queue_actual_rewards[s]}")
+                    print(f"[DEBUG] The edge server {s}'s edge_queue_virtual_rewards is: {edge_queue_virtual_rewards[s]}")
                 if visualize:
-                    for j in self.device_in_types[i]:
+                    for j in range(self.device_num):
                         writer.add_scalars(
                             f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{j}",
-                            {f"ep_{e_id}_edge_act": edge_queue_actual_rewards[i]},
+                            {f"ep_{e_id}_edge_act_s{s}": edge_queue_actual_rewards[s]},
                             t_id
                         )
                         writer.add_scalars(
                             f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{j}",
-                            {f"ep_{e_id}_edge_vir": edge_queue_virtual_rewards[i]},
+                            {f"ep_{e_id}_edge_vir_s{s}": edge_queue_virtual_rewards[s]},
                             t_id
                         )
-                edge_queue_rewards[i] = edge_queue_actual_rewards[i] + edge_queue_virtual_rewards[i]
-                joint_rewards[i] = edge_queue_rewards[i]
+
+            # Assemble per-type joint rewards (all servers' edge rewards shared across types)
+            for i in range(self.device_type_num):
+                joint_rewards[i] = sum(edge_queue_rewards)
                 joint_cost_per_type = 0.0
                 for j in self.device_in_types[i]:
                     joint_rewards[i] += device_rewards[j]

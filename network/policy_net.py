@@ -164,23 +164,39 @@ class MappoPolicyNetLSTM(nn.Module):
 class MaddpgPolicyNet(nn.Module):
     def __init__(self, alg_params):
         super(MaddpgPolicyNet, self).__init__()
-        
-        self.fc1 = nn.Linear(alg_params.obs_dim, alg_params.p_hid_dims[0])
-        self.fc2 = nn.Linear(alg_params.p_hid_dims[0], alg_params.p_hid_dims[1])
-        self.fc3 = nn.Linear(alg_params.p_hid_dims[1], alg_params.action_dim)
+
+        obs_dim = alg_params.policy_input_dim
+        hid1, hid2 = alg_params.p_hid_dims
+        act_dim = alg_params.action_dim
+        self.fc1 = nn.Linear(obs_dim, hid1)
+        self.fc2 = nn.Linear(hid1, hid2)
+        self.fc3 = nn.Linear(hid2, act_dim)
         self.tanh = nn.Tanh()
-        
+
         # orthogonal initialization
         if alg_params.use_orthogonal_init:
-            OrthogonalInit(self.fc1)
-            OrthogonalInit(self.fc2)
-            OrthogonalInit(self.fc3, gain = 0.01)
-    
+            nn.init.orthogonal_(self.fc1.weight, gain=nn.init.calculate_gain('tanh'))
+            nn.init.zeros_(self.fc1.bias)
+            nn.init.orthogonal_(self.fc2.weight, gain=nn.init.calculate_gain('tanh'))
+            nn.init.zeros_(self.fc2.bias)
+            nn.init.orthogonal_(self.fc3.weight, gain=0.01)
+            nn.init.zeros_(self.fc3.bias)
+
+        # ---------- action range ----------
+        # S server logits in [-1,1] + 3*ae_dim continuous (offl, trpw, comp)
+        ae_dim = alg_params.action_encode_dim
+        S = alg_params.action_dim - 3 * ae_dim
+        low  = torch.tensor([-1.] * S + [0.6] * ae_dim + [0.6] * ae_dim + [0.6] * ae_dim)
+        high = torch.tensor([1.] * S + [1.0] * ae_dim + [1.0] * ae_dim + [1.0] * ae_dim)
+        self.register_buffer("act_low",  low)
+        self.register_buffer("act_high", high)
+        self.register_buffer("act_scale", (high - low) / 2.0)
+        self.register_buffer("act_bias",  (high + low) / 2.0)
+
     def forward(self, obs):
         x = self.tanh(self.fc1(obs))
         x = self.tanh(self.fc2(x))
-        act = self.tanh(self.fc3(x)) + 1
-        
+        act = self.tanh(self.fc3(x))
         return act
 
 

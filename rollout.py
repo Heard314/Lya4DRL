@@ -66,12 +66,10 @@ class Rollout:
         if not self.evaluate or (self.evaluate and self.eval_mode[0] == "m"):
             self.action_dim = alg_params.action_dim
             self.edge_queue_obs_dim = alg_params.edge_queue_obs_dim
-            self.lstm_hidden_dim = alg_params.p_hid_dims[1]
-            self.env_act_dim = gen_params.edge_server_num + 1  # server_id + 3 cont
+            self.env_act_dim = 3 + 1  # 3 cont (offl_rto, trpw_rto, comp_rto) + 1 server_id
         else:
             self.action_dim = -1
             self.edge_queue_obs_dim = -1
-            self.lstm_hidden_dim = -1
             self.env_act_dim = -1
 
         # training
@@ -219,10 +217,6 @@ class Rollout:
         for i in range(self.device_num):
             device_obss[i] = self.mec_env.device_envs[i].get_obs()
 
-        lstm_hidden_hs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
-        lstm_hidden_cs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
-        next_lstm_hidden_hs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
-        next_lstm_hidden_cs = [[0.0 for _ in range(self.lstm_hidden_dim)] for _ in range(self.device_num)]
         edge_comp_qls = [edge_obs[i * 2] for i in range(self.device_type_num)]  # per-server actual queue
         device_comp_qls = [obs[1] for obs in device_obss]
         # obs scaling
@@ -266,7 +260,7 @@ class Rollout:
                     assert ((task_num >= 1) == (t_id % gen_task_cycle == start_t_id))
                     if task_num >= 1:
                         device_value_obs = concatenate(device_obss[i], edge_obs)
-                        env_act, act_logprob, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i], active=device_active[i])
+                        env_act, act_logprob = self.device_agents[i].choose_action(device_value_obs, active=device_active[i])
                         device_acts_[i] = env_act
                         device_acts[i] = self.device_agents[i].last_full_act
                     else:
@@ -282,7 +276,7 @@ class Rollout:
                     assert ((task_num >= 1) == (t_id % gen_task_cycle == start_t_id))
                     if task_num >= 1:
                         device_value_obs = concatenate(device_obss[i], edge_obs)
-                        env_act, next_lstm_hidden_hs[i], next_lstm_hidden_cs[i] = self.device_agents[i].choose_action(device_value_obs, lstm_hidden_hs[i], lstm_hidden_cs[i])
+                        env_act = self.device_agents[i].choose_action(device_value_obs)
                         device_acts_[i] = env_act
                         device_acts[i] = self.device_agents[i].last_full_act
                     else:
@@ -336,7 +330,7 @@ class Rollout:
                     # print(f"[DEBUG] device_acts: {device_acts}")
                     # print(f"[DEBUG] device_act_logprobs: {device_act_logprobs}")
                     # print(f"[DEBUG] joint_rewards: {joint_rewards}")
-                    self.replay_buffer.store(edge_obs, device_obss, lstm_hidden_hs, lstm_hidden_cs,
+                    self.replay_buffer.store(edge_obs, device_obss,
                                             device_acts, device_act_logprobs,
                                             joint_rewards, device_active)
                 if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "maddpg":
@@ -353,10 +347,6 @@ class Rollout:
             # update obs
             edge_obs = next_edge_obs
             device_obss = next_device_obss
-            if t_id % gen_task_cycle == start_t_id:
-                lstm_hidden_hs = next_lstm_hidden_hs
-                lstm_hidden_cs = next_lstm_hidden_cs
-
             if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "maddpg":
                 total_time_slots = e_id * self.train_time_slots + t_id + 1
                 

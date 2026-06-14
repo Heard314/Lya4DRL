@@ -356,10 +356,10 @@ mappo params
 """
 S = edge_server_num
 ppo_device_obs_dim = 5 + S  # one-hot服务器编号 + trans_rates + queue + vir_queue + 3 task fields
-ppo_edge_queue_obs_dim = 2 * S  # per-server actual + virtual queues per type
+ppo_edge_queue_obs_dim = 2 * S  # per-server actual + virtual queues
 ppo_policy_input_dim = ppo_device_obs_dim + ppo_edge_queue_obs_dim
 ppo_value_input_dims = [n * ppo_policy_input_dim + n * (S + 3) for n in [2, 4, 4]]
-action_encode_dim = 10  # encoding dims per continuous action variable
+action_encode_dim = 1  # encoding dims per continuous action variable
 ppo_action_dim = S + 3 * action_encode_dim  # S server logits + 3*ae_dim continuous
 def get_mappo_params():
     parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
@@ -475,7 +475,7 @@ def get_mappo_params():
 maddpg params
 """
 device_obs_dim = 5 + S  # one-hot服务器编号 + trans_rates + queue + vir_queue + 3 task fields
-edge_queue_obs_dim = 2 * S  # per-server actual + virtual queues per type
+edge_queue_obs_dim = 2 * S  # per-server actual + virtual queues
 action_dim = S + 3 * action_encode_dim  # S server logits + 3*ae_dim continuous
 value_input_obs_dims = [n * (device_obs_dim + edge_queue_obs_dim) for n in [2, 4, 4]]
 value_input_act_dims = [n * (S + 3) for n in [2, 4, 4]]  # joint_act in S+3 compressed form
@@ -522,10 +522,10 @@ def get_maddpg_params():
     parser.add_argument("--action_dim", type = int, default = action_dim,
                         help = "the dimension of agents' actions")
 
-    parser.add_argument("--v_hid_dims", type = list, default = [200, 200],
+    parser.add_argument("--v_hid_dims", type = list, default = [128, 128],
                         help = "the dimension of value network's hidden layers")
-    
-    parser.add_argument("--p_hid_dims", type = list, default = [200, 200], 
+
+    parser.add_argument("--p_hid_dims", type = list, default = [128, 128],
                         help = "the dimension of policy network's hidden layers")
     
     parser.add_argument("--use_orthogonal_init", type = bool, default = True,
