@@ -327,6 +327,15 @@ class DeviceEnv():
             # local compute ratio (clamped to valid range)
             device_comp_rto = np.clip(act[3], 0.6, 1.0)
             device_comp_freq = self.device_comp_freq * device_comp_rto
+
+            if gp.settings.enable_trace:
+                gp.trace_print(f"\n{'='*60}")
+                gp.trace_print(f"[TRACE] t={t_id}, Device {self.env_id}, Task arrival (type={self.device_type})")
+                gp.trace_print(f"  Action raw: server_id={server_id}, offl_rto={act[1]:.4f}, trpw_rto={act[2]:.4f}, comp_rto={act[3]:.4f}")
+                gp.trace_print(f"  After clip: offl_rto={offl_rto:.4f}, trpw_rto={trpw_rto:.4f}, comp_rto={device_comp_rto:.4f}")
+                gp.trace_print(f"  offl_dz = data_size * offl_rto = {self.sched_tasks[0].data_size:.4f} * {offl_rto:.4f} = {offl_dz:.4f}")
+                gp.trace_print(f"  trans_power = base_trans_power * trpw_rto = {self.trans_power:.4f} * {trpw_rto:.4f} = {trans_power:.4f}")
+                gp.trace_print(f"  device_comp_freq = base_freq * comp_rto = {self.device_comp_freq:.4f} * {device_comp_rto:.4f} = {device_comp_freq:.4f}")
             if visualize:
                 writer.add_scalars(
                     f"detail{'_eval' if gp.settings.is_evaluate else ''}/offl_rto_{self.env_id}",
@@ -362,6 +371,16 @@ class DeviceEnv():
             total_offl_dz = 0
             total_offl_comp = 0
             total_trans_dz = self.trans_ql
+
+            if gp.settings.enable_trace:
+                gp.trace_print(f"  distance = sqrt(({self.position_x:.2f}-{sx:.2f})^2 + ({self.position_y:.2f}-{sy:.2f})^2 + {self.position_z}^2) = {self.distance_from_edge:.2f}")
+                gp.trace_print(f"  channel_gain = 0.1 * distance^(-3.5) = 0.1 * {self.distance_from_edge:.2f}^(-3.5) = {self.channel_gain:.6e}")
+                gp.trace_print(f"  trans_rate = BW * log2(1 + P_tx * ch_gain / N0) * 1e-6")
+                gp.trace_print(f"             = {self.bandwidth:.2e} * log2(1 + {trans_power:.2e} * {self.channel_gain:.6e} / {self.noise_power:.2e}) * 1e-6")
+                gp.trace_print(f"             = {trans_rate:.6f} Mb/s")
+                gp.trace_print(f"  max_trans_rate = {self.max_trans_rate:.6f} Mb/s")
+                gp.trace_print(f"  delta_trans_dz = trans_rate * gap = {trans_rate:.6f} * {gap:.4f} = {delta_trans_dz:.6f}")
+                gp.trace_print(f"  total_trans_dz (init) = trans_ql = {self.trans_ql:.6f}")
             '''offload computing part'''
             local_comps = []
             for task_id, offl_dz in enumerate(offl_dzs):
@@ -378,11 +397,6 @@ class DeviceEnv():
                     task.edge_comp_engy = 0
                 else:
                     task.trans_time = tran_queue_delay + task.offl_dz / trans_rate
-                    # print(f"[DEBUG] The device {self.env_id} 's offl_dz is {task.offl_dz}")
-                    # print(f"[DEBUG] The device {self.env_id} 's trans_rate is {trans_rate}")
-                    # print(f"[DEBUG] The device {self.env_id} 's total_tran_time before is {self.total_tran_time}")
-                    # print(f"[DEBUG] The device {self.env_id} 's tran_queue_delay is {tran_queue_delay}")
-                    # print(f"[DEBUG] The device {self.env_id} 's trans_time is {task.trans_time}")
                     self.total_tran_time += task.offl_dz / trans_rate
                     task.tran_engy = trans_power * pow(10, -3) * \
                                     task.offl_dz / trans_rate
@@ -391,8 +405,27 @@ class DeviceEnv():
 
                 if(enable_print): print(f"[DEBUG] the local_comp in device {self.env_id} is {(task.data_size - task.offl_dz) * task.comp_dens}")
                 if(enable_print): print(f"[DEBUG] the offl_comp in device {self.env_id} is {task.offl_dz * task.comp_dens}")
+
+                if gp.settings.enable_trace:
+                    gp.trace_print(f"\n  --- Task {task_id} offloading ---")
+                    gp.trace_print(f"  task.data_size={task.data_size:.4f}, task.comp_dens={task.comp_dens:.4f}, task.dly_cons={task.dly_cons:.4f}")
+                    gp.trace_print(f"  offl_dz = {offl_dz:.4f}, local_data = {task.data_size - offl_dz:.4f}")
+                    gp.trace_print(f"  local_comp = (data_size - offl_dz) * comp_dens = {task.data_size - offl_dz:.4f} * {task.comp_dens:.4f} = {local_comps[-1]:.4f}")
+                    gp.trace_print(f"  offl_comp = offl_dz * comp_dens = {offl_dz:.4f} * {task.comp_dens:.4f} = {offl_dz * task.comp_dens:.4f}")
+                    if task.offl_dz > 0:
+                        gp.trace_print(f"  tran_queue_delay = max(total_tran_time - t*delta, 0) = max({self.total_tran_time:.6f} - {t_id * self.delta:.4f}, 0) = {max(self.total_tran_time - t_id * self.delta, 0):.6f}")
+                        gp.trace_print(f"  trans_time = tran_queue_delay + offl_dz / trans_rate = {tran_queue_delay:.6f} + {offl_dz:.4f}/{trans_rate:.6f} = {task.trans_time:.6f}")
+                        gp.trace_print(f"  total_tran_time (after) = {self.total_tran_time:.6f}")
+                        gp.trace_print(f"  tran_engy = P_tx * 1e-3 * offl_dz / trans_rate = {trans_power:.2f} * 1e-3 * {offl_dz:.4f}/{trans_rate:.6f} = {task.tran_engy:.6f}")
             # Update the transmission queue length at every time slot, regardless of whether new tasks arrive
+            old_trans_ql = self.trans_ql
             self.trans_ql = max(0, total_trans_dz - delta_trans_dz)
+
+            if gp.settings.enable_trace:
+                gp.trace_print(f"\n  --- Transmission queue update ---")
+                gp.trace_print(f"  trans_ql = max(0, total_trans_dz - delta_trans_dz)")
+                gp.trace_print(f"           = max(0, {total_trans_dz:.6f} - {delta_trans_dz:.6f})")
+                gp.trace_print(f"           = max(0, {total_trans_dz - delta_trans_dz:.6f}) = {self.trans_ql:.6f} (was {old_trans_ql:.6f})")
             '''local computing part'''
             self.old_time_ql = self.time_ql
             device_act_queue_growth_rate = self.device_act_queue_growth_rate
@@ -410,26 +443,10 @@ class DeviceEnv():
                     
                 self.total_comp_time += task.l_proc_dly
                 task.local_comp_engy = self.engy_fac * pow(device_comp_freq,2) * local_comp
-                # print(f"[DEBUG] The device", self.env_id, "'s offl_rto is: ", offl_rto)
-                # print(f"[DEBUG] The device", self.env_id, "'s engy_fac is: ", self.engy_fac)
-                # print(f"[DEBUG] The device", self.env_id, "'s local_comp is: ", local_comp)
-                # print(f"[DEBUG] The device", self.env_id, "'s data_size is: ", task.data_size)
-                # print(f"[DEBUG] The device", self.env_id, "'s comp_dens is: ", task.comp_dens)
-                # print(f"[DEBUG] The device", self.env_id, "'s local_comp_engy is: ", task.local_comp_engy)
-                # print(f"[DEBUG] The device", self.env_id, "'s tran_engy is: ", task.tran_engy)
-
-                # if(enable_print): print(f"[DEBUG] The device freq pow2 is {pow(device_comp_freq,2)}")
                 old_time_ql_ = self.time_ql
                 self.time_ql = max(0, old_time_ql_ + device_act_queue_growth_rate * (local_comp / device_comp_freq - gap))
                 self.new_ql_change = device_act_queue_growth_rate * (local_comp / device_comp_freq - gap)
                 self.act_backlog = local_comp / device_comp_freq
-                    # print(f"[DEBUG] The device", self.env_id, "'s time_ql is: ", self.time_ql)
-                    # print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)
-                    # print(f"[DEBUG] The device", self.env_id, "'s new_ql_change is: ", self.new_ql_change)
-                    # print(f"[DEBUG] The device", self.env_id, "'s local_comp is: ", local_comp)
-                    # print(f"[DEBUG] The device", self.env_id, "'s device_comp_freq is: ", device_comp_freq)
-                    # print(f"[DEBUG] The device", self.env_id, "'s delta is: ", self.delta)
-                    # print(f"[DEBUG] The device", self.env_id, "'s fine_ql_change is: ", device_act_queue_growth_rate * (local_comp / device_comp_freq - self.delta))
                 self.avail_task_num += 1
                 # avg_local_time: use only the average computation time of the most recent time slots
                 self.old_comp_times.append(local_comp / device_comp_freq)
@@ -437,40 +454,53 @@ class DeviceEnv():
                 self.avg_local_time = sum(tail) / len(tail) if tail else 0
                 if(enable_print): print(f"[DEBUG] the local comp_dly in device {self.env_id} is {task.l_comp_dly}")
 
+                if gp.settings.enable_trace:
+                    gp.trace_print(f"\n  --- Task {task_id} local computation ---")
+                    gp.trace_print(f"  l_queue_dly = max(total_comp_time - t*delta, 0) = max({self.total_comp_time - task.l_proc_dly:.6f} - {t_id * self.delta:.4f}, 0) = {task.l_queue_dly:.6f}")
+                    gp.trace_print(f"  l_proc_dly = local_comp / dev_comp_freq = {local_comp:.4f} / {device_comp_freq:.4f} = {task.l_proc_dly:.6f}")
+                    gp.trace_print(f"  l_comp_dly = l_queue_dly + l_proc_dly = {task.l_queue_dly:.6f} + {task.l_proc_dly:.6f} = {task.l_comp_dly:.6f}")
+                    gp.trace_print(f"  total_comp_time (after) = {self.total_comp_time:.6f}")
+                    gp.trace_print(f"  local_comp_engy = engy_fac * freq^2 * local_comp = {self.engy_fac:.4f} * {device_comp_freq:.4f}^2 * {local_comp:.4f} = {task.local_comp_engy:.6f}")
+                    gp.trace_print(f"  time_ql = max(0, old_time_ql + growth_rate * (comp_time - gap))")
+                    gp.trace_print(f"          = max(0, {old_time_ql_:.6f} + {device_act_queue_growth_rate} * ({local_comp/device_comp_freq:.6f} - {gap:.4f}))")
+                    gp.trace_print(f"          = max(0, {old_time_ql_ + device_act_queue_growth_rate * (local_comp / device_comp_freq - gap):.6f}) = {self.time_ql:.6f}")
+                    gp.trace_print(f"  new_ql_change = {self.new_ql_change:.6f}")
+                    gp.trace_print(f"  old_comp_times tail (last {len(tail)}): avg_local_time = {self.avg_local_time:.6f}")
+
             self.old_virtual_time_ql = self.virtual_time_ql
             EPS = 1e-8
             device_vir_queue_growth_rate = self.device_vir_queue_growth_rate
             if self.avg_local_time > EPS:
                 old_vir_time_ql_ = self.virtual_time_ql
-                self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val))
-                self.new_vir_ql_change = device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time*self.delta*self.gen_task_cycle - self.device_dly_adj_val)
-                self.vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
+                vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
+                self.virtual_time_ql = max(0, self.virtual_time_ql + device_vir_queue_growth_rate*(vir_backlog - self.device_dly_adj_val))
+                self.new_vir_ql_change = device_vir_queue_growth_rate*(vir_backlog - self.device_dly_adj_val)
+                self.vir_backlog = vir_backlog
+
+                if gp.settings.enable_trace:
+                    gp.trace_print(f"\n  --- Virtual queue update ---")
+                    gp.trace_print(f"  vir_backlog = time_ql / avg_local_time * delta * gen_cycle")
+                    gp.trace_print(f"              = {self.time_ql:.6f} / {self.avg_local_time:.6f} * {self.delta} * {self.gen_task_cycle} = {vir_backlog:.6f}")
+                    gp.trace_print(f"  device_dly_adj_val = {self.device_dly_adj_val:.6f}")
+                    gp.trace_print(f"  virtual_time_ql = max(0, old_vir_ql + vir_growth * (vir_backlog - dly_adj))")
+                    gp.trace_print(f"                  = max(0, {old_vir_time_ql_:.6f} + {device_vir_queue_growth_rate} * ({vir_backlog:.6f} - {self.device_dly_adj_val:.6f}))")
+                    gp.trace_print(f"                  = max(0, {old_vir_time_ql_ + device_vir_queue_growth_rate * (vir_backlog - self.device_dly_adj_val):.6f}) = {self.virtual_time_ql:.6f}")
         else:
-            # Idle-slot queue decay: queues drain naturally when no task arrives
-            total_trans_dz = self.trans_ql
-            delta_trans_dz = self.trans_rate * self.delta
-            self.trans_ql = max(0, total_trans_dz - delta_trans_dz)
+            # Idle slot: no task, no computation, no transmission.
+            # The arrival-slot formula already used gap = gen_task_cycle * delta (0.5s)
+            # to account for the full 5-slot cycle. No further queue changes here.
             self.old_time_ql = self.time_ql
-            self.time_ql = max(0, self.time_ql - self.device_act_queue_growth_rate * self.delta)
-            self.new_ql_change = -self.device_act_queue_growth_rate * self.delta
-            self.act_backlog = 0.0
             self.old_virtual_time_ql = self.virtual_time_ql
-            EPS = 1e-6
-            if self.avg_local_time > EPS:
-                self.virtual_time_ql = max(0, self.virtual_time_ql + self.device_vir_queue_growth_rate * (self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle - self.device_dly_adj_val))
-                self.new_vir_ql_change = self.device_vir_queue_growth_rate * (self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle - self.device_dly_adj_val)
-                self.vir_backlog = self.time_ql / self.avg_local_time * self.delta * self.gen_task_cycle
+            self.act_backlog = 0.0
+            self.new_ql_change = 0.0
+            self.new_vir_ql_change = 0.0
+
+            if gp.settings.enable_trace:
+                gp.trace_print(f"\n{'='*60}")
+                gp.trace_print(f"[TRACE] t={t_id}, Device {self.env_id}, IDLE slot (no task, queues unchanged)")
+                gp.trace_print(f"  time_ql = {self.time_ql:.6f}, trans_ql = {self.trans_ql:.6f}, virtual_time_ql = {self.virtual_time_ql:.6f}")
 
     
-        # print(f"[DEBUG] The device", self.env_id, "'s avg_local_time is: ", self.avg_local_time)
-        # print(f"[DEBUG] The device", self.env_id, "'s device_dly_adj_val is: ", self.device_dly_adj_val)
-
-        # print(f"[DEBUG] The device", self.env_id, "'s virtual_time_ql is: ", self.virtual_time_ql)
-        # print(f"[DEBUG] The device", self.env_id, "'s old_virtual_time_ql is: ", self.old_virtual_time_ql)
-        # print(f"[DEBUG] The device", self.env_id, "'s new_vir_ql_change is: ", self.new_vir_ql_change)
-        # print(f"[DEBUG] The device", self.env_id, "'s fine_vir_ql_change is: ", device_vir_queue_growth_rate*(self.time_ql/self.avg_local_time - self.device_dly_adj_val))
-        
-
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s avg_local_time is: ", self.avg_local_time)
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s old_time_ql is: ", self.old_time_ql)
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s new_ql_change is: ", self.new_ql_change)
@@ -480,31 +510,16 @@ class DeviceEnv():
         if(enable_print): print(f"[DEBUG] The device", self.env_id, "'s virtual_time_ql is: ", self.virtual_time_ql)
 
         if visualize:
-            # writer.add_scalars(
-            #     f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_avg_local_time_{self.env_id}",
-            #     {f"ep_{e_id}": self.avg_local_time},
-            #     t_id
-            # )
             writer.add_scalars(
                 f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_act": self.time_ql},
                 t_id
             )
-            # writer.add_scalars(
-            #     f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
-            #     {f"ep_{e_id}_act_chg": self.new_ql_change},
-            #     t_id
-            # )
             writer.add_scalars(
                 f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
                 {f"ep_{e_id}_vir": self.virtual_time_ql},
                 t_id
             )
-            # writer.add_scalars(
-            #     f"detail{'_eval' if gp.settings.is_evaluate else ''}/device_time_ql_{self.env_id}",
-            #     {f"ep_{e_id}_vir_chg": self.new_vir_ql_change},
-            #     t_id
-            # )
 
         # update scheduling tasks
         sched_tasks = copy.copy(self.sched_tasks)

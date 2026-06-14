@@ -21,6 +21,7 @@ class Rollout:
         self.eval_mode = gen_params.eval_mode
         self.resume_episode = 0
         self.device_type_num = gen_params.device_type_num
+        self.edge_server_num = gen_params.edge_server_num
         # task generation cycle
         self.gen_task_cycle = gen_params.gen_task_cycle
         self.start_slot = gen_params.start_slot
@@ -159,6 +160,16 @@ class Rollout:
         sys.stderr = log_txt_file
         atexit.register(log_txt_file.close)
 
+        # trace file (separate from main log, for per-slot variable tracing)
+        if gen_params.enable_trace:
+            gp.settings.enable_trace = True
+            trace_log_path = self.log_txt_dir_name + "_trace.log"
+            gp.settings.trace_file = open(trace_log_path, "a", encoding="utf-8")
+            print(f"[TRACE] Trace log file: {trace_log_path}")
+            gp.trace_print(f"=== Trace log for run_desc={gen_params.run_desc}, "
+                           f"mode={gen_params.train_mode}, seed={gp.settings.seed} ===\n")
+            atexit.register(gp.settings.trace_file.close)
+
         self.time_slots = self.train_time_slots + 1 if not self.evaluate else self.eval_time_slots
 
         # MEC env
@@ -193,7 +204,7 @@ class Rollout:
         self.device_rewards = np.zeros([self.device_num], dtype = np.float32)
         self.joint_cost = 0
         self.device_costs = np.zeros([self.device_num], dtype = np.float32)
-        self.edge_comp_qls = np.zeros([self.device_type_num], dtype = np.float32)
+        self.edge_comp_qls = np.zeros([self.edge_server_num], dtype = np.float32)
         self.device_comp_qls = np.zeros([self.device_num], dtype = np.float32)
         self.comp_dlys = np.zeros([self.device_num], dtype = np.float32)
         self.edge_comp_dlys = np.zeros([self.device_num], dtype = np.float32)  # the edge computing delay for each task
@@ -217,7 +228,7 @@ class Rollout:
         for i in range(self.device_num):
             device_obss[i] = self.mec_env.device_envs[i].get_obs()
 
-        edge_comp_qls = [edge_obs[i * 2] for i in range(self.device_type_num)]  # per-server actual queue
+        edge_comp_qls = [edge_obs[i * 2] for i in range(self.edge_server_num)]  # per-server actual queue
         device_comp_qls = [obs[1] for obs in device_obss]
         # obs scaling
         if hasattr(self, "obs_scaling"):
@@ -323,24 +334,11 @@ class Rollout:
 
             if t_id % gen_task_cycle == start_t_id:
                 if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "mappo":
-                    # print(f"[DEBUG] edge_obs: {edge_obs}")
-                    # print(f"[DEBUG] device_obss: {device_obss}")
-                    # print(f"[DEBUG] lstm_hidden_hs: {lstm_hidden_hs}")
-                    # print(f"[DEBUG] lstm_hidden_cs: {lstm_hidden_cs}")
-                    # print(f"[DEBUG] device_acts: {device_acts}")
-                    # print(f"[DEBUG] device_act_logprobs: {device_act_logprobs}")
-                    # print(f"[DEBUG] joint_rewards: {joint_rewards}")
                     self.replay_buffer.store(edge_obs, device_obss,
                                             device_acts, device_act_logprobs,
                                             joint_rewards, device_active)
                 if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "maddpg":
-                    # print(f"[DEBUG] edge_obs: {edge_obs}")
-                    # print(f"[DEBUG] device_obss: {device_obss}")
-                    # print(f"[DEBUG] device_acts: {device_acts}")
-                    # print(f"[DEBUG] joint_rewards: {joint_rewards}")
-                    # print(f"[DEBUG] next_edge_obs: {next_edge_obs}")
-                    # print(f"[DEBUG] next_device_obss: {next_device_obss}")
-                    self.replay_buffer.store(edge_obs, device_obss, 
+                    self.replay_buffer.store(edge_obs, device_obss,
                                             device_acts, joint_rewards,
                                             next_edge_obs, next_device_obss)
             
@@ -405,9 +403,9 @@ class Rollout:
             print(f"joint_reward_{i}: {joint_rewards[i]}")
         writer.add_scalar(f"joint_cost{'_eval' if gp.settings.is_evaluate else ''}", joint_cost, e_id)
         print(f"joint_cost: {joint_cost}")
-        for i in range(self.device_type_num):
-            writer.add_scalar(f"edge_comp_ql_{i}{'_eval' if gp.settings.is_evaluate else ''}", edge_comp_qls[i], e_id)
-            print(f"edge_comp_ql_{i}: {edge_comp_qls[i]}")
+        for i in range(self.edge_server_num):
+            writer.add_scalar(f"edge_comp_ql_s{i}{'_eval' if gp.settings.is_evaluate else ''}", edge_comp_qls[i], e_id)
+            print(f"edge_comp_ql_s{i}: {edge_comp_qls[i]}")
         for i in range(self.device_num):
             writer.add_scalar(f"device_reward_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_rewards[i], e_id)
             print(f"device_reward_{i}: {device_rewards[i]}")
@@ -421,8 +419,6 @@ class Rollout:
             print(f"comp_dlys_{i}: {comp_dlys[i]}")
             writer.add_scalar(f"device_csum_engys_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_csum_engys[i], e_id)
             print(f"device_csum_engys_{i}: {device_csum_engys[i]}")
-            # writer.add_scalar("device_comp_expns_"+str(i), device_esum_engys[i], e_id)
-            # print(f"device_comp_expns_{i}: {device_esum_engys[i]}")
             writer.add_scalar(f"device_overtime_nums_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_overtime_nums[i], e_id)
             print(f"device_overtime_nums_{i}: {device_overtime_nums[i]}")
         
@@ -458,14 +454,3 @@ class Rollout:
             if device_task_is_available[i]:
                 self.device_task_avail_nums[i]+=1
 
-        # for i in range(self.device_num):
-        #     self.device_task_avail_nums[i] = max(1.0, self.device_task_avail_nums[i])
-        #     self.comp_dlys[i] /= self.device_task_avail_nums[i]
-        #     self.device_csum_engys[i] /= self.device_task_avail_nums[i]
-        #     self.device_esum_engys[i] /= self.device_task_avail_nums[i]
-    
-    # # Update queue information at every time slot
-    # def average_always(self, t_id, edge_comp_qls, device_comp_qls):
-    #     t_id_ = t_id + 1
-    #     self.edge_comp_qls += 1 / t_id_ * (edge_comp_qls - self.edge_comp_qls)
-    #     self.device_comp_qls += 1 / t_id_ * (device_comp_qls - self.device_comp_qls)

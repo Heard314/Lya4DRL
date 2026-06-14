@@ -33,9 +33,6 @@ class MECEnv():
         self.device_act_queue_reward_weight = gen_params.device_act_queue_reward_weight
         self.device_vir_queue_reward_weight = gen_params.device_vir_queue_reward_weight
 
-        print(f"[DEBUG] device_act_queue_reward_weight: {self.device_act_queue_reward_weight}")
-        print(f"[DEBUG] device_vir_queue_reward_weight: {self.device_vir_queue_reward_weight}")
-
         self.edge_queue_reward_bound_fac = gen_params.edge_queue_reward_bound_fac
 
         self.enable_actual_queue_reward = gen_params.enable_actual_queue_reward
@@ -47,24 +44,9 @@ class MECEnv():
         self.device_vir_queue_reward_min_bound = gen_params.device_vir_queue_reward_min_bound
         self.base_reward_penalty = gen_params.base_reward_penalty
 
-        print(f"[DEBUG] device_act_queue_reward_max_bound: {self.device_act_queue_reward_max_bound}")
-        print(f"[DEBUG] device_act_queue_reward_min_bound: {self.device_act_queue_reward_min_bound}")
-        print(f"[DEBUG] device_vir_queue_reward_max_bound: {self.device_vir_queue_reward_max_bound}")
-        print(f"[DEBUG] device_vir_queue_reward_min_bound: {self.device_vir_queue_reward_min_bound}")
-
         self.timeout_reward_penalty = gen_params.timeout_reward_penalty
         self.target_reward_penalty = gen_params.target_reward_penalty
 
-        print(f"[DEBUG] timeout_reward_penalty: {self.timeout_reward_penalty}")
-        print(f"[DEBUG] target_reward_penalty: {self.target_reward_penalty}")
-
-        # device_env info print
-        print(f"[DEBUG] device_act_queue_growth_rate: {gen_params.device_act_queue_growth_rate}")
-        print(f"[DEBUG] device_vir_queue_growth_rate: {gen_params.device_vir_queue_growth_rate}")
-
-        # edge_env info print
-        print(f"[DEBUG] edge_act_queue_growth_rate: {gen_params.edge_act_queue_growth_rate}")
-        print(f"[DEBUG] edge_vir_queue_growth_rate: {gen_params.edge_vir_queue_growth_rate}")
 
     def reset(self):
         for edge_env in self.edge_envs:
@@ -298,17 +280,16 @@ class MECEnv():
                     print(f"[DEBUG] The edge server {s}'s edge_queue_actual_rewards is: {edge_queue_actual_rewards[s]}")
                     print(f"[DEBUG] The edge server {s}'s edge_queue_virtual_rewards is: {edge_queue_virtual_rewards[s]}")
                 if visualize:
-                    for j in range(self.device_num):
-                        writer.add_scalars(
-                            f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{j}",
-                            {f"ep_{e_id}_edge_act_s{s}": edge_queue_actual_rewards[s]},
-                            t_id
-                        )
-                        writer.add_scalars(
-                            f"detail{'_eval' if gp.settings.is_evaluate else ''}/dev_reward_{j}",
-                            {f"ep_{e_id}_edge_vir_s{s}": edge_queue_virtual_rewards[s]},
-                            t_id
-                        )
+                    writer.add_scalars(
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_reward_s{s}",
+                        {f"ep_{e_id}_act": edge_queue_actual_rewards[s]},
+                        t_id
+                    )
+                    writer.add_scalars(
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_reward_s{s}",
+                        {f"ep_{e_id}_vir": edge_queue_virtual_rewards[s]},
+                        t_id
+                    )
 
             # Assemble per-type joint rewards (all servers' edge rewards shared across types)
             for i in range(self.device_type_num):

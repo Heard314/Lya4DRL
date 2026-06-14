@@ -199,7 +199,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.4, 1.6], [0.6, 0.8], [2.6, 2.8]],
+        default=[[1.6, 2.0], [1.2, 1.5], [3.0, 3.5]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -207,7 +207,7 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[1.8, 2.0], [4.0, 4.2], [1.0, 1.2]],
+        default=[[2.5, 3.0], [4.5, 5.0], [1.8, 2.2]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     parser.add_argument("--comp_dly_thre", type = list, 
@@ -339,7 +339,10 @@ def get_general_params():
     parser.add_argument("--plot_dir", type = str, default = "runs/plot/",
                         help = "the directory for saving plot images")
 
-    params = parser.parse_args()
+    parser.add_argument("--enable_trace", action="store_true",
+                        help = "enable detailed per-slot variable tracing to trace log")
+
+    params, _ = parser.parse_known_args()
 
     # compute server positions
     S_ = params.edge_server_num

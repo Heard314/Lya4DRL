@@ -101,6 +101,7 @@ class MappoDeviceAgent():
         # extract server_id and build env action (average ae_dim blocks)
         ae_dim = self.action_encode_dim
         server_id = int(np.argmax(act[:S]))
+        print(f"[DEBUG] Device {self.agent_id} offloads to server {server_id}")
         cont_vals = []
         for j in range(3):
             block = act[S + j * ae_dim : S + (j + 1) * ae_dim]
@@ -169,6 +170,7 @@ class MaddpgDeviceAgent():
         # First S dims: server logits → argmax
         server_logits = act[:, :S]
         server_id = int(torch.argmax(server_logits, dim=-1).item())
+        print(f"[DEBUG] Device {self.agent_id} offloads to server {server_id}")
 
         # 3*ae_dim dims: continuous actions (ae_dim each)
         cont_act = act[:, S:S + 3 * ae_dim]
