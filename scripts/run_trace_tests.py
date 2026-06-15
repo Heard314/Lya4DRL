@@ -7,14 +7,15 @@ Usage: python scripts/run_trace_tests.py
 """
 import sys, os, traceback
 
-# Ensure we're in the project root
-os.chdir("D:/Desktop/work/yanjiushengbishe/mypaper/Lya4DRL")
-sys.path.insert(0, ".")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJ_ROOT = os.path.dirname(_SCRIPT_DIR)
+os.chdir(_PROJ_ROOT)
+sys.path.insert(0, _PROJ_ROOT)
 
 import config.global_params as gp
 
 # Override exp_result_dir for local Windows testing
-RESULT_DIR = "D:/Desktop/work/yanjiushengbishe/mypaper/Lya4DRL/experiments/"
+RESULT_DIR = os.path.join(_PROJ_ROOT, "experiments")
 gp.settings.exp_result_dir = RESULT_DIR
 
 print(f"exp_result_dir set to: {RESULT_DIR}", flush=True)

@@ -1,4 +1,4 @@
-"""Device computation frequency ablation: 2.5 Gcycles/s"""
+"""Device computation frequency ablation: 2.25 Gcycles/s"""
 import sys, os
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_SCRIPT_DIR)))
@@ -11,7 +11,7 @@ from controller import Controller
 sys.argv = [
     "main",
     "--train_mode", "maddpg",
-    "--run_desc", "dev_freq_2.5",
+    "--run_desc", "dev_freq_2.25",
     "--enable_virtual_queue_reward",
     "--device_vir_queue_reward_weight", "-700",
     "--device_act_queue_reward_weight", "-300",
@@ -28,7 +28,7 @@ sys.argv = [
 ]
 
 gen_params = get_general_params()
-gen_params.device_comp_freqs = [2.5, 2.5, 2.5]
+gen_params.device_comp_freqs = [2.25, 2.25, 2.25]
 
 ctr = Controller(gen_params)
 ctr.train()
