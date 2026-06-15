@@ -1,7 +1,9 @@
 """Task computation ablation: +2 Gcycle average increase"""
 import sys, os
-os.chdir("D:/Desktop/work/yanjiushengbishe/mypaper/Lya4DRL")
-sys.path.insert(0, ".")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(_SCRIPT_DIR))))
+os.chdir(_PROJ_ROOT)
+sys.path.insert(0, _PROJ_ROOT)
 
 from config.params import get_general_params
 from controller import Controller
