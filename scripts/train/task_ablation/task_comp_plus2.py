@@ -1,7 +1,7 @@
 """Task computation ablation: +2 Gcycle average increase"""
 import sys, os
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(_SCRIPT_DIR))))
+_PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_SCRIPT_DIR)))
 os.chdir(_PROJ_ROOT)
 sys.path.insert(0, _PROJ_ROOT)
 
