@@ -22,10 +22,10 @@
 ### 1.2 任务归一化常数不一致（中等）
 
 **位置：**
-- [env/device_env.py:225-226](env/device_env.py#L225-L226) (`reset()` 中 `norm_csum_engy = comp * self.engy_fac * 6.25`)
-- [env/device_env.py:513-514](env/device_env.py#L513-L514) (`compute()` 中 `norm_csum_engy = comp * self.engy_fac * 9`)
+- [env/device_env.py:225-226](env/device_env.py#L225-L226) (`reset()` 中 `norm_csum_engy_fac = comp * self.engy_fac * 6.25`)
+- [env/device_env.py:513-514](env/device_env.py#L513-L514) (`compute()` 中 `norm_csum_engy_fac = comp * self.engy_fac * 9`)
 
-> **后果：** 每个 episode 的第一个任务（在 `reset()` 中生成）使用系数 6.25，后续任务（在 `compute()` 中生成）使用系数 9。`norm_csum_engy` 在 [mec_env.py:205-206](env/mec_env.py#L205-L206) 中参与 reward 计算，导致同一 episode 内不同时间步的任务归一化尺度不一致，Lyapunov 优化目标出现系统性偏差。
+> **后果：** 每个 episode 的第一个任务（在 `reset()` 中生成）使用系数 6.25，后续任务（在 `compute()` 中生成）使用系数 9。`norm_csum_engy_fac` 在 [mec_env.py:205-206](env/mec_env.py#L205-L206) 中参与 reward 计算，导致同一 episode 内不同时间步的任务归一化尺度不一致，Lyapunov 优化目标出现系统性偏差。
 
 ### 1.3 非活跃状态的 log_prob 处理错误（中等）
 
@@ -310,7 +310,7 @@ self.joint_rewards += 1 / gen_t_id_ * (joint_rewards - self.joint_rewards)
 | # | 任务 | 涉及文件 | 预计改动量 |
 |---|------|----------|-----------|
 | 1 | **统一随机数生成器**：所有设备环境的随机操作改用 `self._rnd` / `self._np_rnd` | `device_env.py`, `device_agent.py` | ~10 行 |
-| 2 | **统一归一化常数**：将 `norm_csum_engy` 的计算提取为 `DeviceEnv` 的方法或统一常量 | `device_env.py` | ~5 行 |
+| 2 | **统一归一化常数**：将 `norm_csum_engy_fac` 的计算提取为 `DeviceEnv` 的方法或统一常量 | `device_env.py` | ~5 行 |
 | 3 | **修复 inactive log_prob**：`active=False` 时返回 `None` 或正确处理 mask | `device_agent.py`, `rollout.py`, `edge_agent.py` | ~5 行 |
 | 4 | **OU 噪声重置**：在 `Rollout.reset()` 中调用 `device_agent.reset_ou()` | `rollout.py` | ~3 行 |
 | 5 | **MADDPG 采样安全**：`np.random.choice` 前检查 `batch_slots >= train_batch_size`，不足时使用 `replace=True` 或减小 batch_size | `edge_agent.py` | ~3 行 |
@@ -395,7 +395,7 @@ Phase 3（加固设计）
 > | # | 修复内容 | 文件 | 状态 |
 > |---|---------|------|------|
 > | 1 | 随机种子隔离：`gen_position()`、`move()`、`reset()`、`compute()` 改用 `self._rnd`/`self._np_rnd`；`RandomComputingDeviceAgent` 添加独立 RNG | `device_env.py`, `device_agent.py` | ✅ |
-> | 2 | 归一化常数统一：`reset()` 和 `compute()` 中 `norm_csum_engy` 均使用系数 9 | `device_env.py` | ✅ |
+> | 2 | 归一化常数统一：`reset()` 和 `compute()` 中 `norm_csum_engy_fac` 均使用系数 9 | `device_env.py` | ✅ |
 > | 3 | 非活跃 log_prob：`active=False` 时返回 `None`（与 rollout 中的 `None` 检查一致） | `device_agent.py` | ✅ |
 > | 4 | OU 噪声重置：`Rollout.reset()` 中遍历 device_agents 调用 `reset_ou()` | `rollout.py` | ✅ |
 > | 5 | MADDPG 采样安全：`batch_slots < train_batch_size` 时使用 `replace=True` | `edge_agent.py` | ✅ |

@@ -177,10 +177,10 @@ class MECEnv():
                 if comp_dly > task.dly_cons and not (self.enable_virtual_queue_reward or self.enable_actual_queue_reward):
                     device_rewards[i] += self.timeout_reward_penalty
                 else:
-                    norm_csum_engy = task.norm_csum_engy
-                    norm_esum_engy = task.norm_esum_engy
+                    norm_csum_engy_fac = task.norm_csum_engy_fac
+                    norm_esum_engy_fac = task.norm_esum_engy_fac
                     device_rewards[i] += self.target_reward_penalty * (self.device_energy_weights[device_type] *
-                                                  local_engy)
+                                                  local_engy/norm_csum_engy_fac)
                 # print(f"[DEBUG] the part of engy reward in device {i} is {self.target_reward_penalty * (self.device_energy_weights[device_type] * local_engy)}")
                 if(enable_print): print(f"[DEBUG] The device", i, "'s navie reward is: ", device_rewards[i])
                 device_queue_actual_rewards[i] = 0.0

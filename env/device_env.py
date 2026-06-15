@@ -31,8 +31,8 @@ class Task():
         # edge compute consumed energy
         self.edge_comp_engy = None
         '''normalization'''
-        self.norm_csum_engy = None
-        self.norm_esum_engy = None
+        self.norm_csum_engy_fac = None
+        self.norm_esum_engy_fac = None
 
         # Debug
         self.l_queue_dly = None
@@ -51,8 +51,8 @@ class Task():
                "\ne_comp_dly: " + str(self.e_comp_dly) + \
                "\ntran_engy: " + str(self.tran_engy) + \
                "\ncomp_expn: " + str(self.edge_comp_engy) + \
-               "\nnorm_csum_engy: " + str(self.norm_csum_engy) + \
-               "\nnorm_comp_expn: " + str(self.norm_esum_engy)
+               "\nnorm_csum_engy_fac: " + str(self.norm_csum_engy_fac) + \
+               "\nnorm_comp_expn: " + str(self.norm_esum_engy_fac)
 
 class DeviceEnv():
     
@@ -105,6 +105,7 @@ class DeviceEnv():
         self.max_trans_rate = None
         # unit: Gcycles/s
         self.device_comp_freq = gen_params.device_comp_freqs[self.device_type]
+        self.edge_comp_freq = gen_params.edge_comp_freq
         # unit: Gcycles/s
         self.std_comp_freq = gen_params.std_comp_freq
         # unit: J/Gcycles
@@ -220,8 +221,8 @@ class DeviceEnv():
 
             comp = data_size * comp_dens
             task.dly_cons = self.task_timeout_thre
-            task.norm_csum_engy = comp * self.engy_fac * 9
-            task.norm_esum_engy = comp * self.engy_fac * 1600
+            task.norm_csum_engy_fac = self.engy_fac * self.device_comp_freq**2
+            task.norm_esum_engy_fac = self.engy_fac * self.edge_comp_freq**2
             self.sched_tasks.append(task)
 
     # Channel gains to all servers, local queue information, and task information
@@ -538,8 +539,8 @@ class DeviceEnv():
                 
                 comp = data_size * comp_dens
                 task.dly_cons = self.task_timeout_thre
-                task.norm_csum_engy = comp * self.engy_fac * 9
-                task.norm_esum_engy = comp * self.engy_fac * 1600
+                task.norm_csum_engy_fac = self.engy_fac * self.device_comp_freq**2
+                task.norm_esum_engy_fac = self.engy_fac * self.edge_comp_freq**2
                 
                 self.sched_tasks.append(task)
         else:

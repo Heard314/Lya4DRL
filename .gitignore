@@ -9,3 +9,5 @@ log/
 .idea/
 *.code-workspace
 test_demo.py
+*.log
+*events.out.tfevents*

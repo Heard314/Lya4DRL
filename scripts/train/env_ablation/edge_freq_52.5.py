@@ -24,7 +24,7 @@ sys.argv = [
     "--edge_act_queue_growth_rate", "1",
     "--edge_vir_queue_growth_rate", "0.1",
     "--timeout_reward_penalty", "-4000",
-    "--target_reward_penalty", "-2000",
+    "--target_reward_penalty", "-80",
 ]
 
 gen_params = get_general_params()
