@@ -70,7 +70,7 @@ class EdgeEnv():
             self.virtual_edge_queue_time_ql if self.enable_virtual_queue_reward else -1.0
         ]
 
-    def compute(self, tasks, e_id, t_id, visualize=False):
+    def compute(self, tasks, e_id, t_id, s_id=0, visualize=False):
         writer = self.writer
         enable_print = gp.settings.enable_print
 
@@ -183,13 +183,13 @@ class EdgeEnv():
                     gp.trace_print(f"  virtual_edge_queue_time_ql = max(0, {self.old_virtual_edge_queue_time_ql:.6f} + {self.edge_vir_queue_growth_rate} * ({vir_bl:.6f} - {self.edge_dly_adj_val:.6f})) = {self.virtual_edge_queue_time_ql:.6f}")
 
         if visualize:
-            writer.add_scalars(
-                f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_{e_id}",
-                {f"ep_{e_id}_act": self.edge_queue_time_ql},
-                t_id
+            writer.add_scalar(
+                f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_act_s{s_id}",
+                self.edge_queue_time_ql,
+                e_id
             )
-            writer.add_scalars(
-                f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_{e_id}",
-                {f"ep_{e_id}_vir": self.virtual_edge_queue_time_ql},
-                t_id
+            writer.add_scalar(
+                f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_time_ql_vir_s{s_id}",
+                self.virtual_edge_queue_time_ql,
+                e_id
             )

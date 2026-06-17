@@ -397,30 +397,31 @@ class Rollout:
                 out_dir=gp.settings.plot_dir
             )
 
-        # tensorboard log
+        # tensorboard log (always write) + console print (every 40 episodes)
+        verbose = (e_id % 40 == 0)
         for i in range(self.device_type_num):
             writer.add_scalar(f"joint_reward_{i}{'_eval' if gp.settings.is_evaluate else ''}", joint_rewards[i], e_id)
-            print(f"joint_reward_{i}: {joint_rewards[i]}")
+            if verbose: print(f"joint_reward_{i}: {joint_rewards[i]}")
         writer.add_scalar(f"joint_cost{'_eval' if gp.settings.is_evaluate else ''}", joint_cost, e_id)
-        print(f"joint_cost: {joint_cost}")
+        if verbose: print(f"joint_cost: {joint_cost}")
         for i in range(self.edge_server_num):
             writer.add_scalar(f"edge_comp_ql_s{i}{'_eval' if gp.settings.is_evaluate else ''}", edge_comp_qls[i], e_id)
-            print(f"edge_comp_ql_s{i}: {edge_comp_qls[i]}")
+            if verbose: print(f"edge_comp_ql_s{i}: {edge_comp_qls[i]}")
         for i in range(self.device_num):
             writer.add_scalar(f"device_reward_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_rewards[i], e_id)
-            print(f"device_reward_{i}: {device_rewards[i]}")
+            if verbose: print(f"device_reward_{i}: {device_rewards[i]}")
             writer.add_scalar(f"device_cost_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_costs[i], e_id)
-            print(f"device_cost_{i}: {device_costs[i]}")
+            if verbose: print(f"device_cost_{i}: {device_costs[i]}")
             writer.add_scalar(f"device_comp_ql_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_comp_qls[i], e_id)
-            print(f"device_comp_ql_{i}: {device_comp_qls[i]}")
+            if verbose: print(f"device_comp_ql_{i}: {device_comp_qls[i]}")
             writer.add_scalar(f"device_virtual_time_ql_{i}{'_eval' if gp.settings.is_evaluate else ''}", self.mec_env.device_envs[i].virtual_time_ql, e_id)
-            print(f"device_virtual_time_ql_{i}: {self.mec_env.device_envs[i].virtual_time_ql}")
+            if verbose: print(f"device_virtual_time_ql_{i}: {self.mec_env.device_envs[i].virtual_time_ql}")
             writer.add_scalar(f"comp_dlys_{i}{'_eval' if gp.settings.is_evaluate else ''}", comp_dlys[i], e_id)
-            print(f"comp_dlys_{i}: {comp_dlys[i]}")
+            if verbose: print(f"comp_dlys_{i}: {comp_dlys[i]}")
             writer.add_scalar(f"device_csum_engys_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_csum_engys[i], e_id)
-            print(f"device_csum_engys_{i}: {device_csum_engys[i]}")
+            if verbose: print(f"device_csum_engys_{i}: {device_csum_engys[i]}")
             writer.add_scalar(f"device_overtime_nums_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_overtime_nums[i], e_id)
-            print(f"device_overtime_nums_{i}: {device_overtime_nums[i]}")
+            if verbose: print(f"device_overtime_nums_{i}: {device_overtime_nums[i]}")
         
         if e_id % 50 == 0:
             self.writer.flush()

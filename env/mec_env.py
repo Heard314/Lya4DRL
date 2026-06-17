@@ -78,7 +78,7 @@ class MECEnv():
                 tasks = device_sched_tasks[i]
                 if tasks:
                     server_tasks.extend([t for t in tasks if t.target_server == s])
-            self.edge_envs[s].compute(server_tasks, e_id=e_id, t_id=t_id, visualize=visualize)
+            self.edge_envs[s].compute(server_tasks, e_id=e_id, t_id=t_id, s_id=s, visualize=visualize)
         
         # reward
         device_rewards = [self.base_reward_penalty for i in range(self.device_num)]

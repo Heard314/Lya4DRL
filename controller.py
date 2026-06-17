@@ -116,7 +116,8 @@ class Controller:
         
         start_epi = self.rollout.resume_episode
         for e_id in range(start_epi, self.train_episodes):
-            print("------------------train episode: " + str(e_id) + "------------------")
+            if e_id % 40 == 0:
+                print("------------------train episode: " + str(e_id) + "------------------")
             
             visualize = False
             # if e_id == 1 or e_id == 2: #FOR DEBUG
@@ -187,7 +188,8 @@ class Controller:
         device_overtime_nums = np.zeros([self.device_num], dtype = np.float32)
         
         for e_id in range(1, self.eval_episodes + 1):
-            print("------------------evaluate episode: " + str(e_id) + "------------------")
+            if e_id % 40 == 0:
+                print("------------------evaluate episode: " + str(e_id) + "------------------")
 
             visualize = False
             if e_id % 20 == 0:
