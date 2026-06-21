@@ -199,7 +199,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.6, 2.0], [1.2, 1.5], [3.0, 3.5]],
+        default=[[1.7, 2.0], [1.2, 1.5], [2.8, 3.2]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -207,7 +207,7 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[2.5, 3.0], [4.5, 5.0], [1.8, 2.2]],
+        default=[[2.8, 3.2], [3.8, 4.5], [1.7, 2.1]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     parser.add_argument("--comp_dly_thre", type = list, 
@@ -484,7 +484,7 @@ value_input_obs_dims = [n * (device_obs_dim + edge_queue_obs_dim) for n in [2, 4
 value_input_act_dims = [n * (S + 3) for n in [2, 4, 4]]  # joint_act in S+3 compressed form
 value_input_dims = [obs + act for obs, act in zip(value_input_obs_dims, value_input_act_dims)]
 policy_input_dim = device_obs_dim + edge_queue_obs_dim
-maddpg_train_episodes = 15000
+maddpg_train_episodes = 20000
 maddpg_time_slots = 3000
 maddpg_train_freq = 4
 maddpg_update_freq = 8

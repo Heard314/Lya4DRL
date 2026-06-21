@@ -205,6 +205,7 @@ class Rollout:
         self.joint_cost = 0
         self.device_costs = np.zeros([self.device_num], dtype = np.float32)
         self.edge_comp_qls = np.zeros([self.edge_server_num], dtype = np.float32)
+        self.edge_vir_qls = np.zeros([self.edge_server_num], dtype = np.float32)
         self.device_comp_qls = np.zeros([self.device_num], dtype = np.float32)
         self.comp_dlys = np.zeros([self.device_num], dtype = np.float32)
         self.edge_comp_dlys = np.zeros([self.device_num], dtype = np.float32)  # the edge computing delay for each task
@@ -314,6 +315,7 @@ class Rollout:
             
             # update computing-queue lengths
             edge_comp_qls = [next_edge_obs[i * 2] for i in range(self.device_type_num)]  # per-server actual queue
+            edge_vir_qls = [next_edge_obs[i * 2 + 1] for i in range(self.edge_server_num)]  # per-server virtual queue
             device_comp_qls = [obs[1] for obs in next_device_obss]
 
             if t_id % gen_task_cycle == start_t_id:
@@ -321,7 +323,7 @@ class Rollout:
                                 joint_cost, device_costs,
                                 comp_dlys, device_csum_engys,
                                 device_esum_engys, device_overtime_nums,
-                                device_task_is_available, edge_comp_qls, device_comp_qls)
+                                device_task_is_available, edge_comp_qls, edge_vir_qls, device_comp_qls)
             # self.average_always(t_id, edge_comp_qls, device_comp_qls)
             
             # reward scaling
@@ -381,6 +383,7 @@ class Rollout:
         joint_cost = copy.copy(self.joint_cost)
         device_costs = copy.copy(self.device_costs)
         edge_comp_qls =  copy.copy(self.edge_comp_qls)
+        edge_vir_qls = copy.copy(self.edge_vir_qls)
         device_comp_qls = copy.copy(self.device_comp_qls)
         comp_dlys = copy.copy(self.comp_dlys)
         device_csum_engys = copy.copy(self.device_csum_engys)
@@ -406,7 +409,8 @@ class Rollout:
         if verbose: print(f"joint_cost: {joint_cost}")
         for i in range(self.edge_server_num):
             writer.add_scalar(f"edge_comp_ql_s{i}{'_eval' if gp.settings.is_evaluate else ''}", edge_comp_qls[i], e_id)
-            if verbose: print(f"edge_comp_ql_s{i}: {edge_comp_qls[i]}")
+            writer.add_scalar(f"edge_vir_ql_s{i}{'_eval' if gp.settings.is_evaluate else ''}", edge_vir_qls[i], e_id)
+            if verbose: print(f"edge_comp_ql_s{i}: {edge_comp_qls[i]}, edge_vir_ql_s{i}: {edge_vir_qls[i]}")
         for i in range(self.device_num):
             writer.add_scalar(f"device_reward_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_rewards[i], e_id)
             if verbose: print(f"device_reward_{i}: {device_rewards[i]}")
@@ -428,16 +432,16 @@ class Rollout:
 
         return joint_rewards, device_rewards, \
                joint_cost, device_costs, \
-               edge_comp_qls, device_comp_qls, \
+               edge_comp_qls, edge_vir_qls, device_comp_qls, \
                comp_dlys, device_csum_engys, \
                device_esum_engys, device_overtime_nums
     
     # Update only when new tasks arrive in the time slot
-    def average(self, gen_t_id, joint_rewards, device_rewards, 
-                            joint_cost, device_costs, 
-                            comp_dlys, device_csum_engys, 
+    def average(self, gen_t_id, joint_rewards, device_rewards,
+                            joint_cost, device_costs,
+                            comp_dlys, device_csum_engys,
                             device_esum_engys, device_overtime_nums,
-                            device_task_is_available, edge_comp_qls, device_comp_qls):
+                            device_task_is_available, edge_comp_qls, edge_vir_qls, device_comp_qls):
         gen_t_id_ = gen_t_id + 1
         self.joint_rewards += 1 / gen_t_id_ * (joint_rewards - self.joint_rewards)
         self.device_rewards += 1 / gen_t_id_ * (device_rewards - self.device_rewards)
@@ -449,6 +453,7 @@ class Rollout:
         self.device_overtime_nums += device_overtime_nums
 
         self.edge_comp_qls += 1 / gen_t_id_ * (edge_comp_qls - self.edge_comp_qls)
+        self.edge_vir_qls += 1 / gen_t_id_ * (edge_vir_qls - self.edge_vir_qls)
         self.device_comp_qls += 1 / gen_t_id_ * (device_comp_qls - self.device_comp_qls)
 
         for i in range(self.device_num):

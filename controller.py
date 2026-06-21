@@ -102,6 +102,7 @@ class Controller:
             self.joint_cost_col = []
             self.device_costs_col = []
             self.edge_comp_ql_col = []
+            self.edge_vir_ql_col = []
             self.device_comp_qls_col = []
             self.device_comp_dlys_col = []
             self.device_csum_engys_col = []
@@ -127,7 +128,7 @@ class Controller:
 
             joint_rewards, device_rewards, \
             joint_cost, device_costs, \
-            edge_comp_ql, device_comp_qls, \
+            edge_comp_ql, edge_vir_ql, device_comp_qls, \
             device_comp_dlys, device_csum_engys, \
             device_esum_engys, device_overtime_nums = self.rollout.run(e_id, visualize=visualize)
             
@@ -146,6 +147,7 @@ class Controller:
             self.joint_cost_col.append(joint_cost)
             self.device_costs_col.append(device_costs)
             self.edge_comp_ql_col.append(edge_comp_ql)
+            self.edge_vir_ql_col.append(edge_vir_ql)
             self.device_comp_qls_col.append(device_comp_qls)
             self.device_comp_dlys_col.append(device_comp_dlys)
             self.device_csum_engys_col.append(device_csum_engys)
@@ -181,6 +183,7 @@ class Controller:
         joint_cost = 0
         device_costs = np.zeros([self.device_num], dtype = np.float32)
         edge_comp_ql = 0
+        edge_vir_ql = 0
         device_comp_qls = np.zeros([self.device_num], dtype = np.float32)
         device_comp_dlys = np.zeros([self.device_num], dtype = np.float32)
         device_csum_engys = np.zeros([self.device_num], dtype = np.float32)
@@ -196,7 +199,7 @@ class Controller:
                 visualize = True
             joint_rewards_, device_rewards_, \
             joint_cost_, device_costs_, \
-            edge_comp_ql_, device_comp_qls_, \
+            edge_comp_ql_, edge_vir_ql_, device_comp_qls_, \
             device_comp_dlys_, device_csum_engys_, \
             device_comp_expns_, device_overtime_nums_ = self.rollout.run(e_id, visualize=visualize)
             
@@ -205,6 +208,7 @@ class Controller:
             joint_cost += joint_cost_
             device_costs += device_costs_
             edge_comp_ql += edge_comp_ql_
+            edge_vir_ql += edge_vir_ql_
             device_comp_qls += device_comp_qls_
             device_comp_dlys += device_comp_dlys_
             device_csum_engys += device_csum_engys_
@@ -218,6 +222,7 @@ class Controller:
         joint_cost /= self.eval_episodes
         device_costs /= self.eval_episodes
         edge_comp_ql /= self.eval_episodes
+        edge_vir_ql /= self.eval_episodes
         device_comp_qls /= self.eval_episodes
         device_comp_dlys /= self.eval_episodes
         device_csum_engys /= self.eval_episodes
@@ -226,6 +231,6 @@ class Controller:
         
         return joint_rewards, device_rewards, \
                joint_cost, device_costs, \
-               edge_comp_ql, device_comp_qls, \
+               edge_comp_ql, edge_vir_ql, device_comp_qls, \
                device_comp_dlys, device_csum_engys, \
                device_esum_engys, device_overtime_nums
