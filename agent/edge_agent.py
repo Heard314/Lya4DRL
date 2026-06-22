@@ -56,7 +56,11 @@ class MappoEdgeAgent():
             p_optimizer = torch.optim.Adam(p_net.parameters(),
                                            lr = self.p_lr)
             self.p_optimizers.append(p_optimizer)
-            
+
+        # probe batch for diagnostic monitoring
+        self.probe_batch = None
+        self.train_call_cnt = 0
+
         # load networks' weights
         if gen_params.load_weights:
             v_path = self.weights_dir + "v_net_params_" + str(gen_params.resume_episode) + ".pkl"
@@ -68,15 +72,97 @@ class MappoEdgeAgent():
                 print(f"[DEBUG] Loading policy network {i} from: ", p_path)
                 self.p_nets[i].load_state_dict(torch.load(p_path, map_location=self.device))
 
+    def _capture_probe_batch(self, replay_buffers):
+        """Capture a small fixed batch for diagnostic monitoring across episodes."""
+        total_size = self.train_freq * self.buffer_train_time_slots
+        probe_size = min(64, total_size)
+        idx = np.sort(np.random.choice(total_size, probe_size, replace=False))
+
+        p_inputs, acts, act_logprobs, active_masks = replay_buffers.get_policy_net_training_data()
+        self.probe_p_inputs = p_inputs[idx].to(self.device)
+        self.probe_acts = acts[idx].to(self.device)
+        self.probe_act_logprobs = act_logprobs[idx].to(self.device)
+        self.probe_active_masks = active_masks[idx].to(self.device)
+
+        v_inputs, v_tags, advs = replay_buffers.get_value_net_training_data(self.v_net)
+        self.probe_v_inputs = v_inputs[idx].to(self.device)
+        self.probe_v_tags = v_tags[idx].to(self.device)
+        self.probe_advs = advs[idx].to(self.device)
+
+        self.probe_batch = True  # mark as captured
+        print(f"[PROBE] MAPPO probe batch captured: {probe_size} samples")
+
+    def _eval_probe_batch(self):
+        """Evaluate value_net and policy_nets on the fixed probe batch.
+        Returns diagnostics without modifying network parameters."""
+        if self.probe_batch is None:
+            return
+
+        # --- Value net: forward pass ---
+        with torch.no_grad():
+            v_out = self.v_net(self.probe_v_inputs)
+        v_mean = v_out.mean().item()
+        v_std = v_out.std().item()
+
+        # --- Value net: gradient norm on probe batch ---
+        self.v_optimizer.zero_grad()
+        v_pred = self.v_net(self.probe_v_inputs)
+        v_loss = F.mse_loss(self.probe_v_tags, v_pred)
+        v_loss.backward()
+        v_grad_norm = sum(p.grad.data.norm().item() ** 2
+                          for p in self.v_net.parameters()
+                          if p.grad is not None) ** 0.5
+        self.v_optimizer.zero_grad()
+
+        # --- Policy nets: forward pass (representative device 0) ---
+        rep_dev = 0
+        with torch.no_grad():
+            mean, std = self.p_nets[rep_dev](self.probe_p_inputs[:, rep_dev])
+        p_mean_avg = mean.mean().item()
+        p_std_avg = std.mean().item()
+
+        # --- Policy net: gradient norm on probe batch ---
+        self.p_optimizers[rep_dev].zero_grad()
+        mean, std = self.p_nets[rep_dev](self.probe_p_inputs[:, rep_dev])
+        dist = Normal(mean, std)
+        # reconstruct log_probs
+        scale = self.p_nets[rep_dev].act_scale
+        loc = self.p_nets[rep_dev].act_bias
+        a = (self.probe_acts[:, rep_dev] - loc) / scale
+        a = torch.clamp(a, -1 + 1e-6, 1 - 1e-6)
+        u = 0.5 * (torch.log1p(a) - torch.log1p(-a))
+        normal_logp = dist.log_prob(u).sum(-1)
+        squash = torch.log(1 - a.pow(2) + 1e-6).sum(-1)
+        scale_logsum = torch.log(scale).sum(-1)
+        new_logp = normal_logp - squash - scale_logsum
+        old_logp = self.probe_act_logprobs[:, rep_dev].reshape([-1])
+        ratios = torch.exp(new_logp - old_logp)
+        mask_b = self.probe_active_masks[:, rep_dev].reshape([-1])
+        adv_b = self.probe_advs.reshape([-1])
+        surr1 = ratios * adv_b
+        surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * adv_b
+        denom = mask_b.sum().clamp_min(1.0)
+        p_loss = -(torch.min(surr1, surr2) * mask_b).sum() / denom
+        p_loss.backward()
+        p_grad_norm = sum(p.grad.data.norm().item() ** 2
+                          for p in self.p_nets[rep_dev].parameters()
+                          if p.grad is not None) ** 0.5
+        self.p_optimizers[rep_dev].zero_grad()
+
+        print(f"[PROBE] episode_train_call={self.train_call_cnt} | "
+              f"v_out: mean={v_mean:.4f} std={v_std:.4f} | "
+              f"v_grad_norm={v_grad_norm:.4f} | "
+              f"p_out(dev{rep_dev}): mean={p_mean_avg:.4f} std={p_std_avg:.4f} | "
+              f"p_grad_norm={p_grad_norm:.4f}")
+
     def train_nets(self, replay_buffers):
+        self.train_call_cnt += 1
+
+        # capture probe batch on first call
+        if self.probe_batch is None:
+            self._capture_probe_batch(replay_buffers)
+
         '''training data'''
-        # v_inputs: [train_freq x buffer_train_time_slots, state_dim]
-        # v_tags: [train_freq x buffer_train_time_slots, 1]
-        # p_inputs: [train_freq x buffer_train_time_slots, device_num, obs_dim]
-        # acts: [train_freq x buffer_train_time_slots, device_num, action_dim]
-        # act_logprobs: [train_freq x buffer_train_time_slots, device_num, 1]
-        # advs: [train_freq x buffer_train_time_slots, 1]
-        # active_masks: [train_freq x buffer_train_time_slots, device_num, 1]
         p_inputs, \
         acts, act_logprobs, active_masks = replay_buffers.get_policy_net_training_data()
         p_inputs       = p_inputs.to(self.device)
@@ -95,6 +181,9 @@ class MappoEdgeAgent():
 
         if self.use_lr_decay:
             self.decay_lr()
+
+        # evaluate probe batch after training
+        self._eval_probe_batch()
 
     def train_value_net(self, v_inputs, v_tags):
 
@@ -276,6 +365,10 @@ class MaddpgEdgeAgent():
                                             lr = self.p_lr)
             self.p_optimizers.append(p_optimizer)
 
+        # probe batch for diagnostic monitoring
+        self.probe_batch = None
+        self.train_call_cnt = 0
+
         # load networks' weights
         if gen_params.load_weights:
             v_path = self.weights_dir + "v_net_params_" + f"{gen_params.resume_episode}.pkl"
@@ -289,8 +382,102 @@ class MaddpgEdgeAgent():
                 target_p_path = self.weights_dir + "target_p_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
                 self.target_p_nets[i].load_state_dict(torch.load(target_p_path))
         
+    def _capture_probe_batch(self, replay_buffer):
+        """Capture a small fixed batch for diagnostic monitoring across episodes."""
+        buffer_len = replay_buffer.ps if replay_buffer.ps > 0 else replay_buffer.buffer_size
+        probe_size = min(128, buffer_len)
+        ids = np.sort(np.random.choice(buffer_len, probe_size, replace=False))
+
+        batch_states, batch_device_obss, \
+        batch_joint_acts, batch_joint_rewards, \
+        batch_next_states, batch_next_device_obss = replay_buffer.sample(ids)
+
+        self.probe_states = batch_states.to(self.device)
+        self.probe_device_obss = batch_device_obss.to(self.device)
+        self.probe_joint_acts = batch_joint_acts.to(self.device)
+        self.probe_joint_rewards = batch_joint_rewards.to(self.device)
+        self.probe_next_states = batch_next_states.to(self.device)
+        self.probe_next_device_obss = batch_next_device_obss.to(self.device)
+
+        self.probe_batch = True  # mark as captured
+        print(f"[PROBE] MADDPG probe batch captured: {probe_size} samples")
+
+    def _eval_probe_batch(self):
+        """Evaluate value_net and policy_nets on the fixed probe batch."""
+        if self.probe_batch is None:
+            return
+
+        S = self.edge_server_num
+        ae_dim = self.action_encode_dim
+        compressed_dim = S + 3
+
+        # --- Value net: forward pass ---
+        with torch.no_grad():
+            v_out = self.v_net(self.probe_states, self.probe_joint_acts)
+        v_mean = v_out.mean().item()
+        v_std = v_out.std().item()
+
+        # --- Value net: gradient norm ---
+        with torch.no_grad():
+            batch_next_joint_acts = []
+            for i in range(self.device_num):
+                next_acts = self.target_p_nets[i](self.probe_next_device_obss[:, i])
+                server_logits = next_acts[:, :S]
+                cont_all = next_acts[:, S:S + 3 * ae_dim]
+                cont_compressed = cont_all.reshape(-1, 3, ae_dim).mean(dim=-1)
+                compressed = torch.cat([server_logits, cont_compressed], dim=-1)
+                batch_next_joint_acts.append(compressed)
+            batch_next_joint_acts = torch.concat(batch_next_joint_acts, dim=-1)
+            next_qs = self.target_v_net(self.probe_next_states, batch_next_joint_acts)
+            target_qs = self.probe_joint_rewards + self.gamma * next_qs
+            target_qs = target_qs.detach()
+
+        self.v_optimizer.zero_grad()
+        qs = self.v_net(self.probe_states, self.probe_joint_acts)
+        v_loss = F.mse_loss(target_qs, qs)
+        v_loss.backward()
+        v_grad_norm = sum(p.grad.data.norm().item() ** 2
+                          for p in self.v_net.parameters()
+                          if p.grad is not None) ** 0.5
+        self.v_optimizer.zero_grad()
+
+        # --- Policy net (device 0): forward pass ---
+        rep_dev = 0
+        with torch.no_grad():
+            p_out = self.p_nets[rep_dev](self.probe_device_obss[:, rep_dev])
+        p_mean_avg = p_out.mean().item()
+        p_std_avg = p_out.std().item()
+
+        # --- Policy net: gradient norm ---
+        self.set_requires_grad(self.v_net, False)
+        self.p_optimizers[rep_dev].zero_grad()
+        joint_acts_mod = self.probe_joint_acts.clone()
+        p_acts = self.p_nets[rep_dev](self.probe_device_obss[:, rep_dev])
+        server_logits = p_acts[:, :S]
+        cont_all = p_acts[:, S:S + 3 * ae_dim]
+        cont_compressed = cont_all.reshape(-1, 3, ae_dim).mean(dim=-1)
+        compressed_act = torch.cat([server_logits, cont_compressed], dim=-1)
+        s = rep_dev * compressed_dim
+        e = (rep_dev + 1) * compressed_dim
+        joint_acts_mod[:, s:e] = compressed_act
+        p_loss = (-self.v_net(self.probe_states, joint_acts_mod)).mean()
+        p_loss.backward()
+        p_grad_norm = sum(p.grad.data.norm().item() ** 2
+                          for p in self.p_nets[rep_dev].parameters()
+                          if p.grad is not None) ** 0.5
+        self.p_optimizers[rep_dev].zero_grad()
+        self.set_requires_grad(self.v_net, True)
+
+        print(f"[PROBE] train_call={self.train_call_cnt} | "
+              f"v_out: mean={v_mean:.4f} std={v_std:.4f} | "
+              f"v_grad_norm={v_grad_norm:.4f} | "
+              f"p_out(dev{rep_dev}): mean={p_mean_avg:.4f} std={p_std_avg:.4f} | "
+              f"p_grad_norm={p_grad_norm:.4f}")
+
     def train_nets(self, total_time_slots, replay_buffer):
         if total_time_slots >= self.warm_time_slots:
+            self.train_call_cnt += 1
+
             batch_slots = (total_time_slots + self.gen_task_cycle - 1)//self.gen_task_cycle
             if batch_slots < self.buffer_size:
                 # Buffer not full yet — sample only from valid range
@@ -304,13 +491,11 @@ class MaddpgEdgeAgent():
                 batch_ids = np.random.choice(range(self.buffer_size),
                                                 self.train_batch_size, replace = False)
 
+            # capture probe batch on first call
+            if self.probe_batch is None:
+                self._capture_probe_batch(replay_buffer)
+
             '''training data'''
-            # batch_states: [batch_size, value_input_obs_dim]
-            # batch_device_obss: [batch_size, device_num, policy_input_dim]
-            # batch_joint_acts: [batch_size, value_input_act_dim]
-            # batch_joint_rewards: [batch_size, 1]
-            # batch_next_states: [batch_size, value_input_obs_dim]
-            # batch_next_device_obss: [batch_size, device_num, policy_input_dim]
             self.train_update_cnt += 1
             batch_states, batch_device_obss, \
             batch_joint_acts, batch_joint_rewards, \
@@ -327,6 +512,9 @@ class MaddpgEdgeAgent():
 
             if self.use_lr_decay:
                 self.decay_lr(total_time_slots)
+
+            # evaluate probe batch after training
+            self._eval_probe_batch()
 
     def train_value_net(self, batch_states, batch_joint_acts,
                               batch_joint_rewards,
