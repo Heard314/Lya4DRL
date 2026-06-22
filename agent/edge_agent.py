@@ -43,15 +43,9 @@ class MappoEdgeAgent():
 
         self.device_type_num = gen_params.device_type_num
 
-        # value network
-        self.v_nets = []
-        self.v_optimizers = []
-        for i in range(self.device_type_num):
-            v_net = MappoValueNet(alg_params, i).to(self.device)
-            self.v_nets.append(v_net)
-            v_optimizer = torch.optim.Adam(v_net.parameters(),
-                                            lr = self.v_lr)
-            self.v_optimizers.append(v_optimizer)
+        # value network (single global critic)
+        self.v_net = MappoValueNet(alg_params).to(self.device)
+        self.v_optimizer = torch.optim.Adam(self.v_net.parameters(), lr=self.v_lr)
         # policy networks
         self.p_nets = []
         self.p_optimizers = []
@@ -65,11 +59,9 @@ class MappoEdgeAgent():
             
         # load networks' weights
         if gen_params.load_weights:
-            print(f"Loading value network from: {self.weights_dir}v_net_params.pkl")
-            for i in range(self.device_type_num):
-                v_path = self.weights_dir + "v_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
-                print(f"[DEBUG] Loading value network {i} from: ", v_path)
-                self.v_nets[i].load_state_dict(torch.load(v_path, map_location=self.device))
+            v_path = self.weights_dir + "v_net_params_" + str(gen_params.resume_episode) + ".pkl"
+            print(f"Loading value network from: {v_path}")
+            self.v_net.load_state_dict(torch.load(v_path, map_location=self.device))
             print(f"Loading policy networks from: {self.weights_dir}p_net_params.pkl")
             for i in range(self.device_num):
                 p_path = self.weights_dir + "p_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
@@ -91,38 +83,37 @@ class MappoEdgeAgent():
         acts           = acts.to(self.device)
         act_logprobs   = act_logprobs.to(self.device)
         active_masks   = active_masks.to(self.device)
-        for k in range(self.device_type_num):
-            v_inputs_, v_tags_, advs_ = replay_buffers.get_value_net_training_data(k, self.v_nets[k])
-            v_inputs_       = v_inputs_.to(self.device)
-            v_tags_         = v_tags_.to(self.device)
-            advs_           = advs_.to(self.device)
-            self.train_value_net(k, v_inputs_, v_tags_)
 
-            for i in self.device_in_types[k]:
-                # 训练策略网络依然只用局部信息
-                self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs_, active_masks=active_masks[:, i])
-            
+        v_inputs_, v_tags_, advs_ = replay_buffers.get_value_net_training_data(self.v_net)
+        v_inputs_       = v_inputs_.to(self.device)
+        v_tags_         = v_tags_.to(self.device)
+        advs_           = advs_.to(self.device)
+        self.train_value_net(v_inputs_, v_tags_)
+
+        for i in range(self.device_num):
+            self.train_policy_net(i, p_inputs[:, i], acts[:, i], act_logprobs[:, i], advs_, active_masks=active_masks[:, i])
+
         if self.use_lr_decay:
             self.decay_lr()
-    
-    def train_value_net(self, queue_id, v_inputs, v_tags):
-        
+
+    def train_value_net(self, v_inputs, v_tags):
+
         total_size = self.train_freq * self.buffer_train_time_slots
         for e in range(self.v_epochs):
             for ids in BatchSampler(SubsetRandomSampler(range(total_size)),
                                     self.train_batch_size, False):
-                vs = self.v_nets[queue_id](v_inputs[ids])
-                
+                vs = self.v_net(v_inputs[ids])
+
                 loss = F.mse_loss(v_tags[ids], vs)
-                
-                self.v_optimizers[queue_id].zero_grad()
+
+                self.v_optimizer.zero_grad()
                 loss.backward()
-                
+
                 # gradient clip
                 if self.use_grad_clip:
-                    torch.nn.utils.clip_grad_norm_(self.v_nets[queue_id].parameters(), 
+                    torch.nn.utils.clip_grad_norm_(self.v_net.parameters(),
                                                    self.v_grad_clip)
-                self.v_optimizers[queue_id].step()
+                self.v_optimizer.step()
 
     def train_policy_net(self, agent_id, p_inputs, acts, act_logprobs, advs,
                           active_masks):
@@ -189,29 +180,27 @@ class MappoEdgeAgent():
                 self.p_optimizers[agent_id].step()
 
     def decay_lr(self):
-        if self.v_lr > self.min_v_lr:  
+        if self.v_lr > self.min_v_lr:
             self.v_lr *= self.decay_fac
-            for i in range(self.device_type_num):
-                for params in self.v_optimizers[i].param_groups:
-                    params['lr'] = self.v_lr
-        
-        if self.p_lr > self.min_p_lr:  
+            for params in self.v_optimizer.param_groups:
+                params['lr'] = self.v_lr
+
+        if self.p_lr > self.min_p_lr:
             self.p_lr *= self.decay_fac
             for i in range(self.device_num):
                 for params in self.p_optimizers[i].param_groups:
                     params['lr'] = self.p_lr
-        
+
     def save_nets(self, e_id, seed):
         if not os.path.exists(self.weights_dir):
             os.makedirs(self.weights_dir)
-        
-        for i in range(self.device_type_num):
-            torch.save(self.v_nets[i].state_dict(), 
-                    self.weights_dir + "v_net_params_" + str(i) + "_" + str(e_id) + ".pkl")
-        
+
+        torch.save(self.v_net.state_dict(),
+                self.weights_dir + "v_net_params_" + str(e_id) + ".pkl")
+
         for i in range(self.device_num):
             torch.save(self.p_nets[i].state_dict(),
-                       self.weights_dir + "p_net_params_" + str(i) + "_" + str(e_id) + ".pkl")        
+                       self.weights_dir + "p_net_params_" + str(i) + "_" + str(e_id) + ".pkl")
 
         train_info = {
             "resume_episode": e_id,
@@ -264,21 +253,12 @@ class MaddpgEdgeAgent():
         self.p_decay_fac = alg_params.p_decay_fac
         self.v_decay_fac = alg_params.v_decay_fac
         self.tau = alg_params.tau
-        self.v_nets = []
-        self.target_v_nets = []
-        self.v_optimizers = []
-        for i in range(self.device_type_num):
-            # value network
-            v_net = MaddpgValueNet(alg_params, i).to(self.device)
-            self.v_nets.append(v_net)
-            # target value network
-            target_v_net = MaddpgValueNet(alg_params, i).to(self.device)
-            target_v_net.load_state_dict(v_net.state_dict())
-            self.target_v_nets.append(target_v_net)
-            # optimizer
-            v_optimizer = torch.optim.Adam(v_net.parameters(),
-                                            lr = self.v_lr)
-            self.v_optimizers.append(v_optimizer)
+
+        # single global value network
+        self.v_net = MaddpgValueNet(alg_params).to(self.device)
+        self.target_v_net = MaddpgValueNet(alg_params).to(self.device)
+        self.target_v_net.load_state_dict(self.v_net.state_dict())
+        self.v_optimizer = torch.optim.Adam(self.v_net.parameters(), lr=self.v_lr)
 
         self.p_nets = []
         self.target_p_nets = []
@@ -295,16 +275,14 @@ class MaddpgEdgeAgent():
             p_optimizer = torch.optim.Adam(p_net.parameters(),
                                             lr = self.p_lr)
             self.p_optimizers.append(p_optimizer)
-    
 
         # load networks' weights
         if gen_params.load_weights:
-            for i in range(self.device_type_num):
-                v_path = self.weights_dir + "v_net_params_" + str(i) + f"{gen_params.resume_episode}.pkl"
-                self.v_nets[i].load_state_dict(torch.load(v_path, map_location=self.device))
-                target_v_path = self.weights_dir + "target_v_net_params_" + str(i) + f"{gen_params.resume_episode}.pkl"
-                self.target_v_nets[i].load_state_dict(torch.load(target_v_path, map_location=self.device))
-        
+            v_path = self.weights_dir + "v_net_params_" + f"{gen_params.resume_episode}.pkl"
+            self.v_net.load_state_dict(torch.load(v_path, map_location=self.device))
+            target_v_path = self.weights_dir + "target_v_net_params_" + f"{gen_params.resume_episode}.pkl"
+            self.target_v_net.load_state_dict(torch.load(target_v_path, map_location=self.device))
+
             for i in range(self.device_num):
                 p_path = self.weights_dir + "p_net_params_" + str(i) + f"_{gen_params.resume_episode}.pkl"
                 self.p_nets[i].load_state_dict(torch.load(p_path))
@@ -325,44 +303,33 @@ class MaddpgEdgeAgent():
             else:
                 batch_ids = np.random.choice(range(self.buffer_size),
                                                 self.train_batch_size, replace = False)
-                
+
             '''training data'''
-            # batch_states: [device_type_num, batch_size, state_dim]
-            # batch_device_obss: [batch_size, device_num, obs_dim]
-            # batch_joint_acts: [device_type_num, batch_size, joint_act_dim]
-            # batch_joint_rewards: [device_type_num, batch_size, device_type_num]
-            # batch_next_states: [device_type_num, batch_size, state_dim]
-            # batch_next_device_obss: [batch_size, device_num, obs_dim]
+            # batch_states: [batch_size, value_input_obs_dim]
+            # batch_device_obss: [batch_size, device_num, policy_input_dim]
+            # batch_joint_acts: [batch_size, value_input_act_dim]
+            # batch_joint_rewards: [batch_size, 1]
+            # batch_next_states: [batch_size, value_input_obs_dim]
+            # batch_next_device_obss: [batch_size, device_num, policy_input_dim]
             self.train_update_cnt += 1
             batch_states, batch_device_obss, \
             batch_joint_acts, batch_joint_rewards, \
             batch_next_states, batch_next_device_obss = replay_buffer.sample(batch_ids)
 
-            batch_states = batch_states
-            batch_device_obss = batch_device_obss
-            batch_joint_acts = batch_joint_acts
-            batch_joint_rewards = batch_joint_rewards
-            batch_next_states = batch_next_states
-            batch_next_device_obss = batch_next_device_obss
-            # print(f"[DEBUG] the train_update_cnt is: {self.train_update_cnt}")
             for _ in range(self.critic_updates_round):
-                # print(f"[DEBUG] Training critic networks at update cnt: {self.train_update_cnt}")
-                for i in range(self.device_type_num):
-                    self.train_value_net(i, batch_states[i], batch_joint_acts[i], 
-                                        batch_joint_rewards[i],
-                                        batch_next_states[i], batch_next_device_obss)
+                self.train_value_net(batch_states, batch_joint_acts,
+                                    batch_joint_rewards,
+                                    batch_next_states, batch_next_device_obss)
             if self.train_update_cnt % self.policy_delay_round == 0:
-                # print(f"[DEBUG] Training policy networks at update cnt: {self.train_update_cnt}")
-                for i in range(self.device_type_num):
-                    for j in self.device_in_types[i]:
-                        self.train_policy_net(j, i, batch_states[i], batch_device_obss[:, j], 
-                                            batch_joint_acts[i])
+                for i in range(self.device_num):
+                    self.train_policy_net(i, batch_states, batch_device_obss[:, i],
+                                        batch_joint_acts)
 
             if self.use_lr_decay:
                 self.decay_lr(total_time_slots)
 
-    def train_value_net(self, queue_id, batch_states, batch_joint_acts,
-                              batch_joint_rewards, 
+    def train_value_net(self, batch_states, batch_joint_acts,
+                              batch_joint_rewards,
                               batch_next_states, batch_next_device_obss):
         batch_states = batch_states.to(self.device)
         batch_joint_acts = batch_joint_acts.to(self.device)
@@ -373,7 +340,7 @@ class MaddpgEdgeAgent():
             S = self.edge_server_num
             ae_dim = self.action_encode_dim
             batch_next_joint_acts = []
-            for i in self.device_in_types[queue_id]:
+            for i in range(self.device_num):
                 batch_next_acts = self.target_p_nets[i](batch_next_device_obss[:, i])
                 # Compress: S logits + 3 averaged continuous per device
                 server_logits = batch_next_acts[:, :S]
@@ -382,40 +349,39 @@ class MaddpgEdgeAgent():
                 cont_compressed = cont_blocks.mean(dim=-1)
                 compressed = torch.cat([server_logits, cont_compressed], dim=-1)  # [B, S+3]
                 batch_next_joint_acts.append(compressed)
-            # [batch_size, joint_act_dim]
-            batch_next_joint_acts = torch.concat(batch_next_joint_acts, dim = -1)
+            # [batch_size, device_num * (S+3)]
+            batch_next_joint_acts = torch.concat(batch_next_joint_acts, dim=-1)
             # [batch_size, 1]
-            next_qs = self.target_v_nets[queue_id](batch_next_states, batch_next_joint_acts)
+            next_qs = self.target_v_net(batch_next_states, batch_next_joint_acts)
             target_qs = batch_joint_rewards + self.gamma * next_qs
             target_qs = target_qs.detach()
 
         for i in range(self.v_epochs):
             # [batch_size, 1]
-            qs = self.v_nets[queue_id](batch_states, batch_joint_acts)
-            
+            qs = self.v_net(batch_states, batch_joint_acts)
+
             v_loss = F.mse_loss(target_qs, qs)
-            
-            self.v_optimizers[queue_id].zero_grad()
+
+            self.v_optimizer.zero_grad()
             v_loss.backward()
             # gradient clip
             if self.use_grad_clip:
-                torch.nn.utils.clip_grad_norm_(self.v_nets[queue_id].parameters(), 
+                torch.nn.utils.clip_grad_norm_(self.v_net.parameters(),
                                                self.v_grad_clip)
-            self.v_optimizers[queue_id].step()
+            self.v_optimizer.step()
             
     def set_requires_grad(self, net, flag):
         for p in net.parameters():
             p.requires_grad_(flag)
 
-    def train_policy_net(self, agent_id, queue_id, batch_states, batch_device_obss, batch_joint_acts):
+    def train_policy_net(self, agent_id, batch_states, batch_device_obss, batch_joint_acts):
         batch_states = batch_states.to(self.device)
         batch_device_obss = batch_device_obss.to(self.device)
         batch_joint_acts = batch_joint_acts.to(self.device)
-        agent_id_in_type = agent_id - self.device_in_types[queue_id][0]
         S = self.edge_server_num
         ae_dim = self.action_encode_dim
         compressed_dim = S + 3  # per-device compressed action for Critic
-        # self.set_requires_grad(self.v_nets[queue_id], False)
+        self.set_requires_grad(self.v_net, False)
         for i in range(self.p_epochs):
             batch_joint_acts_ = batch_joint_acts.clone()
             batch_acts = self.p_nets[agent_id](batch_device_obss)
@@ -427,21 +393,21 @@ class MaddpgEdgeAgent():
             cont_compressed = cont_blocks.mean(dim=-1)  # [B, 3]
             compressed_act = torch.cat([server_logits, cont_compressed], dim=-1)  # [B, S+3]
 
-            s = agent_id_in_type * compressed_dim
-            e = (agent_id_in_type + 1) * compressed_dim
+            s = agent_id * compressed_dim
+            e = (agent_id + 1) * compressed_dim
             batch_joint_acts_[:, s:e] = compressed_act
 
-            p_loss = (-self.v_nets[queue_id](batch_states, batch_joint_acts_)).mean()
+            p_loss = (-self.v_net(batch_states, batch_joint_acts_)).mean()
 
             self.p_optimizers[agent_id].zero_grad()
             p_loss.backward()
 
             # gradient clip
             if self.use_grad_clip:
-                torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(), 
+                torch.nn.utils.clip_grad_norm_(self.p_nets[agent_id].parameters(),
                                                self.p_grad_clip)
             self.p_optimizers[agent_id].step()
-        # self.set_requires_grad(self.v_nets[queue_id], True)
+        self.set_requires_grad(self.v_net, True)
 
     @torch.no_grad()
     def soft_update(self, target_net, online_net, tau):
@@ -452,43 +418,38 @@ class MaddpgEdgeAgent():
 
     def update_target_nets(self, total_time_slots):
         if total_time_slots >= self.warm_time_slots:
-            for i in range(self.device_type_num):
-                self.soft_update(self.target_v_nets[i], self.v_nets[i], self.tau)
-            
+            self.soft_update(self.target_v_net, self.v_net, self.tau)
+
             for i in range(self.device_num):
                 self.soft_update(self.target_p_nets[i], self.p_nets[i], self.tau)
-                
+
     def decay_lr(self, total_time_slots):
         if total_time_slots % self.decay_intl == 0:
             if self.v_lr > self.min_v_lr:
                 self.v_lr -= self.v_decay_fac
                 self.v_lr = max(self.v_lr, self.min_v_lr)
-                for i in range(self.device_type_num):
-                    for params in self.v_optimizers[i].param_groups:
-                        params['lr'] = self.v_lr
-            
+                for params in self.v_optimizer.param_groups:
+                    params['lr'] = self.v_lr
+
             if self.p_lr > self.min_p_lr:
                 self.p_lr -= self.p_decay_fac
                 self.p_lr = max(self.p_lr, self.min_p_lr)
                 for i in range(self.device_num):
                     for params in self.p_optimizers[i].param_groups:
                         params['lr'] = self.p_lr
-        
+
     def save_nets(self, total_time_slots):
         if not os.path.exists(self.weights_dir):
             os.makedirs(self.weights_dir)
-        for i in range(self.device_type_num):
-            torch.save(self.v_nets[i].state_dict(),
-                    self.weights_dir + "v_net_params_" + 
-                    str(i) + "_" + str(total_time_slots) + ".pkl")
-            torch.save(self.target_v_nets[i].state_dict(),
-                    self.weights_dir + "target_v_net_params_" + 
-                    str(i) + "_" + str(total_time_slots) + ".pkl")
-        
+        torch.save(self.v_net.state_dict(),
+                self.weights_dir + "v_net_params_" + str(total_time_slots) + ".pkl")
+        torch.save(self.target_v_net.state_dict(),
+                self.weights_dir + "target_v_net_params_" + str(total_time_slots) + ".pkl")
+
         for i in range(self.device_num):
             torch.save(self.p_nets[i].state_dict(),
-                       self.weights_dir + "p_net_params_" + 
+                       self.weights_dir + "p_net_params_" +
                        str(i) + "_" + str(total_time_slots) + ".pkl")
             torch.save(self.target_p_nets[i].state_dict(),
-                       self.weights_dir + "target_p_net_params_" + 
+                       self.weights_dir + "target_p_net_params_" +
                        str(i) + "_" + str(total_time_slots) + ".pkl")

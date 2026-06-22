@@ -58,27 +58,12 @@ class MappoReplayBuffer():
             self.ps[0] = (self.ps[0] + 1) % (self.train_freq)
         self.ps[1] = (self.ps[1] + 1) % (self.buffer_train_time_slots + 1)
 
-    def package_value_inputs(self, train_episode, train_time_slot, queue_id):
+    def package_value_inputs(self, train_episode, train_time_slot):
         v_input = []
-        ae_dim = self.action_encode_dim
-        S = self.action_dim - 3 * ae_dim  # server count
-
-        for dev_id in self.device_in_types[queue_id]:
-            # Global edge_obs (shared across all devices)
+        for dev_id in range(self.device_num):
             for i in range(self.edge_queue_obs_dim):
                 _append_flat(v_input, self.edge_obs[train_episode][train_time_slot][i])
             _append_flat(v_input, self.device_obss[train_episode][train_time_slot][dev_id])
-
-        # Add compressed joint actions (S+3 per device)
-        for dev_id in self.device_in_types[queue_id]:
-            full_act = self.device_acts[train_episode][train_time_slot][dev_id]
-            # server logits: S dims
-            for i in range(S):
-                _append_flat(v_input, full_act[i])
-            # 3 continuous: average each ae_dim block
-            for c in range(3):
-                block_sum = sum(full_act[S + c * ae_dim : S + (c + 1) * ae_dim])
-                _append_flat(v_input, block_sum / ae_dim)
 
         return torch.tensor(v_input, dtype=torch.float32).reshape(1, -1)
 
@@ -142,20 +127,18 @@ class MappoReplayBuffer():
         return p_inputs, \
                acts, act_logprobs, device_active
 
-    def get_value_net_training_data(self, queue_id, value_net):
+    def get_value_net_training_data(self, value_net):
         """
-        Build training data and compute GAE.
+        Build training data and compute GAE with global reward.
         value_net is already on some device (CPU or GPU).
         """
-        # print(f"get_value_net_training_data:value_input_dims {self.value_input_dims}")
         v_inputs = torch.zeros(
-            [self.train_freq, self.buffer_train_time_slots + 1, self.value_input_dims[queue_id]],
+            [self.train_freq, self.buffer_train_time_slots + 1, self.value_input_dims],
             dtype=torch.float32
         )
-        # print(f"v_inputs {v_inputs.shape}")
         for i in range(self.train_freq):
             for j in range(self.buffer_train_time_slots + 1):
-                inputs = self.package_value_inputs(i,j,queue_id)
+                inputs = self.package_value_inputs(i, j)
                 if not torch.is_tensor(inputs):
                     inputs = torch.as_tensor(inputs, dtype=torch.float32)
                 v_inputs[i, j] = inputs
@@ -163,15 +146,14 @@ class MappoReplayBuffer():
         # compute state values with value_net on its device -----
         dev_v = next(value_net.parameters()).device
         with torch.no_grad():
-            # move inputs to value_net device for forward
-            v_inputs_flat = v_inputs.reshape([-1, self.value_input_dims[queue_id]]).to(dev_v)
+            v_inputs_flat = v_inputs.reshape([-1, self.value_input_dims]).to(dev_v)
             vs = value_net(v_inputs_flat)  # [train_freq*(T+1), 1] on dev_v
-            # move back to CPU for further processing
             vs = vs.cpu().reshape([self.train_freq, self.buffer_train_time_slots + 1, 1])
 
         # compute GAE etc. on CPU -----
         jr = torch.as_tensor(self.joint_rewards, dtype=torch.float32)
-        rewards = jr[:, :self.buffer_train_time_slots, queue_id:queue_id+1]
+        # sum all task types' rewards into single global scalar
+        rewards = jr[:, :self.buffer_train_time_slots].sum(dim=-1, keepdim=True)
 
         # deltas: [train_freq, buffer_train_time_slots, 1]
         deltas = rewards + self.gamma * vs[:, 1: self.buffer_train_time_slots + 1] - \
@@ -191,9 +173,7 @@ class MappoReplayBuffer():
         advs = (advs - advs.mean()) / (advs.std() + 1e-5)
 
         # flatten value training data -----
-        # [train_freq * buffer_train_time_slots, state_dim]
-        v_inputs = v_inputs[:, 0: self.buffer_train_time_slots].reshape([-1, self.value_input_dims[queue_id]])
-        # [train_freq * buffer_train_time_slots, 1]
+        v_inputs = v_inputs[:, 0: self.buffer_train_time_slots].reshape([-1, self.value_input_dims])
         v_tags = v_tags.reshape([-1, 1])
 
         advs = advs.reshape([-1, 1])
@@ -212,8 +192,8 @@ class MaddpgReplayBuffer():
         self.action_dim = alg_params.action_dim
         self.action_encode_dim = alg_params.action_encode_dim
         self.value_input_dims = alg_params.value_input_dims
-        self.value_input_obs_dims = alg_params.value_input_obs_dims
-        self.value_input_act_dims = alg_params.value_input_act_dims
+        self.value_input_obs_dim = alg_params.value_input_obs_dim
+        self.value_input_act_dim = alg_params.value_input_act_dim
         self.edge_obss = [None for i in range(self.buffer_size)]
         self.device_obss = [None for i in range(self.buffer_size)]
         self.device_acts = [None for i in range(self.buffer_size)]
@@ -236,12 +216,11 @@ class MaddpgReplayBuffer():
         # update position
         self.ps = (self.ps + 1) % self.buffer_size
 
-    def package_value_inputs(self, batch_id, queue_id):
+    def package_value_inputs(self, batch_id):
         v_input = []
         next_v_input = []
 
-        for dev_id in self.device_in_types[queue_id]:
-            # Global edge_obs (shared across all devices)
+        for dev_id in range(self.device_num):
             for i in range(self.edge_queue_obs_dim):
                 _append_flat(v_input, self.edge_obss[batch_id][i])
                 _append_flat(next_v_input, self.next_edge_obss[batch_id][i])
@@ -266,85 +245,49 @@ class MaddpgReplayBuffer():
         return torch.tensor(p_input, dtype=torch.float32).reshape(1, -1), torch.tensor(next_p_input, dtype=torch.float32).reshape(1, -1)
 
     '''
-    batch_states:             v_net输入,按queue_id划分 [device_type_num, batch_size, state_dim]
-    batch_device_obss:        p_net输入,按device_id划分 [batch_size, device_num, obs_dim]
-    batch_joint_acts:         v_net输出,按queue_id划分 [device_type_num, batch_size, joint_act_dim]
-    batch_joint_rewards:      v_net输入,按queue_id划分 [device_type_num, batch_size, device_type_num]
-    batch_next_states:        v_net输入,按queue_id划分 [device_type_num, batch_size, state_dim]
-    batch_next_device_obss:   p_net输入,按device_id划分 [batch_size, device_num, obs_dim]
+    batch_states:             v_net输入 [batch_size, state_dim] (all devices)
+    batch_device_obss:        p_net输入 [batch_size, device_num, obs_dim]
+    batch_joint_acts:         v_net输入 [batch_size, joint_act_dim] (all devices)
+    batch_joint_rewards:      v_net输入 [batch_size, 1] (sum of all types)
+    batch_next_states:        v_net输入 [batch_size, state_dim]
+    batch_next_device_obss:   p_net输入 [batch_size, device_num, obs_dim]
     '''
     def sample(self, batch_ids):
-        # states and device obss
-        # next states and device obss
-        batch_states = [
-            torch.zeros((len(batch_ids), self.value_input_obs_dims[i]), dtype=torch.float32)
-            for i in range(self.device_type_num)
-        ]
-        batch_next_states = [
-            torch.zeros((len(batch_ids), self.value_input_obs_dims[i]), dtype=torch.float32)
-            for i in range(self.device_type_num)
-        ]
-        batch_device_obss = torch.zeros(
-            [len(batch_ids), self.device_num,  self.policy_input_dim],
-            dtype=torch.float32
-        )
-        batch_next_device_obss = torch.zeros(
-            [len(batch_ids), self.device_num,  self.policy_input_dim],
-            dtype=torch.float32
-        )
-        j = 0
-        for id_ in batch_ids:
-            for i in range(self.device_type_num):
-                state, next_state = self.package_value_inputs(id_,i)
-                state = state.reshape(-1)
-                next_state = next_state.reshape(-1)
-                batch_states[i][j] = state
-                batch_next_states[i][j] = next_state
-            j += 1
-        
-        j = 0
-        for id_ in batch_ids:
-            for i in range(self.device_num):
-                device_obs, next_device_obs = self.package_policy_input(id_, i)
-                device_obs = device_obs.reshape(-1)
-                next_device_obs = next_device_obs.reshape(-1)
-                batch_device_obss[j][i] = device_obs
-                batch_next_device_obss[j][i] = next_device_obs
-            j += 1
-
-        # joint actions — compressed from S+3*ae_dim to S+3 per device
         S = self.edge_queue_obs_dim // 2
         ae_dim = self.action_encode_dim
-        batch_joint_acts = [
-            torch.zeros((len(batch_ids), self.value_input_act_dims[i]), dtype=torch.float32)
-            for i in range(self.device_type_num)
-        ]
+
+        batch_states = torch.zeros((len(batch_ids), self.value_input_obs_dim), dtype=torch.float32)
+        batch_next_states = torch.zeros((len(batch_ids), self.value_input_obs_dim), dtype=torch.float32)
+        batch_device_obss = torch.zeros([len(batch_ids), self.device_num, self.policy_input_dim], dtype=torch.float32)
+        batch_next_device_obss = torch.zeros([len(batch_ids), self.device_num, self.policy_input_dim], dtype=torch.float32)
+        batch_joint_acts = torch.zeros((len(batch_ids), self.value_input_act_dim), dtype=torch.float32)
+        batch_joint_rewards = torch.zeros((len(batch_ids), 1), dtype=torch.float32)
+
         j = 0
         for id_ in batch_ids:
-            for k in range(self.device_type_num):
-                joint_act = []
-                for i in self.device_in_types[k]:
-                    full_act = self.device_acts[id_][i]  # [S + 3*ae_dim]
-                    # server_logits: S dims
-                    server_logits = full_act[:S]
-                    # continuous: 3*ae_dim dims → average to 3 dims
-                    cont_all = full_act[S:S + 3 * ae_dim]
-                    cont_3 = [sum(cont_all[c * ae_dim : (c + 1) * ae_dim]) / ae_dim for c in range(3)]
-                    joint_act.extend(server_logits + cont_3)
-                joint_act = torch.tensor(joint_act, dtype=torch.float32).reshape(-1)
-                batch_joint_acts[k][j] = joint_act
+            state, next_state = self.package_value_inputs(id_)
+            batch_states[j] = state.reshape(-1)
+            batch_next_states[j] = next_state.reshape(-1)
+
+            for i in range(self.device_num):
+                device_obs, next_device_obs = self.package_policy_input(id_, i)
+                batch_device_obss[j][i] = device_obs.reshape(-1)
+                batch_next_device_obss[j][i] = next_device_obs.reshape(-1)
+
+            joint_act = []
+            for i in range(self.device_num):
+                full_act = self.device_acts[id_][i]  # [S + 3*ae_dim]
+                server_logits = full_act[:S]
+                cont_all = full_act[S:S + 3 * ae_dim]
+                cont_3 = [sum(cont_all[c * ae_dim : (c + 1) * ae_dim]) / ae_dim for c in range(3)]
+                joint_act.extend(server_logits + cont_3)
+            batch_joint_acts[j] = torch.tensor(joint_act, dtype=torch.float32).reshape(-1)
+
+            # global reward: sum of all type rewards
+            batch_joint_rewards[j] = sum(self.joint_rewards[id_])
+
             j += 1
 
-        # joint rewards
-        batch_joint_rewards = [
-            torch.zeros((len(batch_ids), 1), dtype=torch.float32)
-            for i in range(self.device_type_num)
-        ]
-        j = 0
-        for id_ in batch_ids:
-            for k in range(self.device_type_num):
-                batch_joint_rewards[k][j] = self.joint_rewards[id_][k]
-            j += 1
         return batch_states, batch_device_obss, \
                 batch_joint_acts, batch_joint_rewards, \
                 batch_next_states, batch_next_device_obss

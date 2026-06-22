@@ -361,7 +361,7 @@ S = edge_server_num
 ppo_device_obs_dim = 5 + S  # one-hot服务器编号 + trans_rates + queue + vir_queue + 3 task fields
 ppo_edge_queue_obs_dim = 2 * S  # per-server actual + virtual queues
 ppo_policy_input_dim = ppo_device_obs_dim + ppo_edge_queue_obs_dim
-ppo_value_input_dims = [n * ppo_policy_input_dim + n * (S + 3) for n in [2, 4, 4]]
+ppo_value_input_dims = device_num * (ppo_device_obs_dim + ppo_edge_queue_obs_dim)
 action_encode_dim = 1  # encoding dims per continuous action variable
 ppo_action_dim = S + 3 * action_encode_dim  # S server logits + 3*ae_dim continuous
 def get_mappo_params():
@@ -375,7 +375,7 @@ def get_mappo_params():
     parser.add_argument("--edge_queue_obs_dim", type = int, default = ppo_edge_queue_obs_dim,
                         help = "the dimension of edge queues' observations")
 
-    parser.add_argument("--value_input_dims", type = list, default = ppo_value_input_dims,
+    parser.add_argument("--value_input_dims", type = int, default = ppo_value_input_dims,
                         help = "the dimension of value network input")
     
     parser.add_argument("--policy_input_dim", type = int, default = ppo_policy_input_dim,
@@ -480,9 +480,9 @@ maddpg params
 device_obs_dim = 5 + S  # one-hot服务器编号 + trans_rates + queue + vir_queue + 3 task fields
 edge_queue_obs_dim = 2 * S  # per-server actual + virtual queues
 action_dim = S + 3 * action_encode_dim  # S server logits + 3*ae_dim continuous
-value_input_obs_dims = [n * (device_obs_dim + edge_queue_obs_dim) for n in [2, 4, 4]]
-value_input_act_dims = [n * (S + 3) for n in [2, 4, 4]]  # joint_act in S+3 compressed form
-value_input_dims = [obs + act for obs, act in zip(value_input_obs_dims, value_input_act_dims)]
+value_input_obs_dim = device_num * (device_obs_dim + edge_queue_obs_dim)
+value_input_act_dim = device_num * (S + 3)  # joint_act in S+3 compressed form
+value_input_dims = value_input_obs_dim + value_input_act_dim
 policy_input_dim = device_obs_dim + edge_queue_obs_dim
 maddpg_train_episodes = 20000
 maddpg_time_slots = 3000
@@ -507,13 +507,13 @@ def get_maddpg_params():
     parser.add_argument("--edge_queue_obs_dim", type = int, default = edge_queue_obs_dim,
                         help = "the dimension of edge queues' observations")
 
-    parser.add_argument("--value_input_obs_dims", type = list, default = value_input_obs_dims,
+    parser.add_argument("--value_input_obs_dim", type = int, default = value_input_obs_dim,
                         help = "the dimension of value network input's obs part")
 
-    parser.add_argument("--value_input_act_dims", type = list, default = value_input_act_dims,
+    parser.add_argument("--value_input_act_dim", type = int, default = value_input_act_dim,
                         help = "the dimension of value network input's action part")
 
-    parser.add_argument("--value_input_dims", type = list, default = value_input_dims,
+    parser.add_argument("--value_input_dims", type = int, default = value_input_dims,
                         help = "the dimension of value network input")
     
     parser.add_argument("--policy_input_dim", type = int, default = policy_input_dim,
