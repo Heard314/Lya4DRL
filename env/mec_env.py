@@ -248,8 +248,8 @@ class MECEnv():
             actual_scale_negfac = self.device_num * device_act_queue_reward_min_bound * self.edge_queue_reward_bound_fac
             virtual_scale_negfac = self.device_num * device_vir_queue_reward_min_bound * self.edge_queue_reward_bound_fac
 
-            edge_act_queue_reward_weight = 0.85 * self.device_act_queue_reward_weight * self.device_num * 1.0 / self.delta / tightest_dly
-            edge_vir_queue_reward_weight = 0.85 * self.device_vir_queue_reward_weight * self.device_num
+            edge_act_queue_reward_weight = self.device_act_queue_reward_weight * self.device_num * 1.0 / self.delta / tightest_dly
+            edge_vir_queue_reward_weight = self.device_vir_queue_reward_weight * self.device_num
 
             edge_queue_rewards = [0.0] * edge_queue_num
             edge_queue_actual_rewards = [0.0] * edge_queue_num

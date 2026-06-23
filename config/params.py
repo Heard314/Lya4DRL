@@ -247,7 +247,7 @@ def get_general_params():
                         help = "the b parameter for edge weight linear function")
 
     parser.add_argument("--device_dly_adj_fac", type = list,
-                        default = [1.0]*edge_queue_num,
+                        default = [0.8]*edge_queue_num,
                         # default = [0.8]*edge_queue_num,
                         help = "the weights of tasks' device computation queue overtime threshold factor.")
 
