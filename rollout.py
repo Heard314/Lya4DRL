@@ -314,7 +314,7 @@ class Rollout:
             next_edge_obs, next_device_obss, device_task_is_available = self.mec_env.step(device_acts_, e_id = e_id, t_id = t_id, visualize = visualize)
             
             # update computing-queue lengths
-            edge_comp_qls = [next_edge_obs[i * 2] for i in range(self.device_type_num)]  # per-server actual queue
+            edge_comp_qls = [next_edge_obs[i * 2] for i in range(self.edge_server_num)]  # per-server actual queue
             edge_vir_qls = [next_edge_obs[i * 2 + 1] for i in range(self.edge_server_num)]  # per-server virtual queue
             device_comp_qls = [obs[1] for obs in next_device_obss]
 
