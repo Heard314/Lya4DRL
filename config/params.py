@@ -199,7 +199,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.7, 2.0], [1.2, 1.5], [2.8, 3.2]],
+        default=[[1.0, 2.0], [2.0, 4.0], [4.0, 8.0]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -207,7 +207,7 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[2.8, 3.2], [3.8, 4.5], [1.7, 2.1]],
+        default=[[0.0, 8.0], [0.0, 4.0], [0.0, 2.0]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     parser.add_argument("--comp_dly_thre", type = list, 
