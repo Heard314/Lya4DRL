@@ -61,13 +61,21 @@ class RewardScaling():
 
     def __call__(self, rewards):
         if self.train_mode == "mappo":
-            for i in range(len(self.R)):
-                self.R[i] = self.gamma * self.R[i] + rewards[i]
-                self.r_running_ms[i].update(self.R[i])
-            rewards = [float(rewards[i] / (self.r_running_ms[i].std + 1e-8)) for i in range(len(rewards))]
+            if isinstance(rewards, (list, tuple, np.ndarray, torch.Tensor)):
+                for i in range(len(self.R)):
+                    self.R[i] = self.gamma * self.R[i] + rewards[i]
+                    self.r_running_ms[i].update(self.R[i])
+                rewards = [float(rewards[i] / (self.r_running_ms[i].std + 1e-8)) for i in range(len(rewards))]
+            else:
+                self.R[0] = self.gamma * self.R[0] + float(rewards)
+                self.r_running_ms[0].update(self.R[0])
+                rewards = float(rewards / (self.r_running_ms[0].std + 1e-8))
         elif self.train_mode == "maddpg":
             reward_scale = 1e-4
-            rewards = [ri * reward_scale for ri in rewards]
+            if isinstance(rewards, (list, tuple, np.ndarray)):
+                rewards = [ri * reward_scale for ri in rewards]
+            else:
+                rewards = float(rewards) * reward_scale
         return rewards
         
     # reset 'R' when an episode is done
