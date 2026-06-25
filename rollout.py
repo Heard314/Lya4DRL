@@ -119,6 +119,7 @@ class Rollout:
                 + "runs/"
                 + run_dir
             )
+        os.makedirs(self.tb_log_dir, exist_ok=True)
         self.writer = SummaryWriter(log_dir=f"{self.tb_log_dir}/")
         print(f"The tensorboard file path is {self.tb_log_dir}")
         self.log_txt_dir_name = (
@@ -178,7 +179,7 @@ class Rollout:
         self.device_num_per_type = gen_params.device_num_per_type
         self.device_types = gen_params.device_types
 
-        self.joint_rewards = None
+        self.joint_reward = None
         self.device_rewards = None
         self.joint_cost = None
         self.device_costs = None
@@ -200,7 +201,7 @@ class Rollout:
             if hasattr(agent, "reset_ou"):
                 agent.reset_ou()
 
-        self.joint_rewards = np.zeros([self.device_type_num], dtype = np.float32)
+        self.joint_reward = 0.0
         self.device_rewards = np.zeros([self.device_num], dtype = np.float32)
         self.joint_cost = 0
         self.device_costs = np.zeros([self.device_num], dtype = np.float32)
@@ -230,7 +231,7 @@ class Rollout:
             device_obss[i] = self.mec_env.device_envs[i].get_obs()
 
         edge_comp_qls = [edge_obs[i * 2] for i in range(self.edge_server_num)]  # per-server actual queue
-        device_comp_qls = [obs[1] for obs in device_obss]
+        device_comp_qls = [obs[self.edge_server_num] for obs in device_obss]  # time_ql at index S
         # obs scaling
         if hasattr(self, "obs_scaling"):
             edge_obs, device_obss = self.obs_scaling(edge_obs, device_obss)
@@ -307,7 +308,7 @@ class Rollout:
 
 
             # step
-            joint_rewards, device_rewards, \
+            joint_reward, device_rewards, \
             joint_cost, device_costs, \
             comp_dlys, device_csum_engys, \
             device_esum_engys, device_overtime_nums, \
@@ -316,10 +317,10 @@ class Rollout:
             # update computing-queue lengths
             edge_comp_qls = [next_edge_obs[i * 2] for i in range(self.edge_server_num)]  # per-server actual queue
             edge_vir_qls = [next_edge_obs[i * 2 + 1] for i in range(self.edge_server_num)]  # per-server virtual queue
-            device_comp_qls = [obs[1] for obs in next_device_obss]
+            device_comp_qls = [obs[self.edge_server_num] for obs in next_device_obss]  # time_ql at index S
 
             if t_id % gen_task_cycle == start_t_id:
-                self.average(gen_t_id, joint_rewards, device_rewards,
+                self.average(gen_t_id, joint_reward, device_rewards,
                                 joint_cost, device_costs,
                                 comp_dlys, device_csum_engys,
                                 device_esum_engys, device_overtime_nums,
@@ -328,8 +329,8 @@ class Rollout:
             
             # reward scaling
             if hasattr(self, "reward_scaling"):
-                joint_rewards = self.reward_scaling(joint_rewards)
-            # print(f"[DEBUG] joint_rewards: {joint_rewards}")
+                joint_reward = self.reward_scaling(joint_reward)
+            # print(f"[DEBUG] joint_reward: {joint_reward}")
             # obs scaling
             if hasattr(self, "obs_scaling"):
                 next_edge_obs, next_device_obss = self.obs_scaling(next_edge_obs, next_device_obss)
@@ -338,10 +339,10 @@ class Rollout:
                 if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "mappo":
                     self.replay_buffer.store(edge_obs, device_obss,
                                             device_acts, device_act_logprobs,
-                                            joint_rewards, device_active)
+                                            joint_reward, device_active)
                 if not (self.evaluate or gp.settings.is_evaluate) and self.train_mode == "maddpg":
                     self.replay_buffer.store(edge_obs, device_obss,
-                                            device_acts, joint_rewards,
+                                            device_acts, joint_reward,
                                             next_edge_obs, next_device_obss)
             
             # update obs
@@ -378,7 +379,7 @@ class Rollout:
             if (e_id + 1) % self.save_freq == 0:
                 self.edge_agent.save_nets(e_id, self.seed)
 
-        joint_rewards = copy.copy(self.joint_rewards)
+        joint_reward = copy.copy(self.joint_reward)
         device_rewards = copy.copy(self.device_rewards)
         joint_cost = copy.copy(self.joint_cost)
         device_costs = copy.copy(self.device_costs)
@@ -400,50 +401,36 @@ class Rollout:
                 out_dir=gp.settings.plot_dir
             )
 
-        # tensorboard log (always write) + console print (every 40 episodes)
-        verbose = (e_id % 40 == 0)
-        for i in range(self.device_type_num):
-            writer.add_scalar(f"joint_reward_{i}{'_eval' if gp.settings.is_evaluate else ''}", joint_rewards[i], e_id)
-            if verbose: print(f"joint_reward_{i}: {joint_rewards[i]}")
+        # tensorboard log
+        writer.add_scalar(f"joint_reward{'_eval' if gp.settings.is_evaluate else ''}", joint_reward, e_id)
         writer.add_scalar(f"joint_cost{'_eval' if gp.settings.is_evaluate else ''}", joint_cost, e_id)
-        if verbose: print(f"joint_cost: {joint_cost}")
         for i in range(self.edge_server_num):
             writer.add_scalar(f"edge_comp_ql_s{i}{'_eval' if gp.settings.is_evaluate else ''}", edge_comp_qls[i], e_id)
             writer.add_scalar(f"edge_vir_ql_s{i}{'_eval' if gp.settings.is_evaluate else ''}", edge_vir_qls[i], e_id)
-            if verbose: print(f"edge_comp_ql_s{i}: {edge_comp_qls[i]}, edge_vir_ql_s{i}: {edge_vir_qls[i]}")
         for i in range(self.device_num):
             writer.add_scalar(f"device_reward_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_rewards[i], e_id)
-            if verbose: print(f"device_reward_{i}: {device_rewards[i]}")
             writer.add_scalar(f"device_cost_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_costs[i], e_id)
-            if verbose: print(f"device_cost_{i}: {device_costs[i]}")
             writer.add_scalar(f"device_comp_ql_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_comp_qls[i], e_id)
-            if verbose: print(f"device_comp_ql_{i}: {device_comp_qls[i]}")
             writer.add_scalar(f"device_virtual_time_ql_{i}{'_eval' if gp.settings.is_evaluate else ''}", self.mec_env.device_envs[i].virtual_time_ql, e_id)
-            if verbose: print(f"device_virtual_time_ql_{i}: {self.mec_env.device_envs[i].virtual_time_ql}")
             writer.add_scalar(f"comp_dlys_{i}{'_eval' if gp.settings.is_evaluate else ''}", comp_dlys[i], e_id)
-            if verbose: print(f"comp_dlys_{i}: {comp_dlys[i]}")
             writer.add_scalar(f"device_csum_engys_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_csum_engys[i], e_id)
-            if verbose: print(f"device_csum_engys_{i}: {device_csum_engys[i]}")
             writer.add_scalar(f"device_overtime_nums_{i}{'_eval' if gp.settings.is_evaluate else ''}", device_overtime_nums[i], e_id)
-            if verbose: print(f"device_overtime_nums_{i}: {device_overtime_nums[i]}")
-        
-        if e_id % 50 == 0:
-            self.writer.flush()
+        writer.flush()
 
-        return joint_rewards, device_rewards, \
+        return joint_reward, device_rewards, \
                joint_cost, device_costs, \
                edge_comp_qls, edge_vir_qls, device_comp_qls, \
                comp_dlys, device_csum_engys, \
                device_esum_engys, device_overtime_nums
     
     # Update only when new tasks arrive in the time slot
-    def average(self, gen_t_id, joint_rewards, device_rewards,
+    def average(self, gen_t_id, joint_reward, device_rewards,
                             joint_cost, device_costs,
                             comp_dlys, device_csum_engys,
                             device_esum_engys, device_overtime_nums,
                             device_task_is_available, edge_comp_qls, edge_vir_qls, device_comp_qls):
         gen_t_id_ = gen_t_id + 1
-        self.joint_rewards += 1 / gen_t_id_ * (joint_rewards - self.joint_rewards)
+        self.joint_reward += 1 / gen_t_id_ * (joint_reward - self.joint_reward)
         self.device_rewards += 1 / gen_t_id_ * (device_rewards - self.device_rewards)
         self.joint_cost += 1 / gen_t_id_ * (joint_cost - self.joint_cost)
         self.device_costs += 1 / gen_t_id_ * (device_costs - self.device_costs)

@@ -88,7 +88,7 @@ class MECEnv():
         edge_queue_rewards = [0.0 for _ in range(edge_queue_num)]
         edge_queue_actual_rewards = [0.0 for _ in range(edge_queue_num)]
         edge_queue_virtual_rewards = [0.0 for _ in range(edge_queue_num)]
-        joint_rewards = [0.0 for _ in range(self.device_type_num)]  # per-type for value nets
+        joint_reward = 0.0  # single global scalar for value net
         joint_cost = 0
         device_costs = [0 for i in range(self.device_num)]
         device_comp_dlys = [0 for i in range(self.device_num)]
@@ -290,23 +290,33 @@ class MECEnv():
                         {f"ep_{e_id}_vir": edge_queue_virtual_rewards[s]},
                         t_id
                     )
-
-            # Assemble per-type joint rewards (all servers' edge rewards shared across types)
-            for i in range(self.device_type_num):
-                joint_rewards[i] = sum(edge_queue_rewards)
-                joint_cost_per_type = 0.0
-                for j in self.device_in_types[i]:
-                    joint_rewards[i] += device_rewards[j]
-                    joint_cost_per_type += device_costs[j]
-                if visualize:
                     writer.add_scalars(
-                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_reward_{i}",
-                        {f"ep_{e_id}": joint_rewards[i]},
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_ql_act_s{s}",
+                        {f"ep_{e_id}": edge_env.edge_queue_time_ql},
                         t_id
                     )
                     writer.add_scalars(
+                        f"detail{'_eval' if gp.settings.is_evaluate else ''}/edge_ql_vir_s{s}",
+                        {f"ep_{e_id}": edge_env.virtual_edge_queue_time_ql},
+                        t_id
+                    )
+
+            # Assemble single global joint reward
+            joint_reward = sum(edge_queue_rewards) + sum(device_rewards)
+            joint_cost_per_type = [0.0 for _ in range(self.device_type_num)]
+            for i in range(self.device_type_num):
+                for j in self.device_in_types[i]:
+                    joint_cost_per_type[i] += device_costs[j]
+            if visualize:
+                writer.add_scalars(
+                    f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_reward",
+                    {f"ep_{e_id}": joint_reward},
+                    t_id
+                )
+                for i in range(self.device_type_num):
+                    writer.add_scalars(
                         f"detail{'_eval' if gp.settings.is_evaluate else ''}/joint_cost_{i}",
-                        {f"ep_{e_id}": joint_cost_per_type},
+                        {f"ep_{e_id}": joint_cost_per_type[i]},
                         t_id
                     )
             joint_cost = sum(device_costs)
@@ -328,7 +338,7 @@ class MECEnv():
             next_device_obss[i] = self.device_envs[i].get_obs()
             # print(f"device_id {i}, next_device_obss: {next_device_obss[i]}")
 
-        return joint_rewards, device_rewards, \
+        return joint_reward, device_rewards, \
                joint_cost, device_costs, \
                device_comp_dlys, device_csum_engys, \
                device_esum_engys, device_overtime_nums, \

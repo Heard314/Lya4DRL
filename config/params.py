@@ -486,7 +486,7 @@ value_input_dims = value_input_obs_dim + value_input_act_dim
 policy_input_dim = device_obs_dim + edge_queue_obs_dim
 maddpg_train_episodes = 20000
 maddpg_time_slots = 3000
-maddpg_train_freq = 4
+maddpg_train_freq = 2
 maddpg_update_freq = 8
 maddpg_lr_decay_freq = 100
 maddpg_p_lr = 5e-5
@@ -525,7 +525,7 @@ def get_maddpg_params():
     parser.add_argument("--action_dim", type = int, default = action_dim,
                         help = "the dimension of agents' actions")
 
-    parser.add_argument("--v_hid_dims", type = list, default = [128, 128],
+    parser.add_argument("--v_hid_dims", type = list, default = [512, 256],
                         help = "the dimension of value network's hidden layers")
 
     parser.add_argument("--p_hid_dims", type = list, default = [128, 128],
@@ -583,7 +583,7 @@ def get_maddpg_params():
     parser.add_argument("--min_p_lr", type = float, default = maddpg_p_min_lr,
                         help = "the minimal learning-rate of policy networks")
     
-    parser.add_argument("--critic_updates_round", type = int, default = 1,
+    parser.add_argument("--critic_updates_round", type = int, default = 3,
                         help = "the number of critic network updates per training")
 
     parser.add_argument("--policy_delay_round", type = int, default = 1,

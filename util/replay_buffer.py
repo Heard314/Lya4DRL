@@ -152,8 +152,8 @@ class MappoReplayBuffer():
 
         # compute GAE etc. on CPU -----
         jr = torch.as_tensor(self.joint_rewards, dtype=torch.float32)
-        # sum all task types' rewards into single global scalar
-        rewards = jr[:, :self.buffer_train_time_slots].sum(dim=-1, keepdim=True)
+        # joint_reward is already a single global scalar per slot
+        rewards = jr[:, :self.buffer_train_time_slots].unsqueeze(-1)
 
         # deltas: [train_freq, buffer_train_time_slots, 1]
         deltas = rewards + self.gamma * vs[:, 1: self.buffer_train_time_slots + 1] - \
@@ -283,8 +283,8 @@ class MaddpgReplayBuffer():
                 joint_act.extend(server_logits + cont_3)
             batch_joint_acts[j] = torch.tensor(joint_act, dtype=torch.float32).reshape(-1)
 
-            # global reward: sum of all type rewards
-            batch_joint_rewards[j] = sum(self.joint_rewards[id_])
+            # global reward: single scalar per slot
+            batch_joint_rewards[j] = self.joint_rewards[id_]
 
             j += 1
 

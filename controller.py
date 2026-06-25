@@ -126,12 +126,12 @@ class Controller:
             if e_id % 800 == 0:
                 visualize = True
 
-            joint_rewards, device_rewards, \
+            joint_reward, device_rewards, \
             joint_cost, device_costs, \
             edge_comp_ql, edge_vir_ql, device_comp_qls, \
             device_comp_dlys, device_csum_engys, \
             device_esum_engys, device_overtime_nums = self.rollout.run(e_id, visualize=visualize)
-            
+
             if e_id % 800 == 0:
                 print("------------------evaluation after episode: " + str(e_id) + "------------------")
                 gp.settings.is_evaluate = True
@@ -142,7 +142,7 @@ class Controller:
             
 
             # collection
-            self.joint_rewards_col.append(joint_rewards)
+            self.joint_rewards_col.append(joint_reward)
             self.device_rewards_col.append(device_rewards)
             self.joint_cost_col.append(joint_cost)
             self.device_costs_col.append(device_costs)
@@ -178,7 +178,7 @@ class Controller:
         self.rollout.writer.close()
 
     def evaluate(self):
-        joint_rewards = np.zeros([self.device_type_num], dtype = np.float32)
+        joint_reward = 0.0
         device_rewards = np.zeros([self.device_num], dtype = np.float32)
         joint_cost = 0
         device_costs = np.zeros([self.device_num], dtype = np.float32)
@@ -189,7 +189,7 @@ class Controller:
         device_csum_engys = np.zeros([self.device_num], dtype = np.float32)
         device_esum_engys = np.zeros([self.device_num], dtype = np.float32)
         device_overtime_nums = np.zeros([self.device_num], dtype = np.float32)
-        
+
         for e_id in range(1, self.eval_episodes + 1):
             if e_id % 40 == 0:
                 print("------------------evaluate episode: " + str(e_id) + "------------------")
@@ -197,13 +197,13 @@ class Controller:
             visualize = False
             if e_id % 20 == 0:
                 visualize = True
-            joint_rewards_, device_rewards_, \
+            joint_reward_, device_rewards_, \
             joint_cost_, device_costs_, \
             edge_comp_ql_, edge_vir_ql_, device_comp_qls_, \
             device_comp_dlys_, device_csum_engys_, \
             device_comp_expns_, device_overtime_nums_ = self.rollout.run(e_id, visualize=visualize)
-            
-            joint_rewards += joint_rewards_
+
+            joint_reward += joint_reward_
             device_rewards += device_rewards_
             joint_cost += joint_cost_
             device_costs += device_costs_
@@ -217,7 +217,7 @@ class Controller:
         self.rollout.writer.close()
 
         # averages
-        joint_rewards /= self.eval_episodes
+        joint_reward /= self.eval_episodes
         device_rewards /= self.eval_episodes
         joint_cost /= self.eval_episodes
         device_costs /= self.eval_episodes
@@ -228,8 +228,8 @@ class Controller:
         device_csum_engys /= self.eval_episodes
         device_esum_engys /= self.eval_episodes
         device_overtime_nums /= self.eval_episodes
-        
-        return joint_rewards, device_rewards, \
+
+        return joint_reward, device_rewards, \
                joint_cost, device_costs, \
                edge_comp_ql, edge_vir_ql, device_comp_qls, \
                device_comp_dlys, device_csum_engys, \
