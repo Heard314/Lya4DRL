@@ -38,7 +38,7 @@ def get_general_params():
     parser.add_argument("--eval_seed", type = int, default = 7878,
                         help = "evaluation random-seed")
     
-    parser.add_argument("--train_seed", type = int, default = 7878,
+    parser.add_argument("--train_seed", type = int, default = 8484,
                     help = "training random-seed")
 
     parser.add_argument("--eval_freq", type = int, default = 400,
@@ -73,7 +73,7 @@ def get_general_params():
     parser.add_argument("--device_types", type = list, 
                         # default = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4],
                         # default = [0]*4 + [1]*2 + [2]*2 + [3]*1 + [4]*1,
-                        default = [0]*2 + [1]*4 + [2]*4,
+                        default = [0]*4 + [1]*4 + [2]*2,
                         help = "the types of devices")
 
     parser.add_argument("--device_in_types", type = list, 
@@ -92,16 +92,16 @@ def get_general_params():
                         #     [9]
                         # ],
                         default = [
-                            [0,1],
-                            [2,3,4,5],
-                            [6,7,8,9],
+                            [0,1,2,3],
+                            [4,5,6,7],
+                            [8,9],
                         ],
                         help = "all devices nums for each types")
 
     parser.add_argument("--device_num_per_type", type = list, 
                         # default = [20,10,10,5,5],
                         # default = [4,2,2,1,1],
-                        default = [2,4,4],
+                        default = [4,4,2],
                         help = "the number of devices for each type")
 
     parser.add_argument("--device_type_num", type = int, 
@@ -184,7 +184,7 @@ def get_general_params():
                         help = "the min distance between end device and edge server. (m)")
     
     parser.add_argument("--device_comp_freqs", type = list,
-                        default = [2.5]*edge_queue_num,
+                        default = [3.0]*edge_queue_num,
                         help = "the computation frequencies of devices (Gcycles/s)")
     
     parser.add_argument("--std_comp_freq", type = float, default = 2, 
