@@ -1,5 +1,6 @@
-"""1 server, 10 devices — no queue reward baseline"""
-import sys, os
+"""reward_scale_coef = 0.01"""
+import sys
+import os
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_SCRIPT_DIR)))
 os.chdir(_PROJ_ROOT)
@@ -11,7 +12,9 @@ from controller import Controller
 sys.argv = [
     "main",
     "--train_mode", "maddpg",
-    "--run_desc", "single_1s10d_no_queue",
+    "--run_desc", "v_coef_0_01",
+    "--enable_virtual_queue_reward",
+    "--reward_scale_coef", "0.01",
     "--device_vir_queue_reward_weight", "-700",
     "--device_act_queue_reward_weight", "-300",
     "--device_act_queue_reward_max_bound", "200",
@@ -24,27 +27,8 @@ sys.argv = [
     "--edge_vir_queue_growth_rate", "0.1",
     "--timeout_reward_penalty", "-4000",
     "--target_reward_penalty", "-80",
-    # single server
-    "--edge_server_num", "1",
-    # network dims (S=1, device_num=10)
-    "--device_obs_dim", "6",
-    "--edge_queue_obs_dim", "2",
-    "--action_dim", "4",
-    "--value_input_obs_dim", "80",
-    "--value_input_act_dim", "40",
-    "--value_input_dims", "120",
-    "--policy_input_dim", "8",
 ]
 
 gen_params = get_general_params()
-gen_params.device_types = [0]*2 + [1]*4 + [2]*4
-gen_params.device_in_types = [
-    list(range(0, 2)),
-    list(range(2, 6)),
-    list(range(6, 10)),
-]
-gen_params.device_num_per_type = [2, 4, 4]
-gen_params.data_size_inls = [[0.0, 4.0], [0.0, 2.0], [0.0, 1.0]]
-
 ctr = Controller(gen_params)
 ctr.train()

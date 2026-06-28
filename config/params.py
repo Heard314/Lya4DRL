@@ -73,7 +73,7 @@ def get_general_params():
     parser.add_argument("--device_types", type = list, 
                         # default = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4],
                         # default = [0]*4 + [1]*2 + [2]*2 + [3]*1 + [4]*1,
-                        default = [0]*4 + [1]*4 + [2]*2,
+                        default = [0]*2 + [1]*4 + [2]*4,
                         help = "the types of devices")
 
     parser.add_argument("--device_in_types", type = list, 
@@ -92,16 +92,16 @@ def get_general_params():
                         #     [9]
                         # ],
                         default = [
-                            [0,1,2,3],
-                            [4,5,6,7],
-                            [8,9],
+                            [0,1],
+                            [2,3,4,5],
+                            [6,7,8,9],
                         ],
                         help = "all devices nums for each types")
 
     parser.add_argument("--device_num_per_type", type = list, 
                         # default = [20,10,10,5,5],
                         # default = [4,2,2,1,1],
-                        default = [4,4,2],
+                        default = [2,4,4],
                         help = "the number of devices for each type")
 
     parser.add_argument("--device_type_num", type = int, 
@@ -199,7 +199,7 @@ def get_general_params():
         type=list,
         # default=[[0.9, 1.2], [0.9, 1.0], [0.5, 2.0],
         #         [1.4, 1.5], [0.6, 1.2]],
-        default=[[1.0, 2.0], [2.0, 4.0], [4.0, 8.0]],
+        default=[[0.0, 8.0], [0.0, 4.0], [0.0, 2.0]],
         help="the data-size intervals of tasks (Mbits)"
     )
 
@@ -207,7 +207,7 @@ def get_general_params():
         "--comp_dens_inls",
         type=list,
         # default=[[0.3, 0.4], [0.6, 0.8], [0.15, 0.2]],
-        default=[[0.0, 8.0], [0.0, 4.0], [0.0, 2.0]],
+        default=[[1.0, 2.0], [2.0, 4.0], [4.0, 8.0]],
         help="the computation-density intervals of tasks (GFLOPs/Mbits)"
     )
     parser.add_argument("--comp_dly_thre", type = list, 
@@ -247,12 +247,12 @@ def get_general_params():
                         help = "the b parameter for edge weight linear function")
 
     parser.add_argument("--device_dly_adj_fac", type = list,
-                        default = [0.8]*edge_queue_num,
+                        default = [0.95]*edge_queue_num,
                         # default = [0.8]*edge_queue_num,
                         help = "the weights of tasks' device computation queue overtime threshold factor.")
 
     parser.add_argument("--edge_dly_adj_fac", type = list, 
-                        default = [0.8]*edge_queue_num,
+                        default = [0.95]*edge_queue_num,
                         # default = [0.6]*edge_queue_num,
                         help = "the weights of tasks' edge computation queue overtime threshold factor.")
 
@@ -287,7 +287,7 @@ def get_general_params():
                         help = "The Lyapunov Drift-Plus-Penalty weight for edge queues")
 
     parser.add_argument("--edge_queue_reward_bound_fac", type = float,
-                        default = 0.85,
+                        default = 1.0,
                         help = "The bound multi factor for edge queue reward")
 
     # navie reward
@@ -342,7 +342,20 @@ def get_general_params():
     parser.add_argument("--enable_trace", action="store_true",
                         help = "enable detailed per-slot variable tracing to trace log")
 
+    parser.add_argument("--reward_scale_coef", type = float, default = 1.0,
+                        help = "global scale coefficient for queue reward weights and bounds")
+
     params, _ = parser.parse_known_args()
+
+    # apply reward scale coefficient
+    c = params.reward_scale_coef
+    if c != 1.0:
+        params.device_act_queue_reward_weight *= c
+        params.device_vir_queue_reward_weight *= c
+        params.device_act_queue_reward_max_bound *= c
+        params.device_act_queue_reward_min_bound *= c
+        params.device_vir_queue_reward_max_bound *= c
+        params.device_vir_queue_reward_min_bound *= c
 
     # compute server positions
     S_ = params.edge_server_num
@@ -364,6 +377,7 @@ ppo_policy_input_dim = ppo_device_obs_dim + ppo_edge_queue_obs_dim
 ppo_value_input_dims = device_num * (ppo_device_obs_dim + ppo_edge_queue_obs_dim)
 action_encode_dim = 1  # encoding dims per continuous action variable
 ppo_action_dim = S + 3 * action_encode_dim  # S server logits + 3*ae_dim continuous
+ppo_train_episodes = 8000
 def get_mappo_params():
     parser = argparse.ArgumentParser(description = "mappo params", add_help=False, allow_abbrev=False)
 
@@ -398,7 +412,7 @@ def get_mappo_params():
                         help = "whether to use orthogonal-initialization")
     
     # training
-    parser.add_argument("--train_episodes", type = int, default = 30000,
+    parser.add_argument("--train_episodes", type = int, default = ppo_train_episodes,
                         help = "the number of training episodes")
 
     parser.add_argument("--train_time_slots", type = int, default = 3000,
@@ -484,7 +498,7 @@ value_input_obs_dim = device_num * (device_obs_dim + edge_queue_obs_dim)
 value_input_act_dim = device_num * (S + 3)  # joint_act in S+3 compressed form
 value_input_dims = value_input_obs_dim + value_input_act_dim
 policy_input_dim = device_obs_dim + edge_queue_obs_dim
-maddpg_train_episodes = 20000
+maddpg_train_episodes = 8000
 maddpg_time_slots = 3000
 maddpg_train_freq = 2
 maddpg_update_freq = 8

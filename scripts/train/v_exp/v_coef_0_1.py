@@ -1,5 +1,6 @@
-"""Task computation ablation: +2 Gcycle average increase (no queue reward)"""
-import sys, os
+"""reward_scale_coef = 0.1"""
+import sys
+import os
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_SCRIPT_DIR)))
 os.chdir(_PROJ_ROOT)
@@ -11,7 +12,9 @@ from controller import Controller
 sys.argv = [
     "main",
     "--train_mode", "maddpg",
-    "--run_desc", "task_comp_plus2_no_queue",
+    "--run_desc", "v_coef_0_1",
+    "--enable_virtual_queue_reward",
+    "--reward_scale_coef", "0.1",
     "--device_vir_queue_reward_weight", "-700",
     "--device_act_queue_reward_weight", "-300",
     "--device_act_queue_reward_max_bound", "200",
@@ -27,8 +30,5 @@ sys.argv = [
 ]
 
 gen_params = get_general_params()
-gen_params.data_size_inls = [[1.8, 2.3], [1.3, 1.7], [3.3, 4.5]]
-gen_params.comp_dens_inls = [[2.8, 3.3], [5.8, 6.8], [2.1, 2.5]]
-
 ctr = Controller(gen_params)
 ctr.train()

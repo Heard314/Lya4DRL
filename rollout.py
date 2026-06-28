@@ -31,6 +31,22 @@ class Rollout:
         root_path = gp.settings.exp_result_dir
         run_dir = gp.settings.run_dir
 
+        # --- per-algorithm learning rate override ---
+        _virtual = gen_params.enable_virtual_queue_reward
+        _actual = gen_params.enable_actual_queue_reward
+        _mode   = gen_params.train_mode
+
+        if _mode == "maddpg":
+            if _virtual and not _actual:
+                # my_exp (virtual queue reward only): lower LR to stabilise training
+                alg_params.p_lr = 2e-5
+                alg_params.v_lr = 5e-5
+        elif _mode == "mappo":
+            if _virtual and not _actual:
+                # my_exp PPO (virtual queue reward only): lower LR
+                alg_params.p_lr = 5e-5
+                alg_params.v_lr = 5e-5
+
         # edge agent and replay buffer
         if (not self.evaluate and self.train_mode == "mappo") or \
             (self.evaluate and self.eval_mode == "mappo"):

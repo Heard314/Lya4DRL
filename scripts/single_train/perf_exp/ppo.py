@@ -36,14 +36,14 @@ sys.argv = [
 ]
 
 gen_params = get_general_params()
-gen_params.device_types = [0]*4 + [1]*4 + [2]*2
+gen_params.device_types = [0]*2 + [1]*4 + [2]*4
 gen_params.device_in_types = [
-    list(range(0, 4)),
-    list(range(4, 8)),
-    list(range(8, 10)),
+    list(range(0, 2)),
+    list(range(2, 6)),
+    list(range(6, 10)),
 ]
-gen_params.device_num_per_type = [4, 4, 2]
-gen_params.comp_dens_inls = [[0.0, 4.0], [0.0, 2.0], [0.0, 1.0]]
+gen_params.device_num_per_type = [2, 4, 4]
+gen_params.data_size_inls = [[0.0, 4.0], [0.0, 2.0], [0.0, 1.0]]
 
 ctr = Controller(gen_params)
 ctr.train()

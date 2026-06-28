@@ -1,4 +1,4 @@
-"""1 server, 10 devices — no queue reward baseline"""
+"""1 server, 10 devices — device_dly_adj_fac=0.4, edge_dly_adj_fac=0.8"""
 import sys, os
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_SCRIPT_DIR)))
@@ -11,7 +11,8 @@ from controller import Controller
 sys.argv = [
     "main",
     "--train_mode", "maddpg",
-    "--run_desc", "single_1s10d_no_queue",
+    "--run_desc", "single_1s10d_thre_dev0_4_edge0_8",
+    "--enable_virtual_queue_reward",
     "--device_vir_queue_reward_weight", "-700",
     "--device_act_queue_reward_weight", "-300",
     "--device_act_queue_reward_max_bound", "200",
@@ -45,6 +46,9 @@ gen_params.device_in_types = [
 ]
 gen_params.device_num_per_type = [2, 4, 4]
 gen_params.data_size_inls = [[0.0, 4.0], [0.0, 2.0], [0.0, 1.0]]
+
+gen_params.device_dly_adj_fac = [0.4, 0.4, 0.4]
+gen_params.edge_dly_adj_fac = [0.8, 0.8, 0.8]
 
 ctr = Controller(gen_params)
 ctr.train()
