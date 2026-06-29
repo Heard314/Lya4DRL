@@ -11,8 +11,7 @@ from controller import Controller
 sys.argv = [
     "main",
     "--train_mode", "maddpg",
-    "--run_desc", "scale_3s25d_rt_ddpg_no_queue",
-    "--enable_actual_queue_reward",
+    "--run_desc", "scale_3s25d_rt_ddpg",
     "--device_vir_queue_reward_weight", "-700",
     "--device_act_queue_reward_weight", "-300",
     "--device_act_queue_reward_max_bound", "200",

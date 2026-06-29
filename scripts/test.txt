@@ -1,0 +1,10 @@
+python /root/Lya4DRL/scripts/train/v_exp/v_coef_0_1.py
+python /root/Lya4DRL/scripts/train/v_exp/v_coef_0_01.py
+python /root/Lya4DRL/scripts/train/v_exp/v_coef_1.py
+python /root/Lya4DRL/scripts/train/v_exp/v_coef_10.py
+python /root/Lya4DRL/scripts/train/v_exp/v_coef_100.py
+
+python /root/Lya4DRL/scripts/train/scale_3s25d/my_exp.py
+python /root/Lya4DRL/scripts/train/scale_3s25d/rt_ddpg.py
+python /root/Lya4DRL/scripts/train/scale_3s25d/ppo.py
+python /root/Lya4DRL/scripts/train/scale_3s25d/no_queue.py
