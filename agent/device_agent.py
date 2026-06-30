@@ -4,7 +4,6 @@ import torch
 from torch.distributions import Normal
 from network.policy_net import MaddpgPolicyNet, MappoPolicyNet
 from util.utils import GetPolicyInputs, GaussianNoise
-import math
 import config.global_params as gp
 
 class MappoDeviceAgent():
@@ -19,37 +18,6 @@ class MappoDeviceAgent():
         self.action_dim = alg_params.action_dim
         self.action_encode_dim = alg_params.action_encode_dim
         self.edge_server_num = gen_params.edge_server_num
-
-        #OU exploration params
-        self.use_ou_noise = gen_params.use_ou_noise
-        self.ou_theta = gen_params.ou_theta  # 越大回归越快，相关性越弱
-        self.ou_sigma = gen_params.ou_sigma   # 越大噪声越强
-        self.ou_dt    = gen_params.ou_dt
-        # ou noise
-        self.ou_scale = gen_params.ou_scale
-        # OU state, shape = [B, action_dim]
-        self._ou_state = None
-        self._ou_stationary_std = math.sqrt((self.ou_sigma ** 2) / (2.0 * self.ou_theta + 1e-8) + 1e-8)
-    
-    def reset_ou(self):
-        # Called once at the beginning of each episode to avoid noise drift across episodes
-        self._ou_state = None
-
-    def _ou_eps(self, device, batch_size, dim):
-        # Generate OU noise eps (time-correlated) and normalize it to approximately N(0, 1)
-        if (self._ou_state is None) or (self._ou_state.shape[0] != batch_size) or (self._ou_state.shape[1] != dim):
-            self._ou_state = torch.zeros(batch_size, dim, device=device)
-
-        z = torch.randn(batch_size, dim, device=device)  # OU noise
-        self._ou_state = (
-            self._ou_state
-            + self.ou_theta * (0.0 - self._ou_state) * self.ou_dt
-            + self.ou_sigma * math.sqrt(self.ou_dt) * z
-        )
-
-        # Normalization makes the marginal distribution closer to standard normal, then ou_scale controls exploration strength
-        eps = (self._ou_state / (self._ou_stationary_std + 1e-8)) * self.ou_scale
-        return eps
 
     def choose_action(self, obs, active: bool = True):
 
@@ -77,10 +45,7 @@ class MappoDeviceAgent():
             act = action.squeeze(0).tolist()
             act_logprob = None
         else:
-            if self.use_ou_noise:
-                eps = self._ou_eps(device=mean.device, batch_size=batch_size, dim=mean.size(-1))
-            else:
-                eps = torch.randn_like(mean).clamp(-3.0, 3.0)
+            eps = torch.randn_like(mean).clamp(-3.0, 3.0)
 
             ae_dim = self.action_encode_dim
             noise_scale = torch.tensor(

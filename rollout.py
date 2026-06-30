@@ -11,6 +11,7 @@ from util.replay_buffer import MappoReplayBuffer, MaddpgReplayBuffer
 from util.utils import ObsScaling, RewardScaling, concatenate
 from torch.utils.tensorboard import SummaryWriter
 import sys, atexit, os
+import random
 import config.global_params as gp
 class Rollout:
     def __init__(self, gen_params, alg_params):
@@ -91,10 +92,14 @@ class Rollout:
 
         # training
         if not self.evaluate:
-            # seed 
+            # seed
             self.seed = gp.settings.seed
-            torch.manual_seed(self.seed)
+            random.seed(self.seed)
             np.random.seed(self.seed)
+            torch.manual_seed(self.seed)
+            torch.cuda.manual_seed_all(self.seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
             self.train_mode = gen_params.train_mode
             self.train_time_slots = alg_params.train_time_slots
             self.train_freq = alg_params.train_freq
@@ -113,8 +118,12 @@ class Rollout:
         else:
             # fix random seed
             self.seed = gp.settings.seed
-            torch.manual_seed(gen_params.eval_seed)
+            random.seed(gen_params.eval_seed)
             np.random.seed(gen_params.eval_seed)
+            torch.manual_seed(gen_params.eval_seed)
+            torch.cuda.manual_seed_all(gen_params.eval_seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
             
             self.eval_time_slots = gen_params.eval_time_slots
 

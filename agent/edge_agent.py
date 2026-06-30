@@ -224,13 +224,7 @@ class MappoEdgeAgent():
                 
                 mask_b = active_masks[ids].reshape([-1]).to(acts.device, dtype=acts.dtype)
                 adv_b = advs[ids].reshape([-1])
-                m = (mask_b > 0)
-                if m.any():
-                    adv_sel = adv_b[m]
-                    adv_sel = (adv_sel - adv_sel.mean()).div(adv_sel.std().clamp_min(1e-8))
-                    adv_b = adv_b.clone()
-                    adv_b[m] = adv_sel
-                
+
                 # PPO-clip
                 surr1 = ratios * adv_b
                 surr2 = torch.clamp(ratios, 1 - self.p_clip, 1 + self.p_clip) * \
